@@ -6,7 +6,7 @@ import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
 import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import { Avatar } from "@/components/Avatar";
-import { ReviewQueueItem } from "./ReviewQueueItem";
+import { AutomationDecisionQueueItem, ReviewQueueItem } from "./ReviewQueueItem";
 import { ReviewQueueClientChangeItem } from "./ReviewQueueClientChangeItem";
 import { ReviewQueueDocumentItem } from "./ReviewQueueDocumentItem";
 import { Badge } from "@/components/ui/Badge";
@@ -119,6 +119,80 @@ export default async function ReviewQueuePage() {
   const openShares = (shares ?? []).filter((s) => s.status === "pending" || s.status === "corrections_requested");
   const resolvedShares = (shares ?? []).filter((s) => !openShares.includes(s));
 
+  const { data: pendingAutomationDecisions } = await supabase
+    .from("automation_pending_steps")
+    .select("id, run_id, automation_step_id, created_at")
+    .eq("workspace_id", workspace.id)
+    .eq("status", "pending_decision")
+    .order("created_at", { ascending: false });
+
+  const automationRunIds = Array.from(new Set((pendingAutomationDecisions ?? []).map((r) => r.run_id)));
+  const automationStepIds = Array.from(new Set((pendingAutomationDecisions ?? []).map((r) => r.automation_step_id)));
+
+  const [{ data: automationRuns }, { data: automationSteps }] = await Promise.all([
+    automationRunIds.length
+      ? supabase
+          .from("automation_runs")
+          .select("id, client_id, engagement_id")
+          .eq("workspace_id", workspace.id)
+          .in("id", automationRunIds)
+      : Promise.resolve({ data: [] as { id: string; client_id: string | null; engagement_id: string | null }[] }),
+    automationStepIds.length
+      ? supabase
+          .from("automation_steps")
+          .select("id, display_name, action_type, action_config")
+          .in("id", automationStepIds)
+      : Promise.resolve({ data: [] as { id: string; display_name: string | null; action_type: string; action_config: Record<string, unknown> }[] }),
+  ]);
+
+  const automationClientIds = Array.from(new Set((automationRuns ?? []).map((r) => r.client_id).filter((v): v is string => Boolean(v))));
+  const automationEngagementIds = Array.from(new Set((automationRuns ?? []).map((r) => r.engagement_id).filter((v): v is string => Boolean(v))));
+
+  const [{ data: automationClients }, { data: automationEngagements }] = await Promise.all([
+    automationClientIds.length
+      ? supabase.from("clients").select("id, client_type, first_name, last_name, business_name").in("id", automationClientIds)
+      : Promise.resolve({ data: [] as { id: string; client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }[] }),
+    automationEngagementIds.length
+      ? supabase.from("engagements").select("id, engagement_number").in("id", automationEngagementIds)
+      : Promise.resolve({ data: [] as { id: string; engagement_number: string | null }[] }),
+  ]);
+
+  const automationRunById = new Map((automationRuns ?? []).map((r) => [r.id, r]));
+  const automationStepById = new Map((automationSteps ?? []).map((s) => [s.id, s]));
+  const automationClientById = new Map((automationClients ?? []).map((c) => [c.id, c]));
+  const automationEngagementById = new Map((automationEngagements ?? []).map((e) => [e.id, e]));
+
+  const reviewDecisionItems = (pendingAutomationDecisions ?? [])
+    .map((p) => {
+      const step = automationStepById.get(p.automation_step_id);
+      if (!step || (step.action_config as Record<string, unknown> | null)?.decision_mode !== "review_queue") return null;
+      const run = automationRunById.get(p.run_id);
+      if (!run) return null;
+      const client = run.client_id ? automationClientById.get(run.client_id) : null;
+      const engagement = run.engagement_id ? automationEngagementById.get(run.engagement_id) : null;
+      const options = Array.isArray((step.action_config as Record<string, unknown>).decision_options)
+        ? ((step.action_config as Record<string, unknown>).decision_options as { key: string; label: string }[])
+        : [];
+      return {
+        id: p.id,
+        stepName: step.display_name ?? "Review Queue Decision",
+        clientName: clientLabel(client ?? null),
+        engagementNumber: engagement?.engagement_number ?? null,
+        engagementId: engagement?.id ?? null,
+        createdAt: p.created_at,
+        options,
+      };
+    })
+    .filter(Boolean) as {
+      id: string;
+      stepName: string;
+      clientName: string;
+      engagementNumber: string | null;
+      engagementId: string | null;
+      createdAt: string;
+      options: { key: string; label: string }[];
+    }[];
+
   const { data: pendingClientChanges } = await supabase
     .from("client_pending_changes")
     .select(
@@ -144,7 +218,11 @@ export default async function ReviewQueuePage() {
   );
 
   const totalPending =
-    clientChangeBatches.size + (submittedOrganizers ?? []).length + (completedDocumentRequests ?? []).length + openShares.length;
+    clientChangeBatches.size +
+    (submittedOrganizers ?? []).length +
+    (completedDocumentRequests ?? []).length +
+    openShares.length +
+    reviewDecisionItems.length;
 
   return (
     <>
@@ -169,6 +247,26 @@ export default async function ReviewQueuePage() {
           <StatTile icon={FileCheck2} tone="amber" label="Documents submitted" value={(completedDocumentRequests ?? []).length} />
           <StatTile icon={Share2} tone="violet" label="Shares awaiting review" value={openShares.length} />
         </div>
+        {reviewDecisionItems.length > 0 && (
+          <section>
+            <h2 className="mb-2 text-sm font-semibold text-ink">Workflow review decisions</h2>
+            <ul className="space-y-3">
+              {reviewDecisionItems.map((item) => (
+                <AutomationDecisionQueueItem
+                  key={item.id}
+                  pendingStepId={item.id}
+                  stepName={item.stepName}
+                  clientName={item.clientName}
+                  engagementNumber={item.engagementNumber}
+                  engagementId={item.engagementId}
+                  createdAt={item.createdAt}
+                  options={item.options}
+                />
+              ))}
+            </ul>
+          </section>
+        )}
+
         <section>
           <h2 className="mb-2 text-sm font-semibold text-ink">Client info changes</h2>
           {clientChangeBatches.size === 0 ? (
