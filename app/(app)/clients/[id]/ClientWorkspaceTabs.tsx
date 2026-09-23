@@ -254,7 +254,7 @@ export function OverviewTab({
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
           <Field label="Name" value={clientDisplayName(client)} />
           <Field label="Primary email" value={client.primary_email} />
-          <Field label="Primary phone" value={client.primary_phone ? formatPhone(client.primary_phone) : null} />
+          <Field label="Primary phone" value={client.primary_phone} />
           {client.client_type === "individual" ? (
             <>
               <TaxIdReveal clientId={client.id} kind="ssn" last4={client.ssn_last4} />
@@ -278,50 +278,51 @@ export function OverviewTab({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Emails</h3>
-            {emails.length === 0 ? (
-              <EmptyState message="No emails on file." />
-            ) : (
-              <ul className="divide-y divide-border">
-                {emails.map((e) => (
-                  <li key={e.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
-                    <span>
-                      {e.email}
-                      <span className="ml-2 text-xs capitalize text-muted">{e.email_type}</span>
-                      {e.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
-                    </span>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {!e.is_primary && <SetEmailPrimaryButton emailId={e.id} />}
-                      <DeleteEmailButton emailId={e.id} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+              {emails.length === 0 ? (
+                <EmptyState message="No emails on file." />
+              ) : (
+                <ul className="divide-y divide-border">
+                  {emails.map((e) => (
+                    <li key={e.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
+                      <span>
+                        {e.email}
+                        <span className="ml-2 text-xs capitalize text-muted">{e.email_type}</span>
+                        {e.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {!e.is_primary && <SetEmailPrimaryButton emailId={e.id} />}
+                        <DeleteEmailButton emailId={e.id} />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-          <div>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Phones</h3>
-            {phones.length === 0 ? (
-              <EmptyState message="No phones on file." />
-            ) : (
-              <ul className="divide-y divide-border">
-                {phones.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
-                    <span>
-                      {formatPhone(p.phone_number)}
-                      <span className="ml-2 text-xs capitalize text-muted">{p.phone_type}</span>
-                      {p.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
-                    </span>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {!p.is_primary && <SetPhonePrimaryButton phoneId={p.id} />}
-                      <DeletePhoneButton phoneId={p.id} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Phones</h3>
+              {phones.length === 0 ? (
+                <EmptyState message="No phones on file." />
+              ) : (
+                <ul className="divide-y divide-border">
+                  {phones.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
+                      <span>
+                        {formatPhone(p.phone_number)}
+                        <span className="ml-2 text-xs capitalize text-muted">{p.phone_type}</span>
+                        {p.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {!p.is_primary && <SetPhonePrimaryButton phoneId={p.id} />}
+                        <DeletePhoneButton phoneId={p.id} />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
-          </div>
+        </div>
 
         <div className="mt-4 border-t border-border pt-4">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Addresses</h3>
