@@ -21,7 +21,6 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
   const isDocumentRequests = activeTab === "document-requests";
 
   const supabase = createClient();
-  const orFilter = `workspace_id.is.null,workspace_id.eq.${workspaceId}`;
 
   const {
     data: { user },
@@ -41,7 +40,7 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
     ? await supabase
         .from("engagement_letter_templates")
         .select("id, name, status, workspace_id, folder_id, requires_signature, merge_fields")
-        .or(orFilter)
+        .eq("workspace_id", workspaceId)
         .order("name")
     : { data: null };
 
