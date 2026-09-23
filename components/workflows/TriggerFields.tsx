@@ -6,6 +6,7 @@ import { TagListInput } from "@/components/workflows/TagListInput";
 import { InlineStepPickerField } from "@/components/workflows/StepPicker";
 
 export type TemplateOption = { id: string; name: string };
+export type ServiceCategoryOption = { id: string; name: string; process_id?: string | null };
 export type PipelineOption = { id: string; name: string; stages: { id: string; name: string }[] };
 
 export const APPOINTMENT_STATUS_OPTIONS = ["scheduled", "confirmed", "completed", "cancelled", "no_show"];
@@ -118,6 +119,7 @@ export function triggerSummary(
   config: Record<string, unknown>,
   organizerTemplates: TemplateOption[],
   services: TemplateOption[] = [],
+  serviceCategories: ServiceCategoryOption[] = [],
   pipelines: PipelineOption[] = []
 ) {
   if (triggerType === "engagement.status_changed") {
@@ -136,6 +138,11 @@ export function triggerSummary(
   }
   if (triggerType === "client.service_interest_selected") {
     const serviceId = config.service_id as string | undefined;
+    const categoryId = config.service_category_id as string | undefined;
+    if (categoryId) {
+      const category = serviceCategories.find((c) => c.id === categoryId);
+      return `When a client selects a service in "${category?.name ?? "a category"}"`;
+    }
     if (!serviceId) return "When a client selects any service";
     const service = services.find((s) => s.id === serviceId);
     return `When a client selects "${service?.name ?? "a service"}"`;
@@ -304,6 +311,7 @@ export function TriggerFields({
   onConfigChange,
   organizerTemplates,
   services = [],
+  serviceCategories = [],
   pipelines = [],
   tagOptions = [],
   webhookUrl,
@@ -317,6 +325,7 @@ export function TriggerFields({
   onConfigChange: (c: Record<string, unknown>) => void;
   organizerTemplates: TemplateOption[];
   services?: TemplateOption[];
+  serviceCategories?: ServiceCategoryOption[];
   pipelines?: PipelineOption[];
   tagOptions?: string[];
   webhookUrl?: string;
@@ -412,6 +421,64 @@ export function TriggerFields({
             tagOptions={tagOptions}
           />
         </label>
+      )}
+
+      {triggerType === "client.service_interest_selected" && (
+        <div className="col-span-2 grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            Match by
+            <select
+              disabled={disabled}
+              value={(config.service_interest_match_type as string) ?? (config.service_category_id as string ? "category" : "service")}
+              onChange={(e) =>
+                onConfigChange(
+                  e.target.value === "category"
+                    ? {
+                        service_interest_match_type: "category",
+                        service_category_id: config.service_category_id ?? "",
+                        service_id: undefined,
+                      }
+                    : {
+                        service_interest_match_type: "service",
+                        service_id: config.service_id ?? "",
+                        service_category_id: undefined,
+                      }
+                )
+              }
+              className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            >
+              <option value="service">Service</option>
+              <option value="category">Category</option>
+            </select>
+          </label>
+          {((config.service_interest_match_type as string) ?? (config.service_category_id as string ? "category" : "service")) === "category" ? (
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Category
+              <select
+                disabled={disabled}
+                value={(config.service_category_id as string) ?? ""}
+                onChange={(e) => onConfigChange({ service_category_id: e.target.value })}
+                className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="" disabled>Choose a category</option>
+                {serviceCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+          ) : (
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Service
+              <select
+                disabled={disabled}
+                value={(config.service_id as string) ?? ""}
+                onChange={(e) => onConfigChange({ service_id: e.target.value })}
+                className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="" disabled>Choose a service</option>
+                {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </label>
+          )}
+        </div>
       )}
 
       {triggerType === "engagement.created" && (

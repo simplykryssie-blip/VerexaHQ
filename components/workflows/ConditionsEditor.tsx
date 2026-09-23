@@ -203,7 +203,7 @@ const CONDITION_FIELDS: FieldMeta[] = [
   { key: "document_request.all_required_complete", label: "All required documents received", group: "Document request", valueKind: "boolean", ops: ["eq"] },
 
   { key: "run.document_signed", label: "Document signed? (sent by \"Send a document for signature\")", group: "Workflow", valueKind: "document_signed_step", ops: ["eq", "neq"] },
-  { key: "run.decision", label: "Decision made? (from a manual decision step)", group: "Workflow", valueKind: "decision_step", ops: ["eq", "neq"] },
+  { key: "run.decision", label: "Review Queue Decision", group: "Workflow", valueKind: "decision_step", ops: ["eq", "neq"] },
 
   { key: "package_purchase.package_name", label: "Package name", group: "Package purchase", valueKind: "text", ops: SELECT_OPS },
   { key: "package_purchase.billing_cadence", label: "Package billing cadence", group: "Package purchase", valueKind: "select", options: ["monthly", "annual", "one_time"], ops: SELECT_OPS },
@@ -433,7 +433,7 @@ function ConditionRow({
                 className={inputClass}
               >
                 <option value="" disabled>
-                  Choose a decision step
+                  Choose a Review Queue Decision
                 </option>
                 {decisionSteps.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -457,7 +457,7 @@ function ConditionRow({
                 ))}
               </select>
               {decisionSteps.length === 0 && (
-                <span className="text-[11px] text-warning">No manual decision steps in this workflow yet -- add one first.</span>
+                <span className="text-[11px] text-warning">No Review Queue Decision step in this workflow yet -- add one first.</span>
               )}
             </>
           )}

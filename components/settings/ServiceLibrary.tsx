@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { Badge } from "@/components/ui/Badge";
 
-export type ServiceCategoryOption = { id: string; name: string };
+export type ServiceCategoryOption = { id: string; name: string; process_id: string | null };
 
 export type ServiceCard = {
   id: string;
@@ -42,12 +42,14 @@ export function ServiceLibrary({
   services,
   categories,
   canManage,
+  pipelines,
   creating,
   onCreatingChange,
 }: {
   workspaceId: string;
   services: ServiceCard[];
   categories: ServiceCategoryOption[];
+  pipelines: { id: string; name: string }[];
   canManage: boolean;
   creating: boolean;
   onCreatingChange: (creating: boolean) => void;
@@ -64,6 +66,7 @@ export function ServiceLibrary({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [categoryName, setCategoryName] = useState("");
+  const [categoryProcessId, setCategoryProcessId] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
 
@@ -108,11 +111,13 @@ export function ServiceLibrary({
   function beginEditCategory(category: ServiceCategoryOption) {
     setEditingCategoryId(category.id);
     setCategoryName(category.name);
+    setCategoryProcessId(category.process_id ?? "");
   }
 
   function cancelEditCategory() {
     setEditingCategoryId(null);
     setCategoryName("");
+    setCategoryProcessId("");
   }
 
   async function saveCategory() {
@@ -121,7 +126,7 @@ export function ServiceLibrary({
     setSavingCategory(true);
     const { error: updateError } = await supabase
       .from("service_categories")
-      .update({ name: trimmed })
+      .update({ name: trimmed, process_id: categoryProcessId || null })
       .eq("id", editingCategoryId)
       .eq("workspace_id", workspaceId);
     setSavingCategory(false);
@@ -261,6 +266,14 @@ export function ServiceLibrary({
                 <div key={category.id} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2">
                   {editingCategoryId === category.id ? (
                     <>
+                      <select
+                        value={categoryProcessId}
+                        onChange={(e) => setCategoryProcessId(e.target.value)}
+                        className="w-48 rounded-lg border border-border px-2.5 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                      >
+                        <option value="">No default pipeline</option>
+                        {pipelines.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
                       <input
                         autoFocus
                         value={categoryName}
@@ -280,7 +293,10 @@ export function ServiceLibrary({
                     </>
                   ) : (
                     <>
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{category.name}</span>
+                      <div className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-ink">{category.name}</span>
+                        {category.process_id && <span className="block truncate text-[11px] text-muted">{pipelines.find((p) => p.id === category.process_id)?.name ?? "Default pipeline"}</span>}
+                      </div>
                       <button type="button" onClick={() => beginEditCategory(category)} className="rounded-lg p-1.5 text-muted hover:text-accent" aria-label={`Edit ${category.name}`}>
                         <Pencil size={14} />
                       </button>

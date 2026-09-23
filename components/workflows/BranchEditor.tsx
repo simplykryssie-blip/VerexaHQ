@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
@@ -24,6 +24,13 @@ type DraftBranch = {
   conditions: ConditionGroup[];
   to_step_id: string | null;
 };
+
+const REVIEW_QUEUE_DECISIONS = [
+  { key: "approve", label: "Approve" },
+  { key: "need_info", label: "Need Info" },
+  { key: "ero_review", label: "ERO Review" },
+  { key: "deny", label: "Deny" },
+];
 
 function initialBranches(edges: WorkflowStepEdgeRow[]): DraftBranch[] {
   const sorted = [...edges].sort((a, b) => a.sort_order - b.sort_order);
@@ -89,9 +96,53 @@ export function BranchEditor({
   const supabase = createClient();
   const toast = useToast();
   const confirm = useConfirm();
+  const [decisionMode, setDecisionMode] = useState<"conditions" | "review_queue">("conditions");
   const [branches, setBranches] = useState<DraftBranch[]>(() => initialBranches(edges));
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from("automation_steps").select("action_config").eq("id", stepId).single();
+      if (cancelled) return;
+      const config = (data?.action_config ?? {}) as Record<string, unknown>;
+      const isReviewQueue = config.decision_mode === "review_queue";
+      setDecisionMode(isReviewQueue ? "review_queue" : "conditions");
+      if (isReviewQueue && edges.length === 0) {
+        setBranches(
+          REVIEW_QUEUE_DECISIONS.map((option) => ({
+            id: null,
+            clientKey: option.key,
+            label: option.label,
+            conditions: [{ conditions: [{ field: "run.decision", op: "eq", value: `${stepId}|${option.key}` }] }],
+            to_step_id: null,
+          }))
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [stepId, supabase]);
+
+  function switchDecisionMode(mode: "conditions" | "review_queue") {
+    setDecisionMode(mode);
+    setRemovedIds((current) => [...new Set([...current, ...edges.map((e) => e.id)])]);
+    if (mode === "review_queue") {
+      setBranches(
+        REVIEW_QUEUE_DECISIONS.map((option) => ({
+          id: null,
+          clientKey: option.key,
+          label: option.label,
+          conditions: [{ conditions: [{ field: "run.decision", op: "eq", value: `${stepId}|${option.key}` }] }],
+          to_step_id: null,
+        }))
+      );
+    } else {
+      setBranches(initialBranches(edges));
+    }
+  }
 
   function addBranch() {
     setBranches((b) => [...b, { id: null, clientKey: `new-${b.length}-${Date.now()}`, label: "", conditions: [{ conditions: [] }], to_step_id: null }]);
@@ -125,6 +176,24 @@ export function BranchEditor({
     if (!(await ensureTagsConfirmed(supabase, workspaceId, tagsToConfirm, confirm, (message) => toast.show(message, "error")))) return;
 
     setSaving(true);
+
+    const { error: stepConfigError } = await supabase
+      .from("automation_steps")
+      .update(
+        decisionMode === "review_queue"
+          ? {
+              action_config: { decision_mode: "review_queue", decision_options: REVIEW_QUEUE_DECISIONS },
+              display_name: "Review Queue Decision",
+            }
+          : { action_config: {} }
+      )
+      .eq("id", stepId);
+    if (stepConfigError) {
+      toast.show(stepConfigError.message, "error");
+      setSaving(false);
+      return;
+    }
+
     for (const id of removedIds) {
       const { error } = await supabase.from("automation_step_edges").delete().eq("id", id);
       if (error) {
@@ -164,6 +233,25 @@ export function BranchEditor({
         Branches are evaluated top to bottom -- the first one whose conditions match wins. Leave a branch&apos;s conditions empty to make
         it the default/else path.
       </p>
+
+      <label className="flex flex-col gap-1 text-xs text-muted">
+        Condition type
+        <select
+          disabled={!canManage}
+          value={decisionMode}
+          onChange={(e) => switchDecisionMode(e.target.value as "conditions" | "review_queue")}
+          className="rounded-lg border border-border px-2 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+        >
+          <option value="conditions">Evaluate conditions</option>
+          <option value="review_queue">Review Queue Decision</option>
+        </select>
+      </label>
+
+      {decisionMode === "review_queue" && (
+        <p className="rounded-lg bg-surfaceMuted px-3 py-2 text-xs text-muted">
+          The workflow pauses here until a reviewer chooses Approve, Need Info, ERO Review, or Deny in the Review Queue.
+        </p>
+      )}
       {branches.map((b, i) => (
         <div key={b.clientKey} className="rounded-2xl border border-border bg-surface shadow-soft p-3">
           <div className="flex items-center justify-between gap-2">

@@ -13,12 +13,14 @@ export function ServicesPageClient({
   workspaceSlug,
   services,
   categories,
+  pipelines,
   canManage,
 }: {
   workspaceId: string;
   workspaceSlug: string;
   services: ServiceCard[];
   categories: ServiceCategoryOption[];
+  pipelines: { id: string; name: string }[];
   canManage: boolean;
 }) {
   const [creating, setCreating] = useState(false);
@@ -78,6 +80,7 @@ export function ServicesPageClient({
           workspaceId={workspaceId}
           services={services}
           categories={categories}
+          pipelines={pipelines}
           canManage={canManage}
           creating={creating}
           onCreatingChange={setCreating}

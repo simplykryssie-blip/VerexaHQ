@@ -8645,6 +8645,7 @@ export type Database = {
           display_order: number
           id: string
           name: string
+          process_id: string | null
           slug: string
           updated_at: string
           workspace_id: string | null
@@ -8654,6 +8655,7 @@ export type Database = {
           display_order?: number
           id?: string
           name: string
+          process_id?: string | null
           slug: string
           updated_at?: string
           workspace_id?: string | null
@@ -8663,11 +8665,19 @@ export type Database = {
           display_order?: number
           id?: string
           name?: string
+          process_id?: string | null
           slug?: string
           updated_at?: string
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "service_categories_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "processes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "service_categories_workspace_id_fkey"
             columns: ["workspace_id"]

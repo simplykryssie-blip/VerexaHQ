@@ -18,6 +18,7 @@ import {
   defaultTriggerConfig,
   triggerSummary,
   type TemplateOption,
+  type ServiceCategoryOption,
   type PipelineOption,
 } from "@/components/workflows/TriggerFields";
 
@@ -51,6 +52,7 @@ export function WorkflowList({
   canManage,
   organizerTemplates,
   services = [],
+  serviceCategories = [],
   pipelines = [],
   tagOptions = [],
   open,
@@ -62,6 +64,7 @@ export function WorkflowList({
   canManage: boolean;
   organizerTemplates: TemplateOption[];
   services?: TemplateOption[];
+  serviceCategories?: ServiceCategoryOption[];
   pipelines?: PipelineOption[];
   tagOptions?: string[];
   open: boolean;
@@ -277,6 +280,7 @@ export function WorkflowList({
               onConfigChange={setTriggerConfig}
               organizerTemplates={organizerTemplates}
               services={services}
+              serviceCategories={serviceCategories}
               pipelines={pipelines}
               tagOptions={tagOptions}
             />
@@ -343,7 +347,7 @@ export function WorkflowList({
                         {w.step_count === 0 && <Badge tone="warning">No steps yet</Badge>}
                       </div>
                       <p className="break-words text-xs text-muted sm:truncate">
-                        {triggerSummary(w.trigger_type, w.trigger_config, organizerTemplates, services, pipelines)} &middot; {w.step_count} step
+                        {triggerSummary(w.trigger_type, w.trigger_config, organizerTemplates, services, serviceCategories, pipelines)} &middot; {w.step_count} step
                         {w.step_count === 1 ? "" : "s"} &middot; {w.run_count} run{w.run_count === 1 ? "" : "s"}
                       </p>
                     </div>
