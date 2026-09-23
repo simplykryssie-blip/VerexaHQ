@@ -18,7 +18,8 @@ export async function EmailSmsLibrary({ workspaceId, activeTabParam }: { workspa
     supabase.from("library_folders").select("id, parent_folder_id, name").eq("workspace_id", workspaceId).eq("item_type", "email_sms_template").order("name"),
   ]);
 
-  // System-owned templates are not workspace library items. They are kept
+  // System-owned templates are not workspace library items. They remain protected in Verexa's system layer.
+  // System masters are not workspace library items. They are kept
   // outside tenant libraries and exposed only through Verexa's protected
   // system/Marketplace surfaces. A workspace library contains only rows
   // owned by this workspace.
