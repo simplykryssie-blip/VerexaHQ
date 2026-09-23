@@ -412,6 +412,7 @@ export function StepCard({
   const [justCreatedLink, setJustCreatedLink] = useState<{ kind: "organizer" | "engagement_letter"; id: string; name: string } | null>(null);
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const [tagDraft, setTagDraft] = useState("");
+  const [taskDueMode, setTaskDueMode] = useState<"calendar_days" | "business_hours">(step.action_config?.due_in_business_hours != null ? "business_hours" : "calendar_days");
 
   const emailOptions = [...emailTemplates, ...extraEmailTemplates.filter((e) => !emailTemplates.some((t) => t.id === e.id))];
   const smsOptions = [...smsTemplates, ...extraSmsTemplates.filter((e) => !smsTemplates.some((t) => t.id === e.id))];
@@ -996,13 +997,36 @@ export function StepCard({
             <MergeableField label="Task title" fieldKey="title" config={config} setField={setField} canManage={canManage} placeholder="Automated task" />
             <MergeableField as="textarea" label="Description" fieldKey="description" config={config} setField={setField} canManage={canManage} />
             <label className="flex flex-col gap-1 text-xs text-muted">
-              Due in (days)
+              Due timing
+              <select
+                disabled={!canManage}
+                value={taskDueMode}
+                onChange={(e) => {
+                  const mode = e.target.value as "calendar_days" | "business_hours";
+                  setTaskDueMode(mode);
+                  setConfig((current) => {
+                    const next = { ...current } as Record<string, unknown>;
+                    if (mode === "business_hours") delete next.due_in_days;
+                    else delete next.due_in_business_hours;
+                    return next;
+                  });
+                  setSaved(false);
+                }}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="calendar_days">Calendar days</option>
+                <option value="business_hours">Business hours</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              {taskDueMode === "business_hours" ? "Due in (business hours)" : "Due in (days)"}
               <input
                 disabled={!canManage}
                 type="number"
                 min={0}
-                value={(config.due_in_days as string) ?? ""}
-                onChange={(e) => setField("due_in_days", e.target.value)}
+                step={taskDueMode === "business_hours" ? "0.5" : "1"}
+                value={((taskDueMode === "business_hours" ? config.due_in_business_hours : config.due_in_days) as string) ?? ""}
+                onChange={(e) => setField(taskDueMode === "business_hours" ? "due_in_business_hours" : "due_in_days", e.target.value)}
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
             </label>
@@ -1032,9 +1056,7 @@ export function StepCard({
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink capitalize focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               >
                 {TASK_PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
+                  <option key={p} value={p}>{p}</option>
                 ))}
               </select>
             </label>
@@ -1052,7 +1074,6 @@ export function StepCard({
             </label>
           </>
         )}
-
         {actionType === "create_appointment" && (
           <>
             <MergeableField label="Title" fieldKey="title" config={config} setField={setField} canManage={canManage} placeholder="Appointment" />
