@@ -107,7 +107,19 @@ export function BranchEditor({
       const { data } = await supabase.from("automation_steps").select("action_config").eq("id", stepId).single();
       if (cancelled) return;
       const config = (data?.action_config ?? {}) as Record<string, unknown>;
-      setDecisionMode(config.decision_mode === "review_queue" ? "review_queue" : "conditions");
+      const isReviewQueue = config.decision_mode === "review_queue";
+      setDecisionMode(isReviewQueue ? "review_queue" : "conditions");
+      if (isReviewQueue && edges.length === 0) {
+        setBranches(
+          REVIEW_QUEUE_DECISIONS.map((option) => ({
+            id: null,
+            clientKey: option.key,
+            label: option.label,
+            conditions: [{ conditions: [{ field: "run.decision", op: "eq", value: `${stepId}|${option.key}` }] }],
+            to_step_id: null,
+          }))
+        );
+      }
     })();
     return () => {
       cancelled = true;
@@ -116,6 +128,7 @@ export function BranchEditor({
 
   function switchDecisionMode(mode: "conditions" | "review_queue") {
     setDecisionMode(mode);
+    setRemovedIds((current) => [...new Set([...current, ...edges.map((e) => e.id)])]);
     if (mode === "review_queue") {
       setBranches(
         REVIEW_QUEUE_DECISIONS.map((option) => ({
