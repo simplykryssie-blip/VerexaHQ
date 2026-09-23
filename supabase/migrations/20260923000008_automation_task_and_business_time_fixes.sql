@@ -21,11 +21,13 @@ BEGIN
     RAISE EXCEPTION 'execute_automation_step was not found';
   END IF;
 
-  v_old := $$    'first_name', v_eng.first_name,
-    'firm_name', v_workspace.name,$$;
-  v_new := $$    'first_name', v_eng.first_name,
+  v_old := $    'client_name', btrim(coalesce(v_eng.first_name, '') || ' ' || coalesce(v_eng.last_name, '')),
+    'first_name', v_eng.first_name,
+    'firm_name', v_workspace.name,$;
+  v_new := $    'client_name', btrim(coalesce(v_eng.first_name, '') || ' ' || coalesce(v_eng.last_name, '')),
+    'first_name', v_eng.first_name,
     'client_first_name', v_eng.first_name,
-    'firm_name', v_workspace.name,$$;
+    'firm_name', v_workspace.name,$;
 
   IF position(v_new in v_def) = 0 THEN
     IF position(v_old in v_def) = 0 THEN
