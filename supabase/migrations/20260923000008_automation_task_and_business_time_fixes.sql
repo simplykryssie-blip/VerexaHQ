@@ -1,11 +1,9 @@
--- Automation mechanics: reliable task context, business-hour task deadlines,
--- business-hour wait timeouts, and a canonical client_first_name merge field.
+-- Automation mechanics: reliable task context, business-hour wait timeouts,
+-- and a canonical client_first_name merge field.
 
 DO $migration$
 DECLARE
   v_def text;
-  v_old text;
-  v_new text;
 BEGIN
   SELECT pg_get_functiondef(p.oid) INTO v_def
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -25,36 +23,18 @@ BEGIN
   END IF;
 
   IF position($marker$'task_id', v_new_task_id$marker$ in v_def) = 0 THEN
-    v_old := $old$      where id = p_run_id;
-    elsif v_step.action_type = 'create_appointment' then$old$;
-    v_new := $new$      where id = p_run_id;
+    v_def := replace(
+      v_def,
+      $old$      where id = p_run_id;
+    elsif v_step.action_type = 'create_appointment' then$old$,
+      $new$      where id = p_run_id;
 
       update public.automation_runs
       set trigger_snapshot = coalesce(trigger_snapshot, '{}'::jsonb)
         || jsonb_build_object('task_id', v_new_task_id)
       where id = p_run_id;
-    elsif v_step.action_type = 'create_appointment' then$new$;
-    IF position(v_old in v_def) = 0 THEN
-      RAISE EXCEPTION 'create_task continuation anchor not found';
-    END IF;
-    v_def := replace(v_def, v_old, v_new);
-  END IF;
-
-  v_old := $old$case when v_step.action_config ? 'due_in_days' then now() + make_interval(days => (v_step.action_config->>'due_in_days')::int) else null end,$old$;
-  v_new := $new$case
-        when nullif(v_step.action_config->>'due_in_business_hours', '') is not null
-          then public.compute_business_hours_deadline(v_run.workspace_id, now(), (v_step.action_config->>'due_in_business_hours')::numeric)
-        when v_step.action_config ? 'due_in_days'
-          then now() + make_interval(days => (v_step.action_config->>'due_in_days')::int)
-        else null
-      end,$new$;
-
-  IF position(v_new in v_def) = 0 THEN
-    IF position(v_old in v_def) = 0 THEN
-      v_def := replace(v_def, v_old, v_new);
-    ELSE
-      RAISE EXCEPTION 'task due-date anchor not found';
-    END IF;
+    elsif v_step.action_type = 'create_appointment' then$new$
+    );
   END IF;
 
   EXECUTE v_def;
