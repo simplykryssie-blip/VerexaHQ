@@ -121,7 +121,7 @@ export function DeleteContactButton({ contactId }: { contactId: string }) {
   );
 }
 
-export function AddAddressForm({ clientId, workspaceId }: Ids) {
+export function AddAddressForm({ clientId, workspaceId, open, onOpenChange }: Ids & { open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const router = useRouter();
   const supabase = createClient();
   return (
