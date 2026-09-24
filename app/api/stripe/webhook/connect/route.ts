@@ -7,6 +7,7 @@ import {
   handleFirmPackageSubscriptionUpdated,
   handleFirmPackageSubscriptionDeleted,
 } from "@/lib/stripe/handleFirmPackagePurchase";
+import { handleExternalPartnerPurchaseCheckoutCompleted } from "@/lib/stripe/handleExternalPartnerPurchase";
 
 export async function POST(request: Request) {
   const webhookSecret = process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
@@ -66,12 +67,35 @@ export async function POST(request: Request) {
         subscription?: string | { id: string } | null;
         payment_intent: string;
         amount_total: number;
+        currency?: string;
+        payment_link?: string | null;
+        customer_details?: { name?: string | null; email?: string | null; phone?: string | null } | null;
         metadata?: { invoice_id?: string; payment_plan_id?: string; workspace_id?: string; type?: string; purchase_id?: string };
       };
-      const result =
+      let result =
         session.metadata?.type === "firm_package_purchase"
           ? await handleFirmPackagePurchaseCheckoutCompleted(supabase, session)
           : await handleCheckoutSessionCompleted(supabase, session);
+
+      // Neither of Verexa's own metadata-driven flows matched. This could be
+      // an externally-created Stripe Payment Link (pasted directly into the
+      // public marketing site) completing on this same Stripe-Connected
+      // account -- it carries no Verexa metadata at all, so it always lands
+      // here rather than the branches above. session.payment_link is only
+      // ever present on a genuine Payment-Link-originated session (Verexa's
+      // own checkout.session.create() calls never set it), so gating on it
+      // means this can't misfire against an unrelated skip reason from the
+      // handlers above. Resolves the package the same way the standalone
+      // partner-purchase webhook already does for non-Connected workspaces
+      // (app/api/partner-purchase-webhook/[token]/route.ts) -- matching
+      // session.payment_link against this workspace's own firm_packages.
+      if (result.skipped && workspaceId && session.payment_link) {
+        const externalResult = await handleExternalPartnerPurchaseCheckoutCompleted(supabase, workspaceId, session);
+        if (!("skipped" in externalResult)) {
+          result = { skipped: undefined };
+        }
+      }
+
       await markWebhookProcessed(supabase, logRow?.id, session.metadata?.workspace_id ?? workspaceId);
       if (result.skipped) {
         return NextResponse.json({ received: true, skipped: result.skipped });
