@@ -237,6 +237,7 @@ function ConditionRow({
   documentSignatureSteps,
   decisionSteps,
   tagOptions,
+  firmPackageOptions,
   disabled,
 }: {
   condition: Condition;
@@ -250,6 +251,7 @@ function ConditionRow({
   documentSignatureSteps: DocumentSignatureStepOption[];
   decisionSteps: DecisionStepOption[];
   tagOptions: string[];
+  firmPackageOptions: TemplateOption[];
   disabled: boolean;
 }) {
   const meta = fieldMeta(condition.field);
@@ -552,7 +554,20 @@ function ConditionRow({
             </>
           )}
 
-          {meta.valueKind === "text" && (
+          {meta.valueKind === "text" && meta.key === "firm_connection.package_id" && (
+            <select disabled={disabled} value={condition.value} onChange={(e) => setValue(e.target.value)} className={inputClass}>
+              <option value="" disabled>
+                Choose a package
+              </option>
+              {firmPackageOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {meta.valueKind === "text" && meta.key !== "firm_connection.package_id" && (
             <input disabled={disabled} value={condition.value} onChange={(e) => setValue(e.target.value)} className={inputClass} placeholder="Value" />
           )}
 
@@ -601,6 +616,7 @@ export function ConditionsEditor({
   documentSignatureSteps = [],
   decisionSteps = [],
   tagOptions = [],
+  firmPackageOptions = [],
   disabled,
 }: {
   conditions: Condition[];
@@ -613,6 +629,7 @@ export function ConditionsEditor({
   documentSignatureSteps?: DocumentSignatureStepOption[];
   decisionSteps?: DecisionStepOption[];
   tagOptions?: string[];
+  firmPackageOptions?: TemplateOption[];
   disabled?: boolean;
 }) {
   function addCondition() {
@@ -670,6 +687,7 @@ export function ConditionsEditor({
                 documentSignatureSteps={documentSignatureSteps}
                 decisionSteps={decisionSteps}
                 tagOptions={tagOptions}
+                firmPackageOptions={firmPackageOptions}
                 disabled={Boolean(disabled)}
               />
             </div>
@@ -701,6 +719,7 @@ export function ConditionGroupsEditor({
   documentSignatureSteps = [],
   decisionSteps = [],
   tagOptions = [],
+  firmPackageOptions = [],
   disabled,
 }: {
   groups: ConditionGroup[];
@@ -713,6 +732,7 @@ export function ConditionGroupsEditor({
   documentSignatureSteps?: DocumentSignatureStepOption[];
   decisionSteps?: DecisionStepOption[];
   tagOptions?: string[];
+  firmPackageOptions?: TemplateOption[];
   disabled?: boolean;
 }) {
   function addGroup() {
@@ -777,6 +797,7 @@ export function ConditionGroupsEditor({
               documentSignatureSteps={documentSignatureSteps}
               decisionSteps={decisionSteps}
               tagOptions={tagOptions}
+              firmPackageOptions={firmPackageOptions}
               disabled={disabled}
             />
           </div>

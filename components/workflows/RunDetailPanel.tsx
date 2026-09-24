@@ -10,6 +10,7 @@ type RunHeader = {
   status: string;
   started_at: string;
   completed_at: string | null;
+  blocked_at: string | null;
   engagement_number: string | null;
   client_name: string | null;
   is_test: boolean;
@@ -57,7 +58,7 @@ export function RunDetailPanel({ runId, onClose }: { runId: string; onClose: () 
       const [{ data: runRow, error: runError }, { data: logRows, error: logsError }] = await Promise.all([
         supabase
           .from("automation_runs")
-          .select("id, status, started_at, completed_at, is_test, engagements(engagement_number), clients(first_name, last_name, business_name)")
+          .select("id, status, started_at, completed_at, blocked_at, is_test, engagements(engagement_number), clients(first_name, last_name, business_name)")
           .eq("id", runId)
           .maybeSingle(),
         supabase
@@ -77,6 +78,7 @@ export function RunDetailPanel({ runId, onClose }: { runId: string; onClose: () 
         status: runRow.status,
         started_at: runRow.started_at,
         completed_at: runRow.completed_at,
+        blocked_at: runRow.blocked_at,
         is_test: Boolean(runRow.is_test),
         engagement_number: (runRow.engagements as unknown as { engagement_number: string | null } | null)?.engagement_number ?? null,
         client_name: clientLabelFor(runRow.clients as unknown as { first_name: string | null; last_name: string | null; business_name: string | null } | null),
@@ -127,7 +129,17 @@ export function RunDetailPanel({ runId, onClose }: { runId: string; onClose: () 
               </h2>
               {run && (
                 <p className="text-xs text-muted">
-                  {run.status === "running" ? "In progress" : run.status === "failed" ? "Failed" : run.status === "completed" ? "Completed" : run.status}
+                  {run.blocked_at
+                    ? "Paused (workspace inactive)"
+                    : run.status === "running"
+                      ? "In progress"
+                      : run.status === "failed"
+                        ? "Failed"
+                        : run.status === "completed"
+                          ? "Completed"
+                          : run.status === "cancelled"
+                            ? "Cancelled"
+                            : run.status}
                   {" · started "}
                   {new Date(run.started_at).toLocaleString()}
                   {run.completed_at ? ` · finished ${new Date(run.completed_at).toLocaleString()}` : ""}

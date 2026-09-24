@@ -70,6 +70,7 @@ export function BranchEditor({
   documentSignatureSteps = [],
   decisionSteps = [],
   tagOptions = [],
+  firmPackageOptions = [],
   canManage,
   onSaved,
   onClose,
@@ -88,6 +89,7 @@ export function BranchEditor({
   documentSignatureSteps?: DocumentSignatureStepOption[];
   decisionSteps?: DecisionStepOption[];
   tagOptions?: string[];
+  firmPackageOptions?: TemplateOption[];
   canManage: boolean;
   onSaved: () => void;
   onClose: () => void;
@@ -325,6 +327,7 @@ export function BranchEditor({
               documentSignatureSteps={documentSignatureSteps}
               decisionSteps={decisionSteps}
               tagOptions={tagOptions}
+              firmPackageOptions={firmPackageOptions}
               disabled={!canManage}
             />
           </div>

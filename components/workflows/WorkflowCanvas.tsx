@@ -30,6 +30,7 @@ import "@xyflow/react/dist/style.css";
 import { Plus, Split, Trash2, X, Zap, MoreVertical, Pencil, Copy, EyeOff, Eye } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/Confirm";
 import {
   StepCard,
   actionIcon,
@@ -55,6 +56,15 @@ type StepNodeActions = {
 };
 
 type StepNodeData = { step: WorkflowStepRow; activeRuns: WorkflowRunRow[]; onOpenRun: (runId: string) => void; actions: StepNodeActions };
+
+// A condition step used as a Review Queue Decision is a distinct concept
+// from a plain if/else branch -- it pauses the run for a human to pick an
+// outcome, rather than evaluating data automatically -- so it needs its own
+// default label everywhere a condition step's name is shown unset.
+function defaultConditionLabel(step: WorkflowStepRow): string {
+  const config = step.action_config as Record<string, unknown> | null;
+  return config?.decision_mode === "review_queue" ? "Review Queue Decision" : "Condition";
+}
 
 // Shared ⋮ menu for a canvas node -- Rename (inline edit, toggled via
 // onRenameStart so the node itself owns the input/save/cancel UI, since the
@@ -311,7 +321,7 @@ type ConditionBranchHandle = { id: string; label: string | null; wired: boolean 
 function ConditionNode({ data, selected }: NodeProps & { data: StepNodeData & { branches: ConditionBranchHandle[] } }) {
   const { step, branches, actions } = data;
   const [renaming, setRenaming] = useState(false);
-  const displayName = step.display_name?.trim() || "Condition";
+  const displayName = step.display_name?.trim() || defaultConditionLabel(step);
   return (
     <div
       className={`relative w-80 rounded-2xl border bg-surface px-4 py-3.5 shadow-soft ${selected ? "border-accent ring-2 ring-accent/25" : "border-[#DDD9FB]"}`}
@@ -596,6 +606,7 @@ function CanvasInner({
   staffOptions,
   automationOptions,
   tagOptions = [],
+  firmPackageOptions = [],
   roleOptions = [],
   onEditTrigger,
   onOpenRun,
@@ -619,6 +630,7 @@ function CanvasInner({
   staffOptions: StaffOption[];
   automationOptions: AutomationOption[];
   tagOptions?: string[];
+  firmPackageOptions?: TemplateOption[];
   roleOptions?: RoleOption[];
   onEditTrigger: () => void;
   onOpenRun: (runId: string) => void;
@@ -626,6 +638,7 @@ function CanvasInner({
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
+  const confirm = useConfirm();
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [activeConditionStepId, setActiveConditionStepId] = useState<string | null>(null);
@@ -842,7 +855,7 @@ function CanvasInner({
   }
 
   async function deleteStep(stepId: string) {
-    if (!window.confirm("Remove this step? Any connections to or from it will be removed too.")) return;
+    if (!(await confirm({ title: "Remove this step?", body: "Any connections to or from it will be removed too.", confirmLabel: "Remove" }))) return;
     setNodes((nds) => nds.filter((n) => n.id !== stepId));
     setEdges((eds) => eds.filter((e) => e.source !== stepId && e.target !== stepId));
     setSelectedStepId(null);
@@ -1054,7 +1067,7 @@ function CanvasInner({
     const map: Record<string, string> = {};
     for (const s of steps) {
       const meta = ACTION_TYPES.find((a) => a.value === s.action_type);
-      map[s.id] = s.action_type === "condition" ? "Condition" : meta?.label ?? s.action_type;
+      map[s.id] = s.action_type === "condition" ? defaultConditionLabel(s) : meta?.label ?? s.action_type;
     }
     return map;
   }, [steps]);
@@ -1153,7 +1166,7 @@ function CanvasInner({
         <div className="w-96 shrink-0 overflow-y-auto border-l border-border bg-surfaceMuted p-4">
           <div className="mb-3 flex items-center justify-between">
             <h4 className="text-sm font-semibold text-ink">
-              {selectedEdge ? "Connection" : selectedStep?.action_type === "condition" ? "Condition" : "Step"}
+              {selectedEdge ? "Connection" : selectedStep?.action_type === "condition" ? defaultConditionLabel(selectedStep) : "Step"}
             </h4>
             <button
               type="button"
@@ -1205,6 +1218,7 @@ function CanvasInner({
               documentSignatureSteps={documentSignatureSteps}
               decisionSteps={decisionSteps}
               tagOptions={tagOptions}
+              firmPackageOptions={firmPackageOptions}
               roleOptions={roleOptions}
               canManage={canManage}
               onSaved={() => {
@@ -1239,6 +1253,7 @@ function CanvasInner({
               documentSignatureSteps={documentSignatureSteps}
               decisionSteps={decisionSteps}
               tagOptions={tagOptions}
+              firmPackageOptions={firmPackageOptions}
               canManage={canManage}
               onSaved={() => router.refresh()}
               onClose={() => setActiveConditionStepId(null)}

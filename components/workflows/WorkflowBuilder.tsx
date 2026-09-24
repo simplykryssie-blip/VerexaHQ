@@ -339,6 +339,7 @@ export function StepCard({
   documentSignatureSteps = [],
   decisionSteps = [],
   tagOptions = [],
+  firmPackageOptions = [],
   roleOptions = [],
   canManage,
   onSaved,
@@ -361,6 +362,7 @@ export function StepCard({
   documentSignatureSteps?: DocumentSignatureStepOption[];
   decisionSteps?: DecisionStepOption[];
   tagOptions?: string[];
+  firmPackageOptions?: TemplateOption[];
   roleOptions?: RoleOption[];
   canManage: boolean;
   onSaved: () => void;
@@ -572,7 +574,7 @@ export function StepCard({
   }
 
   async function remove() {
-    if (!window.confirm("Remove this step?")) return;
+    if (!(await confirm({ title: "Remove this step?", confirmLabel: "Remove" }))) return;
     const { error } = await supabase.from("automation_steps").delete().eq("id", step.id);
     if (error) {
       toast.show(error.message, "error");
@@ -765,6 +767,7 @@ export function StepCard({
                 organizerTemplates={organizerTemplates}
                 documentSignatureSteps={documentSignatureSteps}
                 decisionSteps={decisionSteps}
+                firmPackageOptions={firmPackageOptions}
                 disabled={!canManage}
               />
             </div>
@@ -1976,6 +1979,7 @@ export function WorkflowBuilder({
   staffOptions = [],
   automationOptions = [],
   tagOptions = [],
+  firmPackageOptions = [],
   roleOptions = [],
   pendingApprovals = [],
   pendingDecisions = [],
@@ -2005,6 +2009,7 @@ export function WorkflowBuilder({
   staffOptions?: StaffOption[];
   automationOptions?: AutomationOption[];
   tagOptions?: string[];
+  firmPackageOptions?: TemplateOption[];
   roleOptions?: RoleOption[];
   pendingApprovals?: PendingApprovalRow[];
   pendingDecisions?: PendingDecisionRow[];
@@ -2102,7 +2107,7 @@ export function WorkflowBuilder({
       }
       if (issues && issues.length > 0) {
         const lines = issues.map((i) => (i.step_order > 0 ? `Step ${i.step_order} (${i.display_name}): ${i.issue}` : i.issue));
-        window.alert(`Can't activate this workflow yet -- fix these first:\n\n${lines.map((l) => `- ${l}`).join("\n")}`);
+        toast.show(`Can't activate this workflow yet -- fix these first:\n${lines.map((l) => `- ${l}`).join("\n")}`, "error");
         return;
       }
     }
@@ -2125,7 +2130,7 @@ export function WorkflowBuilder({
     }
     if (issues && issues.length > 0) {
       const lines = issues.map((i) => (i.step_order > 0 ? `Step ${i.step_order} (${i.display_name}): ${i.issue}` : i.issue));
-      window.alert(`Can't publish this workflow yet -- fix these first:\n\n${lines.map((l) => `- ${l}`).join("\n")}`);
+      toast.show(`Can't publish this workflow yet -- fix these first:\n${lines.map((l) => `- ${l}`).join("\n")}`, "error");
       return;
     }
     const { error } = await supabase.from("automations").update({ status: "published", is_enabled: true }).eq("id", automationId);
@@ -2140,7 +2145,7 @@ export function WorkflowBuilder({
   }
 
   async function retireWorkflow() {
-    if (!window.confirm("Retire this workflow? It stops firing until you restore it as a draft.")) return;
+    if (!(await confirm({ title: "Retire this workflow?", body: "It stops firing until you restore it as a draft.", confirmLabel: "Retire" }))) return;
     const { error } = await supabase.from("automations").update({ status: "archived", is_enabled: false }).eq("id", automationId);
     if (error) {
       toast.show(error.message, "error");
@@ -2283,6 +2288,7 @@ export function WorkflowBuilder({
             staffOptions={staffOptions}
             automationOptions={automationOptions}
             tagOptions={tagOptions}
+            firmPackageOptions={firmPackageOptions}
             roleOptions={roleOptions}
             onEditTrigger={() => setTriggerModalOpen(true)}
             onOpenRun={(runId) => setOpenRunId(runId)}
@@ -2363,6 +2369,7 @@ export function WorkflowBuilder({
                 pipelines={pipelines}
                 organizerTemplates={organizerTemplates}
                 tagOptions={tagOptions}
+                firmPackageOptions={firmPackageOptions}
                 disabled={!canManage}
               />
             </div>
