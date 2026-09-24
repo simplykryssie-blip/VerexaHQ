@@ -1,3 +1,23 @@
+# Addendum — 2026-09-24: Both 🔴 Fix Now items shipped (PRs #330, #331)
+
+**READ THIS FIRST.** This is the newest handoff state. It supersedes the two 🔴 Fix Now items below; the rest of the 2026-09-20 addendum (Contacts status, architecture background) still applies and is left as-is underneath.
+
+## Item 2 — nested `package_purchase.package_name` condition: 🟢 RESOLVED, was never actually broken
+
+Live-verified before any change: `_evaluate_condition_list`'s nested-path fallback already correctly resolves `package_purchase.package_name` in both shapes this codebase produces (flat literal-dotted key and nested object). Its self-test `test_condition_evaluator_nested_field_resolution()` was run live against production — all 5 checks passed. HANDOFF's suspicion was wrong; no fix to the evaluator's logic was needed.
+
+What *was* real: a 6th occurrence of the "changed-argument-list overload without a DROP FUNCTION" bug class (same family as `create_engagement`/`create_client`/`set_firm_tax_profile`/`search_clients`). `20260927050000_decision_step.sql` redefines `_evaluate_condition_list` with the old 5-arg signature and no `DROP FUNCTION` — but that migration was never actually applied to production (its whole feature contribution is superseded by the already-live `20260923000006_review_queue_decision_automation_runtime.sql`). PR #330 added `20261031060000_drop_stale_evaluate_condition_list_overload.sql`, a migration-history-hygiene no-op, applied to production and re-verified live: exactly one `_evaluate_condition_list` overload exists (`(jsonb,jsonb,uuid,uuid,uuid,uuid,uuid)`).
+
+## Item 1 — External Stripe Payment Link → Verexa Package mapping: 🟡 PARTIALLY RESOLVED
+
+Shipped in PR #331:
+- `app/api/stripe/webhook/connect/route.ts` now falls back to the existing `handleExternalPartnerPurchaseCheckoutCompleted` matcher (`session.payment_link` → `firm_packages.stripe_payment_link_id`) whenever the primary metadata-driven handlers skip and the session actually carries a `payment_link`. This logic already existed and was already correct — it was just unreachable for any workspace using the Stripe-Connect webhook (it was only wired into the standalone `/api/partner-purchase-webhook/[token]` route). No new matching logic was written.
+- The Packages edit page (`app/(app)/settings/packages/[id]/page.tsx`, `components/settings/PackageEditForm.tsx`) now exposes and saves `stripe_payment_link_id`, `stripe_payment_link_url`, `stripe_price_id`, `stripe_product_id`, and `purchase_purpose` — the schema columns already existed (`20260920142055_partner_purchase_stripe_mapping_and_purpose.sql`) but no UI ever wrote to them.
+
+**Still unsolved, deliberately out of scope:** buyer/workspace identity for a *brand-new* external purchaser with no prior Verexa account. `partner_prospects.linked_user_id`/`linked_workspace_id`/`linked_firm_connection_id` remain unwritten placeholder columns — there is still no claim/signup flow connecting a Stripe purchase to a real Verexa login/workspace. This is the "#2" half of the "Buyer identity is a separate problem" section below, and it is still open. Do not consider Item 1 fully closed until that's addressed.
+
+---
+
 # Addendum — 2026-09-20: Contacts closed; Stripe Payment Link architecture clarified
 
 **READ THIS FIRST.** This is the newest handoff state.
@@ -144,10 +164,11 @@ Partner onboarding is separate from Verexa platform customer onboarding. `firm_c
 4. Billing live verification
 5. Dashboard Easy-Fix #1
 6. Contacts completion
+7. `partner_onboarding.created` nested `package_purchase.package_name` resolution — verified already correct; dead 5-arg overload dropped (PR #330)
+8. External Stripe Payment Link → Verexa Package matching on the Connect webhook, Packages UI Stripe-mapping fields (PR #331)
 
 ### 🔴 Fix Now
-1. External Stripe Payment Link → Verexa Package/Buyer mapping — **audit first**
-2. `partner_onboarding.created` nested `package_purchase.package_name` resolution — **verify first**
+1. Buyer/workspace identity for a brand-new external Payment Link purchaser (no prior Verexa account) — still unsolved; see Item 1 in the 2026-09-24 addendum above. Needs a claim/signup flow connecting a Stripe purchase to a real Verexa login/workspace before `partner_prospects.linked_user_id`/`linked_workspace_id`/`linked_firm_connection_id` mean anything.
 
 ### 🟡 Backlog
 - repo-wide accidental PostgreSQL overload audit
