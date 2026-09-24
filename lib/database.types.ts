@@ -928,6 +928,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           automation_step_id: string
+          claimed_at: string | null
           created_at: string
           decided_option: string | null
           id: string
@@ -941,6 +942,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           automation_step_id: string
+          claimed_at?: string | null
           created_at?: string
           decided_option?: string | null
           id?: string
@@ -954,6 +956,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           automation_step_id?: string
+          claimed_at?: string | null
           created_at?: string
           decided_option?: string | null
           id?: string
@@ -994,6 +997,7 @@ export type Database = {
           automation_id: string
           blocked_at: string | null
           blocked_step_id: string | null
+          chain_depth: number
           client_id: string | null
           completed_at: string | null
           connection_id: string | null
@@ -1002,7 +1006,9 @@ export type Database = {
           id: string
           is_test: boolean
           onboarding_id: string | null
+          parent_run_id: string | null
           partner_prospect_id: string | null
+          resume_claimed_at: string | null
           started_at: string
           status: string
           trigger_snapshot: Json
@@ -1014,6 +1020,7 @@ export type Database = {
           automation_id: string
           blocked_at?: string | null
           blocked_step_id?: string | null
+          chain_depth?: number
           client_id?: string | null
           completed_at?: string | null
           connection_id?: string | null
@@ -1022,7 +1029,9 @@ export type Database = {
           id?: string
           is_test?: boolean
           onboarding_id?: string | null
+          parent_run_id?: string | null
           partner_prospect_id?: string | null
+          resume_claimed_at?: string | null
           started_at?: string
           status?: string
           trigger_snapshot?: Json
@@ -1034,6 +1043,7 @@ export type Database = {
           automation_id?: string
           blocked_at?: string | null
           blocked_step_id?: string | null
+          chain_depth?: number
           client_id?: string | null
           completed_at?: string | null
           connection_id?: string | null
@@ -1042,7 +1052,9 @@ export type Database = {
           id?: string
           is_test?: boolean
           onboarding_id?: string | null
+          parent_run_id?: string | null
           partner_prospect_id?: string | null
+          resume_claimed_at?: string | null
           started_at?: string
           status?: string
           trigger_snapshot?: Json
@@ -1110,6 +1122,13 @@ export type Database = {
             columns: ["onboarding_id"]
             isOneToOne: false
             referencedRelation: "partner_onboardings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_runs_parent_run_id_fkey"
+            columns: ["parent_run_id"]
+            isOneToOne: false
+            referencedRelation: "automation_runs"
             referencedColumns: ["id"]
           },
           {
@@ -12288,6 +12307,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      claim_blocked_automation_runs: {
+        Args: { p_limit?: number; p_stale_after_seconds?: number }
+        Returns: { id: string; blocked_step_id: string | null }[]
+      }
+      claim_due_pending_automation_steps: {
+        Args: { p_limit?: number; p_stale_after_seconds?: number }
+        Returns: { id: string; run_id: string; workspace_id: string; automation_step_id: string }[]
+      }
       claim_pending_paid_seat: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -13682,6 +13709,10 @@ export type Database = {
       is_workspace_operational: {
         Args: { p_workspace_id: string }
         Returns: boolean
+      }
+      known_automation_trigger_types: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
       }
       learning_hub_reachable_workspaces: {
         Args: { p_owner_workspace_id: string }
