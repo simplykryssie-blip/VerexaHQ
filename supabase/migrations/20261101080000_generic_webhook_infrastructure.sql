@@ -262,27 +262,37 @@ begin
   );
   v_context := v_last_event;
 
-  if not p_is_test then
-    for v_automation in
-      select * from public.automations
-      where workspace_id = v_workspace_id and is_enabled = true and status = 'published'
-        and trigger_type = 'webhook.received'
-        and trigger_config->>'integration_id' = p_integration_id::text
-        and (nullif(trigger_config->>'event_type', '') is null or trigger_config->>'event_type' = p_event_type)
-    loop
-      if public.evaluate_automation_conditions(v_automation.conditions, v_context, v_workspace_id, null, null) then
-        insert into public.automation_runs (workspace_id, automation_id, trigger_snapshot, status, is_test)
-        values (v_workspace_id, v_automation.id, v_context, 'running', false)
-        returning id into v_run_id;
-        perform public.start_next_automation_step(v_run_id);
-      end if;
-    end loop;
-  end if;
+  -- Test events still walk the real graph (start_next_automation_step /
+  -- execute_automation_step), same as run_automation_test's own runs --
+  -- they're just tagged is_test=true, and it's THAT existing flag (already
+  -- checked throughout execute_automation_step to suppress real emails/SMS/
+  -- financial side effects) that makes this safe, not a webhook-specific
+  -- skip. Building a separate "don't actually run it" path here would be
+  -- exactly the second testing engine the instructions say not to build,
+  -- and would defeat the point of test mode ("verify the workflow path").
+  for v_automation in
+    select * from public.automations
+    where workspace_id = v_workspace_id and is_enabled = true and status = 'published'
+      and trigger_type = 'webhook.received'
+      and trigger_config->>'integration_id' = p_integration_id::text
+      and (nullif(trigger_config->>'event_type', '') is null or trigger_config->>'event_type' = p_event_type)
+  loop
+    if public.evaluate_automation_conditions(v_automation.conditions, v_context, v_workspace_id, null, null) then
+      insert into public.automation_runs (workspace_id, automation_id, trigger_snapshot, status, is_test)
+      values (v_workspace_id, v_automation.id, v_context, 'running', p_is_test)
+      returning id into v_run_id;
+      perform public.start_next_automation_step(v_run_id);
+    end if;
+  end loop;
 
+  -- Scoped to is_test = p_is_test on both sides: a live event must never
+  -- resume a test run, and a test event must never touch a real run waiting
+  -- on real customer data.
   update public.automation_runs
   set trigger_snapshot = coalesce(trigger_snapshot, '{}'::jsonb) || jsonb_build_object('last_webhook_event', v_last_event)
   where workspace_id = v_workspace_id
     and status = 'running'
+    and is_test = p_is_test
     and exists (
       select 1 from public.automation_pending_steps aps
       join public.automation_steps ast on ast.id = aps.automation_step_id

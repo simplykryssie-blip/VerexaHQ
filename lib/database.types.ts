@@ -12468,7 +12468,7 @@ export type Database = {
       claim_webhook_event: {
         Args: {
           p_event_type: string
-          p_external_id: string
+          p_external_id: string | null
           p_integration_id: string
           p_is_test?: boolean
           p_payload: Json

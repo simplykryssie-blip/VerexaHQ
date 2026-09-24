@@ -8,6 +8,7 @@ import { CalendarConnectionCard } from "@/components/settings/CalendarConnection
 import { JotFormConnectionCard } from "@/components/settings/JotFormConnectionCard";
 import { GhlConnectionCard } from "@/components/settings/GhlConnectionCard";
 import { EmailDomainCard, type DnsRecord } from "@/components/settings/EmailDomainCard";
+import { WebhookIntegrationsCard } from "@/components/settings/WebhookIntegrationsCard";
 
 export const dynamic = "force-dynamic";
 
@@ -109,6 +110,14 @@ export default async function IntegrationsPage({
     .select("domain, status, dns_records, from_local_part")
     .eq("workspace_id", workspace!.id)
     .maybeSingle();
+  const { data: canManageWebhooks } = await supabase.rpc("has_permission", { p_workspace_id: workspace!.id, p_permission_key: "automations.manage" });
+  const { data: webhookIntegrations } = canManageWebhooks
+    ? await supabase
+        .from("webhook_integrations")
+        .select("id, provider, name, status, last_event_at")
+        .eq("workspace_id", workspace!.id)
+        .order("created_at")
+    : { data: null };
 
   return (
     <div className="max-w-2xl">
@@ -161,6 +170,18 @@ export default async function IntegrationsPage({
       <div className="mt-6">
         <GhlConnectionCard workspaceId={workspace!.id} isConnected={Boolean(isGhlConnected)} />
       </div>
+
+      {canManageWebhooks && (
+        <>
+          <h2 className="mt-8 font-display text-base font-semibold text-ink">Webhooks</h2>
+          <p className="mt-1 text-sm text-muted">
+            Receive signature-verified events from external systems (or your own Stripe account) to trigger or resume workflows.
+          </p>
+          <div className="mt-6">
+            <WebhookIntegrationsCard workspaceId={workspace!.id} integrations={webhookIntegrations ?? []} />
+          </div>
+        </>
+      )}
 
       {calendarSection}
       {zoomSection}
