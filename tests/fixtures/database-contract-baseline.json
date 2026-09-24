@@ -11,7 +11,12 @@
       "refund_usage_unit",
       "credit_prepaid_balance",
       "grant_workspace_usage_meters",
-      "check_storage_capacity"
+      "check_storage_capacity",
+      "execute_automation_step",
+      "start_next_automation_step",
+      "claim_webhook_event",
+      "mark_webhook_event_processed",
+      "fire_webhook_automations"
     ]
   },
 
@@ -40,7 +45,24 @@
       "check_storage_capacity": { "args": "p_workspace_id uuid, p_additional_bytes bigint", "isSecurityDefiner": true },
       "claim_pending_paid_seat": { "args": "p_workspace_id uuid", "isSecurityDefiner": true },
       "release_paid_seat": { "args": "p_workspace_id uuid, p_seat_id uuid", "isSecurityDefiner": true },
-      "set_platform_admin": { "args": "p_user_email text, p_is_platform_admin boolean", "isSecurityDefiner": true }
+      "set_platform_admin": { "args": "p_user_email text, p_is_platform_admin boolean", "isSecurityDefiner": true },
+
+      "execute_automation_step": { "args": "p_run_id uuid, p_step_id uuid", "isSecurityDefiner": true },
+      "start_next_automation_step": { "args": "p_run_id uuid", "isSecurityDefiner": true },
+      "decide_automation_step": { "args": "p_pending_step_id uuid, p_decided_option text", "isSecurityDefiner": true },
+      "approve_automation_step": { "args": "p_pending_step_id uuid", "isSecurityDefiner": true },
+      "reject_automation_step": { "args": "p_pending_step_id uuid, p_reason text", "isSecurityDefiner": true },
+      "run_automation_test": { "args": "p_automation_id uuid, p_client_id uuid, p_engagement_id uuid", "isSecurityDefiner": true },
+      "validate_automation": { "args": "p_automation_id uuid", "isSecurityDefiner": true },
+      "acknowledge_automation_run": { "args": "p_run_id uuid", "isSecurityDefiner": true },
+      "reorder_automation_step": { "args": "p_step_id uuid, p_direction text", "isSecurityDefiner": true },
+      "delete_workflow_pipeline": { "args": "p_process_id uuid", "isSecurityDefiner": true },
+      "retry_failed_automation_run": { "args": "p_run_id uuid", "isSecurityDefiner": true },
+      "create_webhook_integration": { "args": "p_workspace_id uuid, p_provider text, p_name text", "isSecurityDefiner": true },
+      "rotate_webhook_integration_secret": { "args": "p_integration_id uuid", "isSecurityDefiner": true },
+      "claim_webhook_event": { "args": "p_integration_id uuid, p_event_type text, p_external_id text, p_payload jsonb, p_is_test boolean", "isSecurityDefiner": true },
+      "mark_webhook_event_processed": { "args": "p_event_id uuid, p_status text, p_error text", "isSecurityDefiner": true },
+      "fire_webhook_automations": { "args": "p_integration_id uuid, p_event_type text, p_payload jsonb, p_is_test boolean", "isSecurityDefiner": true }
     }
   }
 }
