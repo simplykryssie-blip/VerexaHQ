@@ -21,7 +21,7 @@ const PHONE_TYPE_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
-export function AddEmailForm({ clientId, workspaceId }: Ids) {
+export function AddEmailForm({ clientId, workspaceId, open, onOpenChange }: Ids & { open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const router = useRouter();
   const supabase = createClient();
   return (
@@ -83,7 +83,7 @@ export function DeleteEmailButton({ emailId }: { emailId: string }) {
   );
 }
 
-export function AddPhoneForm({ clientId, workspaceId }: Ids) {
+export function AddPhoneForm({ clientId, workspaceId, open, onOpenChange }: Ids & { open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const router = useRouter();
   const supabase = createClient();
   return (

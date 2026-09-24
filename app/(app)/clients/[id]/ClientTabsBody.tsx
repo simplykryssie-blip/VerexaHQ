@@ -3,6 +3,7 @@
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import { Tabs } from "@/components/ui/Tabs";
 import { isIndependentTier } from "@/lib/workspaceCapabilities";
+import { normalizeName } from "@/lib/name";
 import { OverviewTab, MessagesTab, BillingTab, NotesTab, TasksTab } from "./ClientWorkspaceTabs";
 import type { ClientWorkspaceProps } from "./ClientWorkspace";
 
@@ -11,7 +12,7 @@ export type ClientTab = (typeof TABS)[number];
 
 function displayName(c: { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }) {
   if (c.client_type !== "individual" && c.business_name) return c.business_name;
-  return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
+  return [c.first_name, c.last_name].filter(Boolean).map((name) => normalizeName(name!)).join(" ") || "Unnamed client";
 }
 
 /** The client's tab bar + tab content -- the one part of the client detail
