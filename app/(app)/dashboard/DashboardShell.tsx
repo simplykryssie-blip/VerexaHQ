@@ -5,11 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Settings2,
-  Eye,
-  EyeOff,
   ArrowUp,
   ArrowDown,
-  GripVertical,
+  RotateCcw,
   DollarSign,
   Briefcase,
   Receipt,
@@ -22,8 +20,11 @@ import {
   CalendarCheck,
   Workflow as WorkflowIcon,
 } from "lucide-react";
+import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
+import { SortableWidgetCard } from "@/components/dashboard/SortableWidgetCard";
 import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
 import { NewClientButton, type ServiceCategory, type StaffOption } from "@/app/(app)/clients/NewClientButton";
 import { KpiWidget, type KpiTrend } from "@/components/widgets/KpiWidget";
@@ -77,6 +78,7 @@ export function DashboardShell({
   serviceCategories,
   staffOptions,
   accountHolderName,
+  defaultWidgets,
 }: {
   workspaceName: string;
   /** ISO timestamp taken at the start of this server render -- see
@@ -103,6 +105,12 @@ export function DashboardShell({
   serviceCategories: ServiceCategory[];
   staffOptions: StaffOption[];
   accountHolderName: string;
+  /** The workspace's own dashboard_widgets defaults, before this user's
+   *  user_widget_preferences overrides are merged in -- kept separate so
+   *  "Reset Layout" can restore them instantly client-side without a
+   *  round trip, then persists the reset by deleting this user's override
+   *  rows (see resetLayout below). */
+  defaultWidgets: WidgetRow[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -110,8 +118,10 @@ export function DashboardShell({
   const [rows, setRows] = useState(widgets);
   const [customizing, setCustomizing] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   const sorted = [...rows].sort((a, b) => a.display_order - b.display_order);
   const visible = sorted.filter((w) => w.is_visible);
@@ -161,6 +171,45 @@ export function DashboardShell({
     setRows((prev) => prev.map((r) => reindexed.find((x) => x.id === r.id) ?? r));
     await Promise.all(reindexed.map((r) => savePreference(r.id, { display_order: r.display_order })));
     setSaving(null);
+    router.refresh();
+  }
+
+  // dnd-kit fires this once per completed drag, scoped to whichever
+  // section's own SortableContext the drag happened in -- `over` can only
+  // ever be a sibling already in that same section (see SortableWidgetCard),
+  // so this always reduces to the existing two-id reorder.
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    void reorder(String(active.id), String(over.id));
+  }
+
+  // Deletes this user's saved overrides for every widget on this dashboard
+  // so the merge in page.tsx falls back to dashboard_widgets' own defaults
+  // next render (the same fallback a brand-new user already gets) --
+  // restores default order and visibility together, without a second
+  // storage mechanism or a broader RPC grant than the RLS policies already
+  // allow a user over their own rows.
+  async function resetLayout() {
+    setSaving("__reset__");
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const { error } = await supabase
+        .from("user_widget_preferences")
+        .delete()
+        .eq("user_id", user.id)
+        .in("dashboard_widget_id", rows.map((r) => r.id));
+      if (error) {
+        setSaving(null);
+        toast.show(error.message, "error");
+        return;
+      }
+    }
+    setRows(defaultWidgets);
+    setSaving(null);
+    toast.show("Layout reset to default", "success");
     router.refresh();
   }
 
@@ -435,6 +484,11 @@ export function DashboardShell({
         meta={<FreshnessBadge generatedAt={generatedAt} />}
         actions={
           <>
+            {customizing && (
+              <Button type="button" variant="secondary" size="sm" disabled={saving !== null} onClick={() => void resetLayout()}>
+                <RotateCcw size={14} aria-hidden="true" /> Reset Layout
+              </Button>
+            )}
             <Button
               type="button"
               variant="secondary"
@@ -474,73 +528,51 @@ export function DashboardShell({
         <PromoBanner />
 
         {customizing && (
-          <div className="mb-4 rounded-xl border border-border bg-surfaceMuted p-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Widget layout -- drag to reorder</h2>
-            <ul className="mt-2 divide-y divide-border">
-              {sorted.filter((row) => isWidgetType(row.widget_type)).map((row) => (
-                <li
-                  key={row.id}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("text/plain", row.id);
-                    e.dataTransfer.effectAllowed = "move";
-                    setDraggingId(row.id);
-                  }}
-                  onDragEnd={() => {
-                    setDraggingId(null);
-                    setDragOverId(null);
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "move";
-                    if (dragOverId !== row.id) setDragOverId(row.id);
-                  }}
-                  onDragLeave={() => setDragOverId((id) => (id === row.id ? null : id))}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const draggedId = e.dataTransfer.getData("text/plain");
-                    setDragOverId(null);
-                    if (draggedId) reorder(draggedId, row.id);
-                  }}
-                  className={`flex cursor-grab items-center justify-between py-2 text-sm transition active:cursor-grabbing ${
-                    draggingId === row.id ? "opacity-40" : ""
-                  } ${dragOverId === row.id && draggingId !== row.id ? "border-t-2 border-accent" : ""}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <GripVertical size={14} className="shrink-0 text-muted" aria-hidden="true" />
-                    <span className={row.is_visible ? "text-slate" : "text-muted line-through"}>{row.title ?? row.widget_type}</span>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={saving === row.id}
-                    onClick={() => toggleVisible(row)}
-                    aria-label={row.is_visible ? `Hide ${row.title ?? row.widget_type}` : `Show ${row.title ?? row.widget_type}`}
-                    className="rounded p-1 text-muted hover:text-ink disabled:opacity-30"
-                  >
-                    {row.is_visible ? <Eye size={14} /> : <EyeOff size={14} />}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <p className="mb-4 text-xs text-muted">
+            Drag a card&apos;s grip handle to reorder it within its section, or use the eye icon to show/hide it. Changes save
+            automatically.
+          </p>
         )}
 
         <div className="space-y-8">
           {WIDGET_SECTIONS.map((section) => {
-            const sectionRows = visible.filter((row) => isWidgetType(row.widget_type) && section.types.includes(row.widget_type));
+            // In Customize mode, hidden widgets stay visible (dimmed, via
+            // SortableWidgetCard) so there's a way to re-show them -- outside
+            // Customize mode, only `visible` renders, same as before.
+            const sectionRows = (customizing ? sorted : visible).filter(
+              (row) => isWidgetType(row.widget_type) && section.types.includes(row.widget_type)
+            );
             if (sectionRows.length === 0) return null;
             return (
               <div key={section.label}>
                 <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">{section.label}</h2>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {sectionRows.map((row) =>
-                    isWidgetType(row.widget_type) ? (
-                      <div key={row.id} className={WIDE_WIDGET_TYPES.has(row.widget_type) ? "sm:col-span-2 lg:col-span-3" : undefined}>
-                        {renderWidget(row.widget_type)}
-                      </div>
-                    ) : null
-                  )}
-                </div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={sectionRows.map((r) => r.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {sectionRows.map((row) =>
+                        isWidgetType(row.widget_type) ? (
+                          <div
+                            key={row.id}
+                            className={`${WIDE_WIDGET_TYPES.has(row.widget_type) ? "sm:col-span-2 lg:col-span-3" : ""} ${
+                              customizing && !row.is_visible ? "opacity-40" : ""
+                            }`}
+                          >
+                            <SortableWidgetCard
+                              id={row.id}
+                              title={row.title ?? row.widget_type}
+                              isVisible={row.is_visible}
+                              editing={customizing}
+                              saving={saving === row.id}
+                              onToggleVisible={() => toggleVisible(row)}
+                            >
+                              {renderWidget(row.widget_type)}
+                            </SortableWidgetCard>
+                          </div>
+                        ) : null
+                      )}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               </div>
             );
           })}
