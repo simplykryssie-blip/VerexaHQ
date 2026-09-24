@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { formatPhone } from "@/lib/phone";
+import { normalizeName } from "@/lib/name";
 import { useToast } from "@/components/Toast";
 import { RichTextEditor } from "@/components/settings/RichTextEditor";
 
 export type FieldDef = {
   name: string;
   label: string;
-  type?: "text" | "email" | "tel" | "date" | "select" | "textarea" | "richtext";
+  type?: "text" | "email" | "tel" | "date" | "select" | "textarea" | "richtext" | "name";
   required?: boolean;
   options?: { value: string; label: string }[];
   showIf?: (values: Record<string, string>) => boolean;
@@ -23,6 +24,8 @@ export function InlineAddForm({
   initialValues,
   submitLabel = "Save",
   trigger,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   label: string;
   fields: FieldDef[];
@@ -31,9 +34,23 @@ export function InlineAddForm({
   initialValues?: Record<string, string>;
   submitLabel?: string;
   trigger?: (openForm: () => void) => React.ReactNode;
+  /** Controlled-open mode -- when provided (even as `false`), an external
+   *  trigger owns whether this form is shown (e.g. a single unified "+ Add
+   *  Contact Information" dropdown driving three of these at once) and this
+   *  component renders no trigger of its own while closed. Omit both props
+   *  for the existing uncontrolled "+ Label" button every other caller
+   *  already relies on -- unchanged. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const toast = useToast();
-  const [open, setOpen] = useState(defaultOpen);
+  const isControlled = controlledOpen !== undefined;
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const open = isControlled ? controlledOpen : internalOpen;
+  function setOpen(next: boolean) {
+    if (isControlled) onOpenChange?.(next);
+    else setInternalOpen(next);
+  }
   const [values, setValues] = useState<Record<string, string>>(initialValues ?? {});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -54,6 +71,7 @@ export function InlineAddForm({
   }
 
   if (!open) {
+    if (isControlled) return null;
     if (trigger) return <>{trigger(() => setOpen(true))}</>;
     return (
       <button
@@ -105,7 +123,7 @@ export function InlineAddForm({
           ) : (
             <input
               key={f.name}
-              type={f.type ?? "text"}
+              type={f.type === "name" ? "text" : f.type ?? "text"}
               required={f.required}
               placeholder={f.label}
               value={values[f.name] ?? ""}
@@ -114,9 +132,12 @@ export function InlineAddForm({
                 setValues((v) => ({ ...v, [f.name]: f.type === "tel" ? formatPhone(raw) : raw }));
               }}
               onBlur={(e) => {
-                if (f.type !== "email") return;
-                const trimmed = e.target.value.trim().toLowerCase();
-                setValues((v) => ({ ...v, [f.name]: trimmed }));
+                if (f.type === "email") {
+                  const trimmed = e.target.value.trim().toLowerCase();
+                  setValues((v) => ({ ...v, [f.name]: trimmed }));
+                } else if (f.type === "name") {
+                  setValues((v) => ({ ...v, [f.name]: normalizeName(e.target.value) }));
+                }
               }}
               className="rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />

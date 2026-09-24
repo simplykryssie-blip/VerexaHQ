@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { QuickActions } from "./QuickActions";
 import { ConvertLeadButton } from "./ConvertLeadButton";
+import { RevertToLeadButton } from "./RevertToLeadButton";
 import { MarkLeadLostButton } from "./MarkLeadLostButton";
 import { ArchiveClientButton } from "./ArchiveClientButton";
 import Link from "next/link";
@@ -245,6 +246,7 @@ export function ClientWorkspace(props: ClientWorkspaceProps) {
 
       <div className="flex items-center gap-2 border-b border-border bg-surface px-8 py-3">
         <ConvertLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
+        <RevertToLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
         <MarkLeadLostButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
         <ArchiveClientButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
         <QuickActions

@@ -31,12 +31,12 @@ export function AddContactForm({ clientId, workspaceId }: Ids) {
     <InlineAddForm
       label="Add a contact"
       fields={[
-        { name: "first_name", label: "First name", required: true },
-        { name: "last_name", label: "Last name", required: true },
+        { name: "first_name", label: "First name", type: "name", required: true },
+        { name: "last_name", label: "Last name", type: "name", required: true },
         { name: "title", label: "Title", type: "select", options: CONTACT_TITLE_OPTIONS },
         { name: "custom_title", label: "Custom title", showIf: (v) => v.title === "other" },
-        { name: "email", label: "Email" },
-        { name: "phone", label: "Phone" },
+        { name: "email", label: "Email", type: "email" },
+        { name: "phone", label: "Phone", type: "tel" },
       ]}
       onSubmit={async (v) => {
         const { error } = await supabase.from("client_contacts").insert({
@@ -72,12 +72,12 @@ export function EditContactForm({ contact }: { contact: ContactRow }) {
         phone: contact.phone ?? "",
       }}
       fields={[
-        { name: "first_name", label: "First name", required: true },
-        { name: "last_name", label: "Last name", required: true },
+        { name: "first_name", label: "First name", type: "name", required: true },
+        { name: "last_name", label: "Last name", type: "name", required: true },
         { name: "title", label: "Title", type: "select", options: CONTACT_TITLE_OPTIONS },
         { name: "custom_title", label: "Custom title", showIf: (v) => v.title === "other" },
-        { name: "email", label: "Email" },
-        { name: "phone", label: "Phone" },
+        { name: "email", label: "Email", type: "email" },
+        { name: "phone", label: "Phone", type: "tel" },
       ]}
       trigger={(openForm) => (
         <button type="button" onClick={openForm} className="text-muted hover:text-ink" aria-label="Edit contact">
@@ -121,12 +121,19 @@ export function DeleteContactButton({ contactId }: { contactId: string }) {
   );
 }
 
-export function AddAddressForm({ clientId, workspaceId }: Ids) {
+export function AddAddressForm({
+  clientId,
+  workspaceId,
+  open,
+  onOpenChange,
+}: Ids & { open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const router = useRouter();
   const supabase = createClient();
   return (
     <InlineAddForm
       label="Add Address"
+      open={open}
+      onOpenChange={onOpenChange}
       fields={[
         {
           name: "address_type",
@@ -141,6 +148,7 @@ export function AddAddressForm({ clientId, workspaceId }: Ids) {
           ],
         },
         { name: "street", label: "Street", required: true },
+        { name: "street2", label: "Apt / Suite / Unit" },
         { name: "city", label: "City" },
         { name: "state", label: "State", type: "select", options: STATE_OPTIONS },
         { name: "zip", label: "ZIP" },
@@ -151,6 +159,7 @@ export function AddAddressForm({ clientId, workspaceId }: Ids) {
           workspace_id: workspaceId,
           address_type: v.address_type,
           street: v.street,
+          street2: v.street2 || null,
           city: v.city || null,
           state: v.state || null,
           zip: v.zip || null,
@@ -179,6 +188,7 @@ export function EditAddressForm({ address }: { address: AddressRow }) {
       initialValues={{
         address_type: address.address_type,
         street: address.street ?? "",
+        street2: address.street2 ?? "",
         city: address.city ?? "",
         state: address.state ?? "",
         zip: address.zip ?? "",
@@ -186,6 +196,7 @@ export function EditAddressForm({ address }: { address: AddressRow }) {
       fields={[
         { name: "address_type", label: "Type", type: "select", required: true, options: ADDRESS_TYPE_OPTIONS },
         { name: "street", label: "Street", required: true },
+        { name: "street2", label: "Apt / Suite / Unit" },
         { name: "city", label: "City" },
         { name: "state", label: "State", type: "select", options: STATE_OPTIONS },
         { name: "zip", label: "ZIP" },
@@ -201,6 +212,7 @@ export function EditAddressForm({ address }: { address: AddressRow }) {
           .update({
             address_type: v.address_type,
             street: v.street,
+            street2: v.street2 || null,
             city: v.city || null,
             state: v.state || null,
             zip: v.zip || null,
@@ -239,7 +251,7 @@ export function AddPortalUserForm({ clientId, workspaceId }: Ids) {
     <InlineAddForm
       label="Invite Additional"
       fields={[
-        { name: "invited_name", label: "Name" },
+        { name: "invited_name", label: "Name", type: "name" },
         { name: "invited_email", label: "Email", type: "email", required: true },
       ]}
       onSubmit={async (v) => {

@@ -1,0 +1,53 @@
+{
+  "_comment": "Policy baseline for tests/database-contract-guard.test.ts. This is NOT a schema snapshot -- it only tracks the small set of functions this project has already had to reason carefully about (the phone-number vulnerability, SD-1, and the pre-existing usage-billing fix), plus the handful of known-safe public/token-based functions the SECURITY DEFINER audit manually verified. Update this file, in the same PR as the migration that changes one of these functions, whenever a deliberate, reviewed change is made -- that review is the point of this file existing.",
+
+  "serviceOnlyFunctions": {
+    "_comment": "SECURITY DEFINER mutation functions that must NEVER show authenticated or anon EXECUTE. Each was fixed after being found callable directly by an unrelated authenticated user with no internal authorization check. If any of these ever shows authenticated_exec or anon_exec = true again, that is the exact regression class that produced both confirmed vulnerabilities -- fail loudly, do not guess intent.",
+    "names": [
+      "provision_phone_number_record",
+      "bill_and_pause_phone_numbers",
+      "resolve_organizer_response_service",
+      "reserve_usage_unit",
+      "refund_usage_unit",
+      "credit_prepaid_balance",
+      "grant_workspace_usage_meters",
+      "check_storage_capacity"
+    ]
+  },
+
+  "acceptedOverloads": {
+    "_comment": "Function names with more than one live signature, and the exact count accepted. Anything with overload_count > 1 that is NOT listed here (or whose count differs) is an unexpected overload -- the same class of migration-discipline drift the audit's own findings warned about (CREATE FUNCTION with a new arg list instead of a true replacement).",
+    "_get_or_create_partner_onboarding": 2
+  },
+
+  "acceptedPublicFunctions": {
+    "_comment": "SECURITY DEFINER functions confirmed, by manual review during the SECURITY DEFINER audit, to be safely authenticated-or-anon-executable despite the automated has_recognized_auth/has_token_lookup heuristics not detecting a standard predicate call or a `token = p_token` lookup pattern in their body. Each entry states why. A function already showing has_recognized_auth=true or has_token_lookup=true does NOT need to be listed here -- this list exists only for the residual cases those two heuristics miss.",
+    "entries": {
+      "capture_public_lead_from_site_page": "Public marketing lead-capture form. workspace_id is derived entirely from a p_page_id/p_section_id lookup against a published site_pages/site_page_sections row -- never accepted directly from the caller -- so there is no caller-supplied identifier to authorize against. Confirmed via full body read."
+    }
+  },
+
+  "trackedSignatures": {
+    "_comment": "A curated (not exhaustive) set of production-critical functions whose exact signature and SECURITY DEFINER/INVOKER status is fingerprinted here. A mismatch against the live database is a REVIEW REQUIRED signal (not an automatic hard failure for most functions), except where noted -- a legitimate signature change happens; the point is forcing a human to notice, and to update this file in the same PR.",
+    "functions": {
+      "provision_phone_number_record": { "args": "p_workspace_id uuid, p_phone_number text, p_twilio_sid text", "isSecurityDefiner": true },
+      "bill_and_pause_phone_numbers": { "args": "p_workspace_id uuid", "isSecurityDefiner": true },
+      "resolve_organizer_response_service": { "args": "p_response_id uuid", "isSecurityDefiner": true },
+      "reserve_usage_unit": { "args": "p_workspace_id uuid, p_resource_type text", "isSecurityDefiner": true },
+      "refund_usage_unit": { "args": "p_workspace_id uuid, p_resource_type text, p_source text", "isSecurityDefiner": true },
+      "credit_prepaid_balance": { "args": "p_workspace_id uuid, p_resource_type text, p_units numeric", "isSecurityDefiner": true },
+      "grant_workspace_usage_meters": { "args": "p_workspace_id uuid", "isSecurityDefiner": true },
+      "check_storage_capacity": { "args": "p_workspace_id uuid, p_additional_bytes bigint", "isSecurityDefiner": true },
+      "claim_pending_paid_seat": { "args": "p_workspace_id uuid", "isSecurityDefiner": true },
+      "release_paid_seat": { "args": "p_workspace_id uuid, p_seat_id uuid", "isSecurityDefiner": true },
+      "set_platform_admin": { "args": "p_user_email text, p_is_platform_admin boolean", "isSecurityDefiner": true },
+      "create_contact_share": { "args": "p_client_id uuid, p_category_keys text[]", "isSecurityDefiner": true },
+      "request_contact_share_update": { "args": "p_retained_contact_id uuid, p_category_keys text[]", "isSecurityDefiner": true },
+      "respond_to_contact_share": { "args": "p_share_id uuid, p_decision text, p_notes text", "isSecurityDefiner": true },
+      "execute_contact_share_transfer": { "args": "p_share_id uuid", "isSecurityDefiner": true },
+      "mark_contact_document_transferred": { "args": "p_transfer_id uuid", "isSecurityDefiner": true },
+      "withdraw_contact_share": { "args": "p_share_id uuid", "isSecurityDefiner": true },
+      "resubmit_contact_share": { "args": "p_share_id uuid", "isSecurityDefiner": true }
+    }
+  }
+}

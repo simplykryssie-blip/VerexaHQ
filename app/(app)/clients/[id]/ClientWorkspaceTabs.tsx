@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Briefcase, CheckSquare, Receipt, ArrowUpRight, FileText, ClipboardCheck, PenLine, RefreshCw, StickyNote, DollarSign, Mail, HelpCircle } from "lucide-react";
 import { taskHref } from "@/lib/taskLink";
+import { formatPhone } from "@/lib/phone";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 import { createClient } from "@/lib/supabase/client";
@@ -29,7 +30,6 @@ import {
   AddContactForm,
   EditContactForm,
   DeleteContactButton,
-  AddAddressForm,
   EditAddressForm,
   DeleteAddressButton,
   AddPortalUserForm,
@@ -41,14 +41,13 @@ import {
   ReopenTaskButton,
 } from "./AddForms";
 import {
-  AddEmailForm,
   SetEmailPrimaryButton,
   DeleteEmailButton,
-  AddPhoneForm,
   SetPhonePrimaryButton,
   DeletePhoneButton,
   SetAddressPrimaryButton,
 } from "./ContactChannelForms";
+import { AddContactInformationControl } from "./AddContactInformationControl";
 import { EditClientProfileForm } from "./EditClientProfileForm";
 import { TagsEditor } from "./TagsEditor";
 import { ServiceInterestControl } from "./ServiceInterestControl";
@@ -254,7 +253,7 @@ export function OverviewTab({
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
           <Field label="Name" value={clientDisplayName(client)} />
           <Field label="Primary email" value={client.primary_email} />
-          <Field label="Primary phone" value={client.primary_phone} />
+          <Field label="Primary phone" value={client.primary_phone ? formatPhone(client.primary_phone) : null} />
           {client.client_type === "individual" ? (
             <>
               <TaxIdReveal clientId={client.id} kind="ssn" last4={client.ssn_last4} />
@@ -273,12 +272,13 @@ export function OverviewTab({
           )}
         </dl>
 
-        <div className="mt-4 grid grid-cols-1 gap-4 border-t border-border pt-4 sm:grid-cols-2">
+        <div className="mt-4 border-t border-border pt-4">
+          <AddContactInformationControl clientId={client.id} workspaceId={workspaceId} />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Emails</h3>
-              <AddEmailForm clientId={client.id} workspaceId={workspaceId} />
-            </div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Emails</h3>
             {emails.length === 0 ? (
               <EmptyState message="No emails on file." />
             ) : (
@@ -301,10 +301,7 @@ export function OverviewTab({
           </div>
 
           <div>
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Phones</h3>
-              <AddPhoneForm clientId={client.id} workspaceId={workspaceId} />
-            </div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Phones</h3>
             {phones.length === 0 ? (
               <EmptyState message="No phones on file." />
             ) : (
@@ -312,7 +309,7 @@ export function OverviewTab({
                 {phones.map((p) => (
                   <li key={p.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
                     <span>
-                      {p.phone_number}
+                      {formatPhone(p.phone_number)}
                       <span className="ml-2 text-xs capitalize text-muted">{p.phone_type}</span>
                       {p.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
                     </span>
@@ -328,10 +325,7 @@ export function OverviewTab({
         </div>
 
         <div className="mt-4 border-t border-border pt-4">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Addresses</h3>
-            <AddAddressForm clientId={client.id} workspaceId={workspaceId} />
-          </div>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Addresses</h3>
           {addresses.length === 0 ? (
             <EmptyState message="No additional addresses." />
           ) : (
@@ -340,7 +334,7 @@ export function OverviewTab({
                 <li key={a.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
                   <span>
                     <span className="mr-2 capitalize text-muted">{a.address_type}:</span>
-                    {[a.street, a.city, a.state, a.zip].filter(Boolean).join(", ")}
+                    {[a.street, a.street2, a.city, [a.state, a.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ")}
                     {a.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
                   </span>
                   <div className="flex shrink-0 items-center gap-2">
@@ -452,7 +446,7 @@ export function OverviewTab({
                     </div>
                     <div className="mt-0.5 flex flex-wrap gap-x-4 text-xs text-muted">
                       {c.email && <span>{c.email}</span>}
-                      {c.phone && <span>{c.phone}</span>}
+                      {c.phone && <span>{formatPhone(c.phone)}</span>}
                     </div>
                   </li>
                 );
@@ -1405,7 +1399,16 @@ export function TasksTab({
 // ------------------------------------------------------------------- Types
 
 export type ContactRow = { id: string; first_name: string | null; last_name: string | null; title: string | null; email: string | null; phone: string | null; is_primary: boolean };
-export type AddressRow = { id: string; address_type: string; street: string | null; city: string | null; state: string | null; zip: string | null; is_primary: boolean };
+export type AddressRow = {
+  id: string;
+  address_type: string;
+  street: string | null;
+  street2: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  is_primary: boolean;
+};
 export type EmailRow = { id: string; email: string; email_type: string; is_primary: boolean };
 export type PhoneRow = { id: string; phone_number: string; phone_type: string; is_primary: boolean };
 export type PortalUserRow = {

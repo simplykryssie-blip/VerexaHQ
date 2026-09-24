@@ -21,12 +21,19 @@ const PHONE_TYPE_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
-export function AddEmailForm({ clientId, workspaceId }: Ids) {
+export function AddEmailForm({
+  clientId,
+  workspaceId,
+  open,
+  onOpenChange,
+}: Ids & { open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const router = useRouter();
   const supabase = createClient();
   return (
     <InlineAddForm
       label="Add Email"
+      open={open}
+      onOpenChange={onOpenChange}
       fields={[
         { name: "email", label: "Email", type: "email", required: true },
         { name: "email_type", label: "Type", type: "select", options: EMAIL_TYPE_OPTIONS },
@@ -83,12 +90,19 @@ export function DeleteEmailButton({ emailId }: { emailId: string }) {
   );
 }
 
-export function AddPhoneForm({ clientId, workspaceId }: Ids) {
+export function AddPhoneForm({
+  clientId,
+  workspaceId,
+  open,
+  onOpenChange,
+}: Ids & { open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const router = useRouter();
   const supabase = createClient();
   return (
     <InlineAddForm
       label="Add Phone"
+      open={open}
+      onOpenChange={onOpenChange}
       fields={[
         { name: "phone", label: "Phone", type: "tel", required: true },
         { name: "phone_type", label: "Type", type: "select", options: PHONE_TYPE_OPTIONS },

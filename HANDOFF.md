@@ -1,6 +1,202 @@
+# Addendum — 2026-09-23: Contacts Pass 1-6 shipped; Contact Sharing Phases 0-5 shipped (DB/RPC/Storage only, no UI); MKB manually upgraded to ERO Office
+
+**READ THIS FIRST.** This is the newest handoff state. The 2026-09-20
+addendum that used to be here is now folded into the chronological log
+further down (`## Addendum — 2026-09-20`) — its Stripe Payment Link /
+nested-package-condition items are still open and untouched this session,
+see the Fix Now list below.
+
+## Branch state — small divergence from `main`, not merged
+
+Still on `claude/verexa-remove-services-vaqbfx` (per the branch-divergence
+saga earlier in this file). As of 2026-09-23 the divergence is small and
+one-directional-ish:
+- `main` has 3 commits this branch lacks: `d2383fe` (service/category
+  automation + Review Queue runtime), `838196a` (#324, service category
+  deletion FK fix), `d369c17` (#323, Services category management).
+- This branch has 14 commits `main` lacks, ending in `5087719` — the 7
+  Contacts Pass commits below, the Contact Sharing commit below, and 7
+  earlier dashboard/bugfix commits (`a54bded` through `f5b10df`, already
+  covered by earlier addenda in this file).
+
+Neither side has been merged into the other this session. Check
+`git rev-list --left-right --count origin/main...origin/claude/verexa-remove-services-vaqbfx`
+before assuming this is still current — it drifts every time either side ships.
+
+## Contacts Consolidated Implementation, Pass 1-6: 🟢 COMPLETE (this branch only, not on `main`)
+
+Six isolated-commit passes, each tested and pushed. **Do not confuse this
+with the unrelated "Contacts completion pass" (PRs #290-299) already on
+`main`** described in the 2026-09-20 addendum below — that was a different
+round of Contacts work on a different branch (`claude/verexa-schema-mismatch-i8c19u`).
+This one:
+- Pass 1 (`095f373`): consistent phone display, phone-format-agnostic
+  search, sub-Contact input types.
+- Pass 2 (`312dd8a`): unified Add Contact Information control, structured
+  `street2`, single-primary-address enforcement.
+- Pass 3 (`ae658c4`): Quick-View flyout trimmed to a real overview; Timeline
+  tab wired in.
+- Pass 4 (`e8dd3d9`): conservative blur-time name normalization
+  (`lib/name.ts`'s `normalizeName`) — only touches uniformly-all-lower or
+  all-upper input, never mixed-case.
+- Pass 5 (`43d3551`): `DocumentWorkspace`'s "Show activity" panel is now
+  document-scoped only (`DOCUMENT_ACTIVITY_TYPES` filter), no longer a
+  duplicate of the general Timeline tab.
+- Pass 6 (`d839d12`): `RevertToLeadButton` — Client→Lead lifecycle
+  reversion, the mirror of the existing Lead→Client conversion.
+
+Explicitly deferred by the task that produced these (still deferred,
+unstarted): **Hard Delete**, and (at the time) **Independent-PTIN→ERO
+Contact sharing** — the latter is no longer fully deferred, see below.
+
+## Contact Sharing (Independent PTIN → ERO): Phases 0-5 shipped (DB/RPC/Storage only). 🛑 UI explicitly NOT started — stop here until asked to continue.
+
+New feature area, not previously in this file. Went through four locked,
+sequential passes this session: (1) a comprehensive architecture audit,
+(2) a schema+workflow design audit, (3) a reconciliation pass resolving 10
+flagged ambiguities down to zero blockers, (4) **actual implementation**,
+strictly scoped to Phases 0-5 by explicit instruction — **do not build the
+UI without a new, explicit ask**, that's Phase 6+ and was never started.
+
+**What it does**: an Independent PTIN workspace can share selected Contact
+data/documents with its one active connected ERO through an explicit
+request → approve → transfer workflow, producing a durable, versioned,
+destination-owned copy (`ero_retained_contacts` + full-snapshot version
+history) that survives the source Contact being hard-deleted or the
+connection being revoked later.
+
+**Shipped this session, commit `5087719`, pushed to
+`claude/verexa-remove-services-vaqbfx`:**
+- **Phase 0**: self-verifying migration enforcing one-active-ERO-per-PTIN
+  at the DB level (`firm_connections_one_active_ero_per_child_idx`).
+- **Phase 1**: 11 new tables (`contact_shares`, `contact_share_categories`,
+  `contact_share_actions`, `ero_retained_contacts` + 4 current-state child
+  tables, `ero_retained_contact_versions`,
+  `ero_retained_contact_version_fields` (EAV full-snapshot model),
+  `contact_document_transfers`) with RLS (source-side identifiers have no
+  FK by design — same pattern already used by `clients.source_workspace_id`
+  in the existing `copy_shared_engagement` precedent), 3 new permissions.
+- **Phase 2**: exactly 7 new `SECURITY DEFINER` RPCs — `create_contact_share`,
+  `request_contact_share_update`, `respond_to_contact_share`,
+  `execute_contact_share_transfer`, `mark_contact_document_transferred`,
+  `withdraw_contact_share`, `resubmit_contact_share`. Explicit
+  `initiated_by` column resolves which side must approve, never inferred.
+- **Phase 3**: `app/api/contact-shares/[id]/approve/route.ts` — two-phase
+  document transfer (RPC creates rows with `transferred_at = NULL`; this
+  route does the actual Storage byte-copy under the service role, retry-safe,
+  existence-checked before copying, only confirms after the destination
+  object is verified present).
+- **Phase 4**: `tests/fixtures/database-contract-baseline.json` updated with
+  all 7 new RPC signatures (database-contract-guard's backing RPC,
+  `run_database_contract_guard`, still doesn't exist in production — a
+  pre-existing gap, not this session's to fix; compliance was verified
+  manually instead).
+- **Phase 5**: `tests/contact-sharing-schema.test.ts` (37 tests) plus
+  extensive live rolled-back-transaction verification against production
+  (share/approve/transfer/zero-diff/idempotency/RLS/one-active-ERO/
+  disconnect/hard-delete flows all confirmed live). **Not live-tested**:
+  the actual document/attachment transfer path (no synthetic attachment was
+  created in verification) and a real reconnect-to-ERO cycle after
+  disconnect (only the underlying find-or-create identity-key logic was
+  exercised).
+
+**Next step for whoever picks this up**: Phase 6+ UI — Share-with-ERO
+button/category picker, ERO share-request review UI, retained-Contact
+viewer, update-request UI, notification surfacing. None of it exists yet.
+Don't start it without confirming that's actually what's being asked for.
+
+## Production data change (outside any app code path): MKB Financial Group upgraded to ERO Office; VA invited
+
+At the user's explicit request and after two rounds of `AskUserQuestion`
+confirmation (the first request was literally "add a seat," which turned
+out to require a tier change first — MKB was `workspace_type =
+'independent_ptin'`, which per `canInviteStaff()` in
+`lib/workspaceCapabilities.ts` has **zero** included seats and is
+hard-blocked from inviting staff at all):
+
+- **`workspaces.workspace_type`** for MKB Financial Group
+  (`2896bf43-95db-420f-9bb5-8854f537bbd1`) changed from `independent_ptin`
+  to `ero_office` via a direct, real (not rolled back) SQL `UPDATE`. **There
+  is no supported in-app or RPC path to do this for an existing workspace**
+  — checked thoroughly; `workspace_type` is read-only everywhere in the app,
+  including every `platform-admin` page. This was safe as a raw data edit
+  only because MKB is `is_billing_exempt = true` and has no
+  `workspace_subscriptions` row at all — no Stripe plan/subscription exists
+  to reconcile. **This would not be safe to repeat for a real paying
+  workspace without first designing an actual upgrade flow** (see new ⚪
+  product decision below).
+- An invitation was created for `admin@mkbfinancialgroup.com` as
+  **Administrative Staff**, via the real `create_workspace_invitation` RPC
+  (impersonated as MKB's owner, `krystal@mkbfinancialgroup.com` —
+  `838c3f09-da48-4963-8917-aacc70a780e2`), token
+  `fcebc653-0baa-4b70-8a59-d194ef868014`, expires 2026-09-30. **Because this
+  was created via direct DB access rather than the app's own authenticated
+  session, no invitation email went out through Resend** — the accept URL
+  (`https://verexahq.com/accept-invitation?token=fcebc653-0baa-4b70-8a59-d194ef868014`)
+  was handed directly to the user to forward to the VA themselves, matching
+  the app's own designed fallback UX for when email delivery isn't
+  configured.
+- **Not yet verified**: MKB now has `ero_office`-tier features exposed that
+  it never had before and that were never exercised for this specific
+  workspace — EFIN field, the `/partners` directory, `ERO_MANAGEMENT_NAV_ITEMS`,
+  `can_use_network_messaging`. Nothing was observed broken, but nobody has
+  actually opened MKB's workspace in a browser since the change. Worth a
+  quick look next time anyone's in there.
+
+## Vercel — checked, nothing was broken, nothing was changed
+
+Checked 2026-09-23 in response to "fix all the errors in Vercel
+deployment": production (`main`, latest `838196a`) is `READY`, and this
+branch's own latest deployment (commit `5087719`) is also `READY`. The
+`ERROR` deployments found in Vercel's history all belonged to
+`feat/service-category-automation-routing` and `fix/workflow-tag-editor-state`
+— both branches' own later pushes superseded them with `READY` builds. No
+current/unresolved deployment error existed; no action was taken.
+
+## Roadmap — updated
+
+### 🟢 Complete (added this session)
+- Contacts Consolidated Pass 1-6 (this branch, not on `main` — see above).
+- Contact Sharing Phases 0-5 — DB/RPC/Storage layer only (this branch, not
+  on `main` — see above). **UI is not complete, do not mark this fully done.**
+
+### 🔴 Fix Now (untouched this session, still exactly as of 2026-09-20)
+1. External Stripe Payment Link → Verexa Package/Buyer mapping — audit
+   first, see full detail below.
+2. `partner_onboarding.created` nested `package_purchase.package_name`
+   resolution — verify first, see full detail below.
+
+### 🟡 Backlog (added this session)
+- Contact Sharing Phase 6+ (UI) — see above.
+- Whether MKB's `ero_office` upgrade surfaced anything that needs cleanup
+  (Partners directory, EFIN, network messaging) — see above, not yet checked.
+- (pre-existing, untouched) repo-wide accidental PostgreSQL overload audit;
+  billing hardening items; partner automation visibility; remaining module
+  roadmap.
+
+### 🔵 Deferred (unchanged)
+- Hard delete (Contacts Pass 1-6 reconfirmed this stays deferred).
+- client-level Stripe Customer / saved payment methods.
+- IRS Transcript/8821; other documented deferred items.
+
+### ⚪ Product decisions (added this session)
+- **No supported way to change an existing workspace's tier/`workspace_type`
+  post-creation.** MKB's flip to `ero_office` this session was a manual,
+  one-off DB edit, safe only because that workspace is billing-exempt. If a
+  real paying workspace ever needs this, a real upgrade flow (billing
+  reconciliation, Stripe plan change, seat recount) needs designing first —
+  don't repeat the manual-edit shortcut for a billed workspace.
+- (pre-existing, untouched) Multi-office Firm details; Workspace PTIN
+  leave/take-client-history behavior; platform-admin included-seat naming;
+  SMS activation-fee decision; other documented decisions.
+
+---
+
 # Addendum — 2026-09-20: Contacts closed; Stripe Payment Link architecture clarified
 
-**READ THIS FIRST.** This is the newest handoff state.
+This was the top-of-file addendum before the 2026-09-23 one above replaced
+it. Kept here verbatim as the chronological record — its Fix Now items are
+still open, see the updated roadmap above for current status.
 
 ## Contacts: 🟢 COMPLETE
 The full Contacts completion pass is closed (PRs #290–#299): remaining filters, archive/restore, cross-page selection, tasks, rich Notes, billing transaction display, signature PDF/audit trail, GHL guard, navigation, CSV, and the final stale `search_clients` overload fix.
@@ -322,6 +518,20 @@ merged app (every route from both branches builds, including `/partners`,
 **Not yet done**: pushing this merge, and a real click-through test in a
 browser (this was a code-level merge verification only) -- check whether
 those happened after this note, since it was written before either.
+
+## Addendum — 2026-09-23: Contacts Pass 1-6, Contact Sharing Phases 0-5, MKB tier change
+
+Full detail is in the top-of-file addendum (search this file for
+"Addendum — 2026-09-23" if it's since been superseded as the top block) —
+this entry exists only so the append-only chronological log doesn't skip a
+session. Summary: shipped Contacts Consolidated Pass 1-6 (`095f373` through
+`d839d12`) and Contact Sharing Phases 0-5 (`5087719`) on
+`claude/verexa-remove-services-vaqbfx`, neither merged to `main`; manually
+flipped MKB Financial Group's `workspace_type` to `ero_office` and created
+a staff invitation for its VA via direct production SQL (no supported
+in-app upgrade path exists); confirmed Vercel had no actual unresolved
+deployment errors. See the top block for exact commits, RPC names, table
+names, and the production identifiers involved.
 
 ## Addendum — 2026-09-20: Contacts completion pass closed out; search_clients stale-overload fixed; future cleanup backlog
 
