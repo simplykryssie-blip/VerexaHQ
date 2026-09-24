@@ -3,6 +3,8 @@ import type { DataTableColumn } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/Avatar";
 import { clientStatusTone } from "@/lib/clientStatus";
+import { normalizeName } from "@/lib/name";
+import { formatPhone } from "@/lib/phone";
 
 // Split out of page.tsx: a Next.js App Router page.tsx file may only export
 // `default` and a small fixed set of route config fields (dynamic,
@@ -20,7 +22,7 @@ export function clientDisplayName(c: {
   // shares the same business_name column as its entity name -- there's no
   // per-type name field in the schema.
   if (c.client_type !== "individual" && c.business_name) return c.business_name;
-  return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
+  return [c.first_name, c.last_name].filter(Boolean).map((name) => normalizeName(name!)).join(" ") || "Unnamed client";
 }
 
 /** Pure so the "assigned but profile row missing" fallback is directly
@@ -80,7 +82,7 @@ export const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
   },
   { key: "type", header: "Type", render: (c) => <span className="capitalize text-slate">{c.client_type}</span> },
   { key: "email", header: "Email", render: (c) => <span className="text-slate">{c.primary_email ?? "--"}</span> },
-  { key: "phone", header: "Phone", render: (c) => <span className="text-slate">{c.primary_phone ?? "--"}</span> },
+  { key: "phone", header: "Phone", render: (c) => <span className="text-slate">{c.primary_phone ? formatPhone(c.primary_phone) : "--"}</span> },
   {
     key: "status",
     header: "Status",
