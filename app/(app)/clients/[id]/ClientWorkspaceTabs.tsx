@@ -254,7 +254,7 @@ export function OverviewTab({
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
           <Field label="Name" value={clientDisplayName(client)} />
           <Field label="Primary email" value={client.primary_email} />
-          <Field label="Primary phone" value={client.primary_phone} />
+          <Field label="Primary phone" value={client.primary_phone ? formatPhone(client.primary_phone) : null} />
           {client.client_type === "individual" ? (
             <>
               <TaxIdReveal clientId={client.id} kind="ssn" last4={client.ssn_last4} />
