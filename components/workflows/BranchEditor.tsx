@@ -71,6 +71,7 @@ export function BranchEditor({
   decisionSteps = [],
   tagOptions = [],
   firmPackageOptions = [],
+  webhookIntegrations = [],
   canManage,
   onSaved,
   onClose,
@@ -90,6 +91,7 @@ export function BranchEditor({
   decisionSteps?: DecisionStepOption[];
   tagOptions?: string[];
   firmPackageOptions?: TemplateOption[];
+  webhookIntegrations?: TemplateOption[];
   canManage: boolean;
   onSaved: () => void;
   onClose: () => void;
@@ -328,6 +330,7 @@ export function BranchEditor({
               decisionSteps={decisionSteps}
               tagOptions={tagOptions}
               firmPackageOptions={firmPackageOptions}
+              webhookIntegrations={webhookIntegrations}
               disabled={!canManage}
             />
           </div>

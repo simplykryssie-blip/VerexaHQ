@@ -10372,6 +10372,8 @@ export type Database = {
           event_type: string
           external_id: string | null
           id: string
+          integration_id: string | null
+          is_test: boolean
           last_error: string | null
           payload: Json
           processed_at: string | null
@@ -10385,6 +10387,8 @@ export type Database = {
           event_type: string
           external_id?: string | null
           id?: string
+          integration_id?: string | null
+          is_test?: boolean
           last_error?: string | null
           payload?: Json
           processed_at?: string | null
@@ -10398,6 +10402,8 @@ export type Database = {
           event_type?: string
           external_id?: string | null
           id?: string
+          integration_id?: string | null
+          is_test?: boolean
           last_error?: string | null
           payload?: Json
           processed_at?: string | null
@@ -10408,7 +10414,68 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "webhook_events_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "webhook_integrations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "webhook_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_integrations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          last_event_at: string | null
+          name: string
+          provider: string
+          signing_secret: string
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_event_at?: string | null
+          name: string
+          provider?: string
+          signing_secret: string
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_event_at?: string | null
+          name?: string
+          provider?: string
+          signing_secret?: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_integrations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_integrations_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -12398,6 +12465,20 @@ export type Database = {
           should_process: boolean
         }[]
       }
+      claim_webhook_event: {
+        Args: {
+          p_event_type: string
+          p_external_id: string
+          p_integration_id: string
+          p_is_test?: boolean
+          p_payload: Json
+        }
+        Returns: {
+          id: string
+          should_process: boolean
+          workspace_id: string
+        }[]
+      }
       compare_config_object_versions: {
         Args: {
           p_id: string
@@ -12745,6 +12826,13 @@ export type Database = {
         }
         Returns: string
       }
+      create_webhook_integration: {
+        Args: { p_name: string; p_provider: string; p_workspace_id: string }
+        Returns: {
+          id: string
+          signing_secret: string
+        }[]
+      }
       create_workflow_pipeline: {
         Args: { p_name: string; p_workspace_id: string }
         Returns: string
@@ -12965,6 +13053,15 @@ export type Database = {
       fire_date_reminder_automations: { Args: never; Returns: number }
       fire_invoice_overdue_automations: { Args: never; Returns: number }
       fire_task_overdue_automations: { Args: never; Returns: number }
+      fire_webhook_automations: {
+        Args: {
+          p_event_type: string
+          p_integration_id: string
+          p_is_test?: boolean
+          p_payload: Json
+        }
+        Returns: undefined
+      }
       flag_organizer_field_for_info: {
         Args: {
           p_instance_index?: number
@@ -13900,6 +13997,10 @@ export type Database = {
         Args: { p_engagement_id: string }
         Returns: undefined
       }
+      mark_webhook_event_processed: {
+        Args: { p_error?: string; p_event_id: string; p_status: string }
+        Returns: undefined
+      }
       maybe_queue_usage_warning: {
         Args: {
           p_resource_type: string
@@ -14475,6 +14576,10 @@ export type Database = {
       revoke_workspace_user: {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
+      }
+      rotate_webhook_integration_secret: {
+        Args: { p_integration_id: string }
+        Returns: string
       }
       run_automation_test: {
         Args: {

@@ -57,6 +57,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: { par
     { data: pendingApprovalsRaw },
     { data: pendingDecisionsRaw },
     { data: firmPackagesRaw },
+    { data: webhookIntegrationsRaw },
   ] = await Promise.all([
       supabase
         .from("automation_steps")
@@ -160,9 +161,16 @@ export default async function WorkflowDetailPage({ params, searchParams }: { par
         .eq("automation_runs.automation_id", automation.id)
         .order("created_at", { ascending: true }),
       supabase.from("firm_packages").select("id, name").eq("workspace_id", workspace.id).order("name"),
+      supabase
+        .from("webhook_integrations")
+        .select("id, name")
+        .eq("workspace_id", workspace.id)
+        .eq("status", "active")
+        .order("name"),
     ]);
 
   const firmPackageOptions: TemplateOption[] = firmPackagesRaw ?? [];
+  const webhookIntegrations: TemplateOption[] = webhookIntegrationsRaw ?? [];
 
   const stepRows: WorkflowStepRow[] = (steps ?? []).map((s) => ({
     id: s.id,
@@ -288,6 +296,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: { par
           services={services ?? []}
           serviceCategories={serviceCategories}
           firmPackageOptions={firmPackageOptions}
+          webhookIntegrations={webhookIntegrations}
           pipelines={pipelines}
           staffOptions={staffOptions}
           automationOptions={automationOptions}

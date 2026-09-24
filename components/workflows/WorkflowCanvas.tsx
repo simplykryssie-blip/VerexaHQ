@@ -607,6 +607,7 @@ function CanvasInner({
   automationOptions,
   tagOptions = [],
   firmPackageOptions = [],
+  webhookIntegrations = [],
   roleOptions = [],
   onEditTrigger,
   onOpenRun,
@@ -631,6 +632,7 @@ function CanvasInner({
   automationOptions: AutomationOption[];
   tagOptions?: string[];
   firmPackageOptions?: TemplateOption[];
+  webhookIntegrations?: TemplateOption[];
   roleOptions?: RoleOption[];
   onEditTrigger: () => void;
   onOpenRun: (runId: string) => void;
@@ -1219,6 +1221,7 @@ function CanvasInner({
               decisionSteps={decisionSteps}
               tagOptions={tagOptions}
               firmPackageOptions={firmPackageOptions}
+              webhookIntegrations={webhookIntegrations}
               roleOptions={roleOptions}
               canManage={canManage}
               onSaved={() => {
@@ -1254,6 +1257,7 @@ function CanvasInner({
               decisionSteps={decisionSteps}
               tagOptions={tagOptions}
               firmPackageOptions={firmPackageOptions}
+              webhookIntegrations={webhookIntegrations}
               canManage={canManage}
               onSaved={() => router.refresh()}
               onClose={() => setActiveConditionStepId(null)}

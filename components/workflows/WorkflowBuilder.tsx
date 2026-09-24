@@ -340,6 +340,7 @@ export function StepCard({
   decisionSteps = [],
   tagOptions = [],
   firmPackageOptions = [],
+  webhookIntegrations = [],
   roleOptions = [],
   canManage,
   onSaved,
@@ -363,6 +364,7 @@ export function StepCard({
   decisionSteps?: DecisionStepOption[];
   tagOptions?: string[];
   firmPackageOptions?: TemplateOption[];
+  webhookIntegrations?: TemplateOption[];
   roleOptions?: RoleOption[];
   canManage: boolean;
   onSaved: () => void;
@@ -768,6 +770,7 @@ export function StepCard({
                 documentSignatureSteps={documentSignatureSteps}
                 decisionSteps={decisionSteps}
                 firmPackageOptions={firmPackageOptions}
+                webhookIntegrations={webhookIntegrations}
                 disabled={!canManage}
               />
             </div>
@@ -1980,6 +1983,7 @@ export function WorkflowBuilder({
   automationOptions = [],
   tagOptions = [],
   firmPackageOptions = [],
+  webhookIntegrations = [],
   roleOptions = [],
   pendingApprovals = [],
   pendingDecisions = [],
@@ -2010,6 +2014,7 @@ export function WorkflowBuilder({
   automationOptions?: AutomationOption[];
   tagOptions?: string[];
   firmPackageOptions?: TemplateOption[];
+  webhookIntegrations?: TemplateOption[];
   roleOptions?: RoleOption[];
   pendingApprovals?: PendingApprovalRow[];
   pendingDecisions?: PendingDecisionRow[];
@@ -2289,6 +2294,7 @@ export function WorkflowBuilder({
             automationOptions={automationOptions}
             tagOptions={tagOptions}
             firmPackageOptions={firmPackageOptions}
+            webhookIntegrations={webhookIntegrations}
             roleOptions={roleOptions}
             onEditTrigger={() => setTriggerModalOpen(true)}
             onOpenRun={(runId) => setOpenRunId(runId)}
@@ -2353,6 +2359,7 @@ export function WorkflowBuilder({
               pipelines={pipelines}
               tagOptions={tagOptions}
               webhookUrl={webhookToken && typeof window !== "undefined" ? `${window.location.origin}/api/automations/webhook/${webhookToken}` : undefined}
+              webhookIntegrations={webhookIntegrations}
               disabled={!canManage}
               onTagDraftChange={setTriggerTagDraft}
               tagDraft={triggerTagDraft}
@@ -2370,6 +2377,7 @@ export function WorkflowBuilder({
                 organizerTemplates={organizerTemplates}
                 tagOptions={tagOptions}
                 firmPackageOptions={firmPackageOptions}
+                webhookIntegrations={webhookIntegrations}
                 disabled={!canManage}
               />
             </div>

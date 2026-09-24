@@ -319,6 +319,7 @@ export function TriggerFields({
   pipelines = [],
   tagOptions = [],
   webhookUrl,
+  webhookIntegrations = [],
   disabled,
   onTagDraftChange,
   tagDraft,
@@ -333,6 +334,7 @@ export function TriggerFields({
   pipelines?: PipelineOption[];
   tagOptions?: string[];
   webhookUrl?: string;
+  webhookIntegrations?: TemplateOption[];
   disabled?: boolean;
   /** See TagListInput's onDraftChange -- lets the Save trigger button fold
    * in a typed-but-uncommitted tag at save time instead of losing it to the
@@ -389,6 +391,40 @@ export function TriggerFields({
             POST JSON to this URL. An <code>email</code> or <code>phone</code> field finds or creates a matching lead; every
             field in the body becomes available to this run&apos;s conditions and merge fields.
           </span>
+        </div>
+      )}
+
+      {triggerType === "webhook.received" && (
+        <div className="col-span-2 flex flex-col gap-1 border-t border-border pt-3 text-xs text-muted">
+          Or start from a configured webhook integration (Settings &rarr; Webhooks) -- signature-verified, supports Stripe
+          and replay-safe delivery, and lets a run resume mid-workflow on a matching later event.
+          <select
+            disabled={disabled}
+            value={(config.integration_id as string) ?? ""}
+            onChange={(e) => onConfigChange({ ...config, integration_id: e.target.value || undefined })}
+            className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+          >
+            <option value="">Don&apos;t use a webhook integration</option>
+            {webhookIntegrations.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+          {Boolean(config.integration_id) && (
+            <input
+              disabled={disabled}
+              value={(config.event_type as string) ?? ""}
+              onChange={(e) => onConfigChange({ ...config, event_type: e.target.value || undefined })}
+              placeholder="Event type (optional -- any event from this integration if blank)"
+              className="mt-1 rounded-lg border border-border px-3 py-2 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            />
+          )}
+          {webhookIntegrations.length === 0 && (
+            <span className="mt-1 text-[11px] normal-case text-warning">
+              No webhook integration configured for this workspace yet -- add one in Settings first.
+            </span>
+          )}
         </div>
       )}
 
