@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, XCircle, MinusCircle, X, User, FlaskConical } from "lucide-react";
+import { CheckCircle2, XCircle, MinusCircle, X, User, FlaskConical, RotateCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { actionIcon, ACTION_TYPES } from "@/components/workflows/WorkflowBuilder";
+import { useToast } from "@/components/Toast";
 
 type RunHeader = {
   id: string;
@@ -42,11 +43,13 @@ function clientLabelFor(c: { first_name: string | null; last_name: string | null
 // Fetches fresh on open rather than trusting whatever the server component
 // last passed down, since a run this panel is opened for is often actively
 // still executing.
-export function RunDetailPanel({ runId, onClose }: { runId: string; onClose: () => void }) {
+export function RunDetailPanel({ runId, onClose, canManage = false }: { runId: string; onClose: () => void; canManage?: boolean }) {
   const supabase = createClient();
+  const toast = useToast();
   const [run, setRun] = useState<RunHeader | null>(null);
   const [logs, setLogs] = useState<LogRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,7 +109,19 @@ export function RunDetailPanel({ runId, onClose }: { runId: string; onClose: () 
     return () => {
       cancelled = true;
     };
-  }, [runId, supabase]);
+  }, [runId, supabase, retrying]);
+
+  async function retry() {
+    setRetrying(true);
+    const { data, error: retryError } = await supabase.rpc("retry_failed_automation_run", { p_run_id: runId });
+    setRetrying(false);
+    if (retryError) {
+      toast.show(retryError.message, "error");
+      return;
+    }
+    const attemptNumber = (data as { attempt_number?: number } | null)?.attempt_number;
+    toast.show(attemptNumber ? `Retrying (attempt ${attemptNumber})` : "Retrying", "success");
+  }
 
   const title = run?.client_name ?? run?.engagement_number ?? "This run";
 
@@ -147,9 +162,22 @@ export function RunDetailPanel({ runId, onClose }: { runId: string; onClose: () 
               )}
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="shrink-0 text-muted hover:text-ink">
-            <X size={16} />
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {canManage && run?.status === "failed" && (
+              <button
+                type="button"
+                onClick={retry}
+                disabled={retrying}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-ink hover:bg-surfaceMuted disabled:cursor-default disabled:opacity-60"
+              >
+                <RotateCw size={13} className={retrying ? "animate-spin" : ""} aria-hidden="true" />
+                Retry
+              </button>
+            )}
+            <button type="button" onClick={onClose} aria-label="Close" className="text-muted hover:text-ink">
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {error && <p className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">{error}</p>}

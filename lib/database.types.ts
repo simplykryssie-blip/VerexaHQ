@@ -990,6 +990,58 @@ export type Database = {
           },
         ]
       }
+      automation_run_retry_attempts: {
+        Row: {
+          attempt_number: number
+          id: string
+          retried_at: string
+          retried_by: string | null
+          run_id: string
+          step_id_at_retry: string | null
+          workspace_id: string
+        }
+        Insert: {
+          attempt_number: number
+          id?: string
+          retried_at?: string
+          retried_by?: string | null
+          run_id: string
+          step_id_at_retry?: string | null
+          workspace_id: string
+        }
+        Update: {
+          attempt_number?: number
+          id?: string
+          retried_at?: string
+          retried_by?: string | null
+          run_id?: string
+          step_id_at_retry?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_run_retry_attempts_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "automation_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_run_retry_attempts_step_id_at_retry_fkey"
+            columns: ["step_id_at_retry"]
+            isOneToOne: false
+            referencedRelation: "automation_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_run_retry_attempts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_runs: {
         Row: {
           acknowledged_at: string | null
@@ -14389,7 +14441,7 @@ export type Database = {
       }
       retry_failed_automation_run: {
         Args: { p_run_id: string }
-        Returns: undefined
+        Returns: Json
       }
       reveal_client_ein: { Args: { p_client_id: string }; Returns: string }
       reveal_client_itin: { Args: { p_client_id: string }; Returns: string }

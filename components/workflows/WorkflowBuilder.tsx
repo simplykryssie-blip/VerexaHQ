@@ -2605,7 +2605,7 @@ export function WorkflowBuilder({
         </div>
       )}
 
-      {openRunId && <RunDetailPanel runId={openRunId} onClose={() => setOpenRunId(null)} />}
+      {openRunId && <RunDetailPanel runId={openRunId} onClose={() => setOpenRunId(null)} canManage={canManage} />}
     </div>
   );
 }
