@@ -5,35 +5,40 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Settings2,
-  Eye,
-  EyeOff,
   ArrowUp,
   ArrowDown,
-  GripVertical,
+  RotateCcw,
   DollarSign,
   Briefcase,
   Receipt,
   FileWarning,
   MessageSquare,
   ListChecks,
-  Plus,
+  LayoutDashboard,
+  UserX,
+  Clock,
+  CalendarCheck,
+  Workflow as WorkflowIcon,
 } from "lucide-react";
+import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
+import { SortableWidgetCard } from "@/components/dashboard/SortableWidgetCard";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
+import { NewClientButton, type ServiceCategory, type StaffOption } from "@/app/(app)/clients/NewClientButton";
 import { KpiWidget, type KpiTrend } from "@/components/widgets/KpiWidget";
 import { PrioritiesWidget } from "@/components/widgets/PrioritiesWidget";
 import { QuickActionsWidget, type QuickActionPermissions } from "@/components/widgets/QuickActionsWidget";
-import { CalendarWidget } from "@/components/widgets/CalendarWidget";
 import { RecentActivityWidget } from "@/components/widgets/RecentActivityWidget";
 import { ReviewQueueWidget } from "@/components/widgets/ReviewQueueWidget";
 import { TopServicesWidget } from "@/components/widgets/TopServicesWidget";
-import { EngagementPipelineWidget } from "@/components/widgets/EngagementPipelineWidget";
-import { StageBreakdownWidget } from "@/components/widgets/StageBreakdownWidget";
 import { DeadlineRiskWidget } from "@/components/widgets/DeadlineRiskWidget";
-import { UnassignedEngagementsWidget } from "@/components/widgets/UnassignedEngagementsWidget";
-import { OverdueRequestsWidget } from "@/components/widgets/OverdueRequestsWidget";
-import { FailedAutomationRunsWidget } from "@/components/widgets/FailedAutomationRunsWidget";
 import { WidgetShell } from "@/components/widgets/WidgetShell";
+import { EmptyState } from "@/components/widgets/EmptyState";
+import { Badge } from "@/components/ui/Badge";
+import { ProgressBar } from "@/components/ui/ProgressBar";
+import { Donut } from "@/components/widgets/Donut";
 import { IconChip } from "@/components/ui/IconChip";
 import { PromoBanner } from "@/components/dashboard/PromoBanner";
 import { FreshnessBadge } from "@/components/dashboard/FreshnessBadge";
@@ -70,6 +75,10 @@ export function DashboardShell({
   workspaceId,
   onboardingSteps,
   seenOnboardingSteps,
+  serviceCategories,
+  staffOptions,
+  accountHolderName,
+  defaultWidgets,
 }: {
   workspaceName: string;
   /** ISO timestamp taken at the start of this server render -- see
@@ -91,6 +100,17 @@ export function DashboardShell({
   /** null once dismissed or already computed away -- render nothing. */
   onboardingSteps: OnboardingStep[] | null;
   seenOnboardingSteps: string[];
+  /** Passed straight through to the "Add Client" CTA's NewClientButton --
+   *  same shape/source that Contacts' own NewClientButton uses. */
+  serviceCategories: ServiceCategory[];
+  staffOptions: StaffOption[];
+  accountHolderName: string;
+  /** The workspace's own dashboard_widgets defaults, before this user's
+   *  user_widget_preferences overrides are merged in -- kept separate so
+   *  "Reset Layout" can restore them instantly client-side without a
+   *  round trip, then persists the reset by deleting this user's override
+   *  rows (see resetLayout below). */
+  defaultWidgets: WidgetRow[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -98,8 +118,10 @@ export function DashboardShell({
   const [rows, setRows] = useState(widgets);
   const [customizing, setCustomizing] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   const sorted = [...rows].sort((a, b) => a.display_order - b.display_order);
   const visible = sorted.filter((w) => w.is_visible);
@@ -152,6 +174,45 @@ export function DashboardShell({
     router.refresh();
   }
 
+  // dnd-kit fires this once per completed drag, scoped to whichever
+  // section's own SortableContext the drag happened in -- `over` can only
+  // ever be a sibling already in that same section (see SortableWidgetCard),
+  // so this always reduces to the existing two-id reorder.
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    void reorder(String(active.id), String(over.id));
+  }
+
+  // Deletes this user's saved overrides for every widget on this dashboard
+  // so the merge in page.tsx falls back to dashboard_widgets' own defaults
+  // next render (the same fallback a brand-new user already gets) --
+  // restores default order and visibility together, without a second
+  // storage mechanism or a broader RPC grant than the RLS policies already
+  // allow a user over their own rows.
+  async function resetLayout() {
+    setSaving("__reset__");
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const { error } = await supabase
+        .from("user_widget_preferences")
+        .delete()
+        .eq("user_id", user.id)
+        .in("dashboard_widget_id", rows.map((r) => r.id));
+      if (error) {
+        setSaving(null);
+        toast.show(error.message, "error");
+        return;
+      }
+    }
+    setRows(defaultWidgets);
+    setSaving(null);
+    toast.show("Layout reset to default", "success");
+    router.refresh();
+  }
+
   function renderWidget(type: WidgetType) {
     switch (type) {
       case "revenue":
@@ -166,40 +227,34 @@ export function DashboardShell({
           />
         );
       case "kpis":
+        // "Engagements" -- Open + Unassigned counts, each linking straight to
+        // the existing filtered list that already has the full itemized
+        // detail (no inline list here, so this stays a compact stat card
+        // rather than duplicating /engagements and /assignments).
         return (
-          <WidgetShell title="Engagements & Tasks">
+          <WidgetShell title="Engagements" reportHref="/engagements" reportLabel="View Engagements">
             <div className="grid grid-cols-2 gap-3">
               <Link href="/engagements?status=open" className="block rounded-lg -m-1 p-1 transition hover:bg-surfaceMuted">
                 <IconChip tone="accent" className="mb-3">
                   <Briefcase size={17} aria-hidden="true" />
                 </IconChip>
-                <p className="text-xs uppercase tracking-wide text-muted">Open Engagements</p>
+                <p className="text-xs uppercase tracking-wide text-muted">Open</p>
                 <p className="mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight text-ink">{data.kpis.openEngagements}</p>
               </Link>
-              <div>
-                <IconChip tone="amber" className="mb-3">
-                  <ListChecks size={17} aria-hidden="true" />
+              <Link
+                href="/assignments?tab=engagements&filter=unassigned"
+                className="block rounded-lg -m-1 p-1 transition hover:bg-surfaceMuted"
+              >
+                <IconChip tone="rose" className="mb-3">
+                  <UserX size={17} aria-hidden="true" />
                 </IconChip>
-                <p className="text-xs uppercase tracking-wide text-muted">Tasks Due Today</p>
+                <p className="text-xs uppercase tracking-wide text-muted">Unassigned</p>
                 <p
-                  className={`mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight ${data.kpis.tasksDueToday > 0 ? "text-warning" : "text-ink"}`}
+                  className={`mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight ${data.unassignedEngagements.length > 0 ? "text-warning" : "text-ink"}`}
                 >
-                  {data.kpis.tasksDueToday}
+                  {data.unassignedEngagements.length}
                 </p>
-                {(() => {
-                  // Fewer outstanding tasks than yesterday's same bucket is good news, so a
-                  // "down" trend here is positive -- the reverse of revenue's convention.
-                  const trend = trendFor(data.kpis.tasksDueToday, data.kpis.tasksDueYesterday, "vs yesterday", data.kpis.tasksDueToday < data.kpis.tasksDueYesterday ? "positive" : "negative");
-                  if (!trend) return null;
-                  const Icon = trend.direction === "up" ? ArrowUp : ArrowDown;
-                  return (
-                    <p className={`mt-1 flex items-center gap-1 text-xs font-medium ${trend.sentiment === "positive" ? "text-success" : "text-danger"}`}>
-                      <Icon size={12} aria-hidden="true" />
-                      {trend.label}
-                    </p>
-                  );
-                })()}
-              </div>
+              </Link>
             </div>
           </WidgetShell>
         );
@@ -214,17 +269,69 @@ export function DashboardShell({
             reportHref="/billing?filter=unpaid"
           />
         );
-      case "missing_documents":
+      case "missing_documents": {
+        // "Client Requests" -- Missing Documents + Overdue Requests counts,
+        // plus the overdue list itself (that list's per-item detail --
+        // which client, which request, how overdue -- has no other home on
+        // the dashboard, unlike the plain Missing Documents count it's
+        // joined with, so it stays inline rather than being dropped).
+        const overdue = data.overdueRequests;
         return (
-          <KpiWidget
-            title="Missing Documents"
-            value={String(data.kpis.missingDocumentsCount)}
-            tone={data.kpis.missingDocumentsCount > 0 ? "warning" : "default"}
-            icon={FileWarning}
-            chip="amber"
+          <WidgetShell
+            title="Client Requests"
             reportHref="/reports/documents?report=missing"
-          />
+            reportLabel="View Documents"
+            action={
+              overdue.length > 0 ? (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-[11px] font-semibold text-white">
+                  {overdue.length}
+                </span>
+              ) : undefined
+            }
+          >
+            <div className="mb-4 grid grid-cols-2 gap-3">
+              <div>
+                <IconChip tone="amber" className="mb-3">
+                  <FileWarning size={17} aria-hidden="true" />
+                </IconChip>
+                <p className="text-xs uppercase tracking-wide text-muted">Missing Documents</p>
+                <p
+                  className={`mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight ${data.kpis.missingDocumentsCount > 0 ? "text-warning" : "text-ink"}`}
+                >
+                  {data.kpis.missingDocumentsCount}
+                </p>
+              </div>
+              <div>
+                <IconChip tone="rose" className="mb-3">
+                  <Clock size={17} aria-hidden="true" />
+                </IconChip>
+                <p className="text-xs uppercase tracking-wide text-muted">Overdue Requests</p>
+                <p
+                  className={`mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight ${overdue.length > 0 ? "text-danger" : "text-ink"}`}
+                >
+                  {overdue.length}
+                </p>
+              </div>
+            </div>
+            {overdue.length > 0 && (
+              <ul className="space-y-2 border-t border-border pt-3">
+                {overdue.map((item) => (
+                  <li key={item.id} className="flex items-center gap-3">
+                    <Clock size={16} className="shrink-0 text-danger" aria-hidden="true" />
+                    <Link href={item.entityHref} className="min-w-0 flex-1 hover:underline">
+                      <p className="truncate text-sm font-medium text-ink">{item.entityLabel}</p>
+                      <p className="truncate text-xs text-muted">{item.title}</p>
+                    </Link>
+                    <Badge tone="danger" className="shrink-0">
+                      {Math.round((Date.now() - new Date(item.due_date).getTime()) / (24 * 60 * 60 * 1000))}d overdue
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </WidgetShell>
         );
+      }
       case "messages":
         return <KpiWidget title="Open Client Messages" value={String(data.kpis.openClientMessages)} icon={MessageSquare} chip="violet" />;
       case "todays_work":
@@ -233,24 +340,125 @@ export function DashboardShell({
         return <ReviewQueueWidget items={data.reviewItems} />;
       case "quick_actions":
         return <QuickActionsWidget permissions={{ ...quickActionPermissions, isAdmin }} />;
-      case "calendar":
-        return <CalendarWidget items={data.calendarItems} />;
+      case "calendar": {
+        // "Today" -- Tasks Due Today count (no dedicated task-list route
+        // exists to link it to, same as before this consolidation) plus the
+        // full existing calendar-items list, so nothing that used to be on
+        // the standalone Calendar card is dropped.
+        const upcoming = data.calendarItems.slice(0, 6);
+        return (
+          <WidgetShell title="Today" reportHref="/calendar" reportLabel="View Calendar">
+            <div className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-surfaceMuted px-3 py-2.5">
+              <IconChip tone="amber">
+                <ListChecks size={17} aria-hidden="true" />
+              </IconChip>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs uppercase tracking-wide text-muted">Tasks Due Today</p>
+                <p
+                  className={`font-display text-xl font-semibold tabular-nums tracking-tight ${data.kpis.tasksDueToday > 0 ? "text-warning" : "text-ink"}`}
+                >
+                  {data.kpis.tasksDueToday}
+                </p>
+              </div>
+              {(() => {
+                const trend = trendFor(
+                  data.kpis.tasksDueToday,
+                  data.kpis.tasksDueYesterday,
+                  "vs yesterday",
+                  data.kpis.tasksDueToday < data.kpis.tasksDueYesterday ? "positive" : "negative"
+                );
+                if (!trend) return null;
+                const Icon = trend.direction === "up" ? ArrowUp : ArrowDown;
+                return (
+                  <p className={`flex shrink-0 items-center gap-1 text-xs font-medium ${trend.sentiment === "positive" ? "text-success" : "text-danger"}`}>
+                    <Icon size={12} aria-hidden="true" />
+                    {trend.label}
+                  </p>
+                );
+              })()}
+            </div>
+            {upcoming.length === 0 ? (
+              <EmptyState icon={CalendarCheck} message="No upcoming deadlines." />
+            ) : (
+              <ul className="space-y-2">
+                {upcoming.map((item) => {
+                  const content = (
+                    <>
+                      <span className="text-slate">{item.label}</span>
+                      <span className="text-xs text-muted">{new Date(item.date).toLocaleDateString()}</span>
+                    </>
+                  );
+                  return (
+                    <li key={item.id} className="flex items-center justify-between text-sm">
+                      {item.href ? (
+                        <Link href={item.href} className="flex w-full items-center justify-between hover:underline">
+                          {content}
+                        </Link>
+                      ) : (
+                        <div className="flex w-full items-center justify-between">{content}</div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </WidgetShell>
+        );
+      }
       case "recent_activity":
         return <RecentActivityWidget items={data.recentActivity} />;
       case "top_services":
         return <TopServicesWidget services={data.topServices} />;
-      case "engagement_pipeline":
-        return <EngagementPipelineWidget stages={data.engagementPipeline} />;
-      case "stage_breakdown":
-        return <StageBreakdownWidget stages={data.engagementPipeline} />;
+      case "engagement_pipeline": {
+        // "Engagement Pipeline" -- the per-stage progress list plus the
+        // former Stage Breakdown donut, both reading the same
+        // data.engagementPipeline the two source widgets already shared, so
+        // this consolidation runs zero additional queries.
+        const stages = data.engagementPipeline;
+        const total = stages.reduce((sum, s) => sum + s.count, 0);
+        const max = Math.max(...stages.map((s) => s.count), 1);
+        const busiestStatus = stages
+          .filter((s) => s.status !== "Completed" && s.count > 0)
+          .reduce<(typeof stages)[number] | null>((m, s) => (!m || s.count > m.count ? s : m), null)?.status;
+
+        const active = stages.filter((s) => s.status !== "Completed" && s.count > 0).sort((a, b) => b.count - a.count);
+        const activeTotal = active.reduce((sum, s) => sum + s.count, 0);
+        const MAX_SEGMENTS = 4;
+        const top = active.slice(0, MAX_SEGMENTS);
+        const otherCount = active.slice(MAX_SEGMENTS).reduce((sum, s) => sum + s.count, 0);
+        const segments = (otherCount > 0 ? [...top, { status: "Other", count: otherCount }] : top).map((s) => ({
+          id: s.status,
+          label: s.status,
+          count: s.count,
+        }));
+
+        return (
+          <WidgetShell title="Engagement Pipeline" reportHref="/engagements" reportLabel="View Full Pipeline">
+            {total === 0 ? (
+              <EmptyState icon={WorkflowIcon} message="No engagements yet." />
+            ) : (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <ul className="space-y-2">
+                  {stages.map((stage) => (
+                    <li key={stage.status} className="flex items-center gap-3">
+                      <span className="w-40 shrink-0 truncate text-xs font-medium text-muted">{stage.status}</span>
+                      <ProgressBar percent={(stage.count / max) * 100} tone={stage.status === busiestStatus ? "gradient" : "accent"} size="sm" />
+                      <span className="w-6 shrink-0 text-right text-xs font-semibold tabular-nums text-ink">{stage.count || "-"}</span>
+                    </li>
+                  ))}
+                </ul>
+                {activeTotal > 0 ? (
+                  <Donut segments={segments} centerLabel={String(activeTotal)} centerSublabel="Active" />
+                ) : (
+                  <EmptyState icon={WorkflowIcon} message="No active engagements right now." />
+                )}
+              </div>
+            )}
+          </WidgetShell>
+        );
+      }
       case "deadline_risk":
         return <DeadlineRiskWidget items={data.deadlineRisk} />;
-      case "unassigned_engagements":
-        return <UnassignedEngagementsWidget items={data.unassignedEngagements} />;
-      case "overdue_requests":
-        return <OverdueRequestsWidget items={data.overdueRequests} />;
-      case "failed_automations":
-        return <FailedAutomationRunsWidget items={data.failedAutomationRuns} />;
       default:
         return null;
     }
@@ -265,40 +473,47 @@ export function DashboardShell({
 
   return (
     <>
-      <div className="relative overflow-hidden border-b border-border px-8 py-9">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-24 -top-36 h-96 w-96 rounded-full bg-gradient-to-br from-accent to-brandGradientTo opacity-20 blur-3xl"
-        />
-        <div className="relative flex items-start justify-between gap-6">
-          <div>
-            <h1 className="font-display text-[28px] font-semibold leading-normal text-ink">
-              Welcome back, <span className="bg-gradient-to-r from-accent to-brandGradientTo bg-clip-text text-transparent">{resolvedGreetingName}</span>.
-            </h1>
-            <p className="mt-1.5 max-w-[46ch] text-sm text-slate">{heroSub}</p>
-            <div className="mt-3">
-              <FreshnessBadge generatedAt={generatedAt} />
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
+      <PageHero
+        icon={LayoutDashboard}
+        heading={
+          <>
+            Welcome back, <HeroHighlight>{resolvedGreetingName}</HeroHighlight>.
+          </>
+        }
+        subtitle={heroSub}
+        meta={<FreshnessBadge generatedAt={generatedAt} />}
+        actions={
+          <>
+            {customizing && (
+              <Button type="button" variant="secondary" size="sm" disabled={saving !== null} onClick={() => void resetLayout()}>
+                <RotateCcw size={14} aria-hidden="true" /> Reset Layout
+              </Button>
+            )}
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
+              active={customizing}
               onClick={() => setCustomizing((v) => !v)}
               aria-pressed={customizing}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                customizing ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:border-accent hover:text-accent"
-              }`}
             >
               <Settings2 size={14} aria-hidden="true" /> {customizing ? "Done" : "Customize"}
-            </button>
-            <Link href="/engagements/new">
-              <Button size="sm">
-                <Plus size={14} aria-hidden="true" /> New Engagement
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </div>
+            </Button>
+            {quickActionPermissions.clientsCreate && (
+              <NewClientButton
+                workspaceId={workspaceId}
+                workspaceName={workspaceName}
+                serviceCategories={serviceCategories}
+                isOwner={isAdmin}
+                staffOptions={staffOptions}
+                accountHolderName={accountHolderName}
+                triggerLabel="Add Client"
+                triggerSize="sm"
+              />
+            )}
+          </>
+        }
+      />
 
       <div className="flex-1 px-8 py-6">
         {onboardingSteps && onboardingSteps.length > 0 && (
@@ -313,73 +528,51 @@ export function DashboardShell({
         <PromoBanner />
 
         {customizing && (
-          <div className="mb-4 rounded-xl border border-border bg-surfaceMuted p-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Widget layout -- drag to reorder</h2>
-            <ul className="mt-2 divide-y divide-border">
-              {sorted.map((row) => (
-                <li
-                  key={row.id}
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("text/plain", row.id);
-                    e.dataTransfer.effectAllowed = "move";
-                    setDraggingId(row.id);
-                  }}
-                  onDragEnd={() => {
-                    setDraggingId(null);
-                    setDragOverId(null);
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "move";
-                    if (dragOverId !== row.id) setDragOverId(row.id);
-                  }}
-                  onDragLeave={() => setDragOverId((id) => (id === row.id ? null : id))}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const draggedId = e.dataTransfer.getData("text/plain");
-                    setDragOverId(null);
-                    if (draggedId) reorder(draggedId, row.id);
-                  }}
-                  className={`flex cursor-grab items-center justify-between py-2 text-sm transition active:cursor-grabbing ${
-                    draggingId === row.id ? "opacity-40" : ""
-                  } ${dragOverId === row.id && draggingId !== row.id ? "border-t-2 border-accent" : ""}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <GripVertical size={14} className="shrink-0 text-muted" aria-hidden="true" />
-                    <span className={row.is_visible ? "text-slate" : "text-muted line-through"}>{row.title ?? row.widget_type}</span>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={saving === row.id}
-                    onClick={() => toggleVisible(row)}
-                    aria-label={row.is_visible ? `Hide ${row.title ?? row.widget_type}` : `Show ${row.title ?? row.widget_type}`}
-                    className="rounded p-1 text-muted hover:text-ink disabled:opacity-30"
-                  >
-                    {row.is_visible ? <Eye size={14} /> : <EyeOff size={14} />}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <p className="mb-4 text-xs text-muted">
+            Drag a card&apos;s grip handle to reorder it within its section, or use the eye icon to show/hide it. Changes save
+            automatically.
+          </p>
         )}
 
         <div className="space-y-8">
           {WIDGET_SECTIONS.map((section) => {
-            const sectionRows = visible.filter((row) => isWidgetType(row.widget_type) && section.types.includes(row.widget_type));
+            // In Customize mode, hidden widgets stay visible (dimmed, via
+            // SortableWidgetCard) so there's a way to re-show them -- outside
+            // Customize mode, only `visible` renders, same as before.
+            const sectionRows = (customizing ? sorted : visible).filter(
+              (row) => isWidgetType(row.widget_type) && section.types.includes(row.widget_type)
+            );
             if (sectionRows.length === 0) return null;
             return (
               <div key={section.label}>
                 <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">{section.label}</h2>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {sectionRows.map((row) =>
-                    isWidgetType(row.widget_type) ? (
-                      <div key={row.id} className={WIDE_WIDGET_TYPES.has(row.widget_type) ? "sm:col-span-2 lg:col-span-3" : undefined}>
-                        {renderWidget(row.widget_type)}
-                      </div>
-                    ) : null
-                  )}
-                </div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={sectionRows.map((r) => r.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {sectionRows.map((row) =>
+                        isWidgetType(row.widget_type) ? (
+                          <div
+                            key={row.id}
+                            className={`${WIDE_WIDGET_TYPES.has(row.widget_type) ? "sm:col-span-2 lg:col-span-3" : ""} ${
+                              customizing && !row.is_visible ? "opacity-40" : ""
+                            }`}
+                          >
+                            <SortableWidgetCard
+                              id={row.id}
+                              title={row.title ?? row.widget_type}
+                              isVisible={row.is_visible}
+                              editing={customizing}
+                              saving={saving === row.id}
+                              onToggleVisible={() => toggleVisible(row)}
+                            >
+                              {renderWidget(row.widget_type)}
+                            </SortableWidgetCard>
+                          </div>
+                        ) : null
+                      )}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               </div>
             );
           })}

@@ -31,8 +31,8 @@ export function AddContactForm({ clientId, workspaceId }: Ids) {
     <InlineAddForm
       label="Add a contact"
       fields={[
-        { name: "first_name", label: "First name", required: true },
-        { name: "last_name", label: "Last name", required: true },
+        { name: "first_name", label: "First name", type: "name", required: true },
+        { name: "last_name", label: "Last name", type: "name", required: true },
         { name: "title", label: "Title", type: "select", options: CONTACT_TITLE_OPTIONS },
         { name: "custom_title", label: "Custom title", showIf: (v) => v.title === "other" },
         { name: "email", label: "Email" },
@@ -121,7 +121,7 @@ export function DeleteContactButton({ contactId }: { contactId: string }) {
   );
 }
 
-export function AddAddressForm({ clientId, workspaceId }: Ids) {
+export function AddAddressForm({ clientId, workspaceId, open, onOpenChange }: Ids & { open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const router = useRouter();
   const supabase = createClient();
   return (
@@ -239,7 +239,7 @@ export function AddPortalUserForm({ clientId, workspaceId }: Ids) {
     <InlineAddForm
       label="Invite Additional"
       fields={[
-        { name: "invited_name", label: "Name" },
+        { name: "invited_name", label: "Name", type: "name" },
         { name: "invited_email", label: "Email", type: "email", required: true },
       ]}
       onSubmit={async (v) => {

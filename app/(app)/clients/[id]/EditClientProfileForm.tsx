@@ -39,8 +39,8 @@ export function EditClientProfileForm({ client, portalUsers }: { client: Profile
         { name: "primary_phone", label: "Primary phone", type: "tel" },
       ]
     : [
-        { name: "first_name", label: "First name", required: true },
-        { name: "last_name", label: "Last name", required: true },
+        { name: "first_name", label: "First name", type: "name", required: true },
+        { name: "last_name", label: "Last name", type: "name", required: true },
         { name: "primary_email", label: "Primary email", type: "email" },
         { name: "primary_phone", label: "Primary phone", type: "tel" },
       ];

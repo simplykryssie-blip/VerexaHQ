@@ -12,6 +12,7 @@ import { ConvertLeadButton } from "./ConvertLeadButton";
 import { MarkLeadLostButton } from "./MarkLeadLostButton";
 import { ArchiveClientButton } from "./ArchiveClientButton";
 import { clientStatusTone } from "@/lib/clientStatus";
+import { formatPhone } from "@/lib/phone";
 import { ClientTabsBody, displayName, type ClientTab } from "./ClientTabsBody";
 import { ClientInsightWidgets } from "./ClientInsightWidgets";
 import type { ClientWorkspaceProps } from "./ClientWorkspace";
@@ -101,7 +102,10 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
               <Avatar name={displayName(client)} size="lg" />
               <div>
                 <p className="font-display text-lg font-semibold text-ink">{displayName(client)}</p>
-                <p className="text-sm text-muted">{[client.primary_email, client.primary_phone].filter(Boolean).join(" · ") || "No contact info on file"}</p>
+                <p className="text-sm text-muted">
+                  {[client.primary_email, client.primary_phone ? formatPhone(client.primary_phone) : null].filter(Boolean).join(" · ") ||
+                    "No contact info on file"}
+                </p>
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1">
