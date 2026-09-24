@@ -1,18 +1,20 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, X } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
-// A self-promotional slot on the dashboard -- content here is swappable per
-// workspace (e.g. cross-promoting a related service or sister product), not
-// wired to any data. Edit the props below directly, or lift them into a
-// prop/config later if this needs to vary per workspace.
+// A persistent, self-promotional slot on the dashboard -- content here is
+// swappable per workspace (e.g. cross-promoting a related service or sister
+// product), not wired to any data. Edit the props below directly, or lift
+// them into a prop/config later if this needs to vary per workspace.
 //
-// Dismiss is local-to-page-load only (component state, not persisted) --
-// same reasoning as OnboardingChecklist's closedForNow: there's no per-user
-// "seen this" record for a rotating promo slot, so it just comes back on the
-// next visit rather than needing a dismiss table for placeholder content.
+// Intentionally not dismissible: this is meant to stay visible whenever the
+// dashboard is shown. It's also intentionally kept to a single static
+// banner for now (no rotation/carousel) -- see the props below, which are
+// exactly the fields a future rotating multi-banner slot would need per
+// banner (eyebrow/headline/description/CTA), so this component can grow
+// into accepting an array of these instead of one set of defaults without
+// a rewrite.
 export function PromoBanner({
   eyebrow = "Focus on what matters.",
   headline = "We'll handle the rest.",
@@ -26,19 +28,8 @@ export function PromoBanner({
   ctaLabel?: string;
   ctaHref?: string;
 }) {
-  const [dismissed, setDismissed] = useState(false);
-  if (dismissed) return null;
-
   return (
     <div className="relative mb-4 overflow-hidden rounded-2xl bg-accent px-8 py-7 shadow-soft">
-      <button
-        type="button"
-        onClick={() => setDismissed(true)}
-        aria-label="Dismiss"
-        className="absolute right-3 top-3 z-10 rounded-full p-1 text-white/70 transition hover:bg-white/10 hover:text-white"
-      >
-        <X size={16} aria-hidden="true" />
-      </button>
       <svg
         aria-hidden="true"
         className="pointer-events-none absolute -right-10 -top-10 h-56 w-56 text-white/10"

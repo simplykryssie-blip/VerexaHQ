@@ -11,12 +11,18 @@ export function PageHero({
   heading,
   subtitle,
   actions,
+  meta,
 }: {
   icon: React.ElementType;
   tone?: IconChipTone;
   heading: React.ReactNode;
   subtitle: React.ReactNode;
   actions?: React.ReactNode;
+  /** Optional content below the subtitle (e.g. a freshness badge) -- kept
+   * outside the subtitle's own `<p>` so block-level content doesn't nest
+   * inside a paragraph. Omit for the plain heading+subtitle look every
+   * other PageHero consumer already has. */
+  meta?: React.ReactNode;
 }) {
   return (
     <div className="relative overflow-hidden border-b border-border px-8 py-9">
@@ -32,6 +38,7 @@ export function PageHero({
           <div>
             <h1 className="font-display text-[28px] font-semibold leading-normal text-ink">{heading}</h1>
             <p className="mt-1.5 max-w-[60ch] text-sm text-slate">{subtitle}</p>
+            {meta && <div className="mt-3">{meta}</div>}
           </div>
         </div>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}

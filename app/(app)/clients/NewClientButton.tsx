@@ -14,7 +14,7 @@ import { US_STATES } from "@/lib/usStates";
 
 const DRAFT_KEY = "new-client-button";
 
-type ServiceCategory = { id: string; name: string; services: { id: string; name: string }[] };
+export type ServiceCategory = { id: string; name: string; services: { id: string; name: string }[] };
 type ServiceOption = { id: string; name: string };
 
 type EntityClientType = "business" | "trust" | "estate" | "organization";
@@ -67,7 +67,7 @@ const ENTITY_NAME_LABELS: Record<EntityClientType, string> = {
   organization: "Organization name",
 };
 
-type StaffOption = { id: string; display_name: string | null };
+export type StaffOption = { id: string; display_name: string | null };
 
 export function NewClientButton({
   workspaceId,
@@ -76,6 +76,8 @@ export function NewClientButton({
   isOwner = false,
   staffOptions = [],
   accountHolderName = "Me",
+  triggerLabel = "New Client",
+  triggerSize = "md",
 }: {
   workspaceId: string;
   workspaceName: string;
@@ -89,6 +91,14 @@ export function NewClientButton({
    *  viewer IS the account holder, so the default option is labeled with
    *  their real name instead of a generic "Me". */
   accountHolderName?: string;
+  /** Visible text on the trigger button -- defaults to "New Client" so
+   *  every existing call site (Contacts page header/empty state) is
+   *  unaffected. Only the Dashboard's CTA overrides this; the flow itself
+   *  (modal, validation, create_client RPC) is identical regardless. */
+  triggerLabel?: string;
+  /** Matches Button's own size prop -- defaults to "md", the size every
+   *  existing call site already renders at. */
+  triggerSize?: "sm" | "md";
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -469,8 +479,8 @@ export function NewClientButton({
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>
-        <Plus size={16} /> New Client
+      <Button size={triggerSize} onClick={() => setOpen(true)}>
+        <Plus size={16} /> {triggerLabel}
       </Button>
 
       {open && (
