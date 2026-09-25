@@ -48,6 +48,7 @@ import {
   Upload,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import type { Json } from "@/lib/database.types";
 import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/Confirm";
@@ -2043,6 +2044,8 @@ export function WorkflowBuilder({
   const [testClient, setTestClient] = useState<ClientOption | null>(null);
   const [runningTest, setRunningTest] = useState(false);
   const [testError, setTestError] = useState<string | null>(null);
+  const [testWebhookEventType, setTestWebhookEventType] = useState("");
+  const [testWebhookPayload, setTestWebhookPayload] = useState("{}");
 
   // These mirror server props into local state so edits feel instant, but a
   // plain useState initializer only runs once -- without this, revisiting
@@ -2181,13 +2184,34 @@ export function WorkflowBuilder({
   // and logs what it would have done instead, but everything else (tasks,
   // notes, tags, assignment, pipeline moves) executes for real against that
   // client -- that's what makes this a trustworthy test instead of a guess.
+  //
+  // A webhook.received workflow has no client -- a real run never has one
+  // (fire_webhook_automations never sets client_id) -- so this branch skips
+  // the client requirement entirely and instead lets the tester supply the
+  // event type/payload a real delivery would carry, matching the shape a
+  // live event actually produces (run_automation_test's own webhook.received
+  // branch).
   async function runTest() {
-    if (!testClient) return;
+    const isWebhookTrigger = currentTriggerType === "webhook.received";
+    if (!isWebhookTrigger && !testClient) return;
+
+    let webhookPayload: Json | undefined;
+    if (isWebhookTrigger) {
+      try {
+        webhookPayload = testWebhookPayload.trim() ? (JSON.parse(testWebhookPayload) as Json) : {};
+      } catch {
+        setTestError("Payload must be valid JSON.");
+        return;
+      }
+    }
+
     setRunningTest(true);
     setTestError(null);
     const { data: runId, error } = await supabase.rpc("run_automation_test", {
       p_automation_id: automationId,
-      p_client_id: testClient.id,
+      p_client_id: isWebhookTrigger ? null : testClient!.id,
+      p_webhook_event_type: isWebhookTrigger ? testWebhookEventType.trim() || undefined : undefined,
+      p_webhook_payload: isWebhookTrigger ? webhookPayload : undefined,
     });
     setRunningTest(false);
     if (error) {
@@ -2196,6 +2220,8 @@ export function WorkflowBuilder({
     }
     setTestModalOpen(false);
     setTestClient(null);
+    setTestWebhookEventType("");
+    setTestWebhookPayload("{}");
     toast.show("Test run started", "success");
     router.refresh();
     if (runId) setOpenRunId(runId);
@@ -2573,6 +2599,8 @@ export function WorkflowBuilder({
                 onClick={() => {
                   setTestModalOpen(false);
                   setTestClient(null);
+                  setTestWebhookEventType("");
+                  setTestWebhookPayload("{}");
                   setTestError(null);
                 }}
                 aria-label="Close"
@@ -2581,12 +2609,38 @@ export function WorkflowBuilder({
                 <X size={16} />
               </button>
             </div>
-            <p className="mb-3 text-xs text-muted">
-              Pick a real client to run this workflow against. Every step actually executes -- tasks, notes, tags, assignment, and pipeline moves happen
-              for real -- but nothing goes out to the client: email, SMS, portal messages, engagement letters, portal invites, webhooks, and sent quotes
-              are simulated and logged instead of sent.
-            </p>
-            <ClientPickerField workspaceId={workspaceId} selected={testClient} onSelect={setTestClient} />
+            {currentTriggerType === "webhook.received" ? (
+              <>
+                <p className="mb-3 text-xs text-muted">
+                  This workflow has no client -- a real webhook delivery never has one. Instead, describe the event a delivery would carry. Every step
+                  actually executes -- tasks, notes, tags, and pipeline moves happen for real -- but nothing goes out: email, SMS, portal messages,
+                  engagement letters, portal invites, webhooks, and sent quotes are simulated and logged instead of sent.
+                </p>
+                <label className="mb-1 block text-xs font-medium text-slate">Event type</label>
+                <input
+                  value={testWebhookEventType}
+                  onChange={(e) => setTestWebhookEventType(e.target.value)}
+                  placeholder={(config.event_type as string) || "test.event"}
+                  className="mb-3 w-full rounded-lg border border-border px-3 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+                <label className="mb-1 block text-xs font-medium text-slate">Payload (JSON)</label>
+                <textarea
+                  value={testWebhookPayload}
+                  onChange={(e) => setTestWebhookPayload(e.target.value)}
+                  rows={5}
+                  className="w-full rounded-lg border border-border px-3 py-1.5 font-mono text-xs text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+              </>
+            ) : (
+              <>
+                <p className="mb-3 text-xs text-muted">
+                  Pick a real client to run this workflow against. Every step actually executes -- tasks, notes, tags, assignment, and pipeline moves happen
+                  for real -- but nothing goes out to the client: email, SMS, portal messages, engagement letters, portal invites, webhooks, and sent quotes
+                  are simulated and logged instead of sent.
+                </p>
+                <ClientPickerField workspaceId={workspaceId} selected={testClient} onSelect={setTestClient} />
+              </>
+            )}
             {testError && <p className="mt-2 text-sm text-danger">{testError}</p>}
             <div className="mt-4 flex justify-end gap-2">
               <button
@@ -2594,6 +2648,8 @@ export function WorkflowBuilder({
                 onClick={() => {
                   setTestModalOpen(false);
                   setTestClient(null);
+                  setTestWebhookEventType("");
+                  setTestWebhookPayload("{}");
                   setTestError(null);
                 }}
                 className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-slate hover:bg-surfaceMuted"
@@ -2603,7 +2659,7 @@ export function WorkflowBuilder({
               <button
                 type="button"
                 onClick={runTest}
-                disabled={!testClient || runningTest}
+                disabled={(currentTriggerType !== "webhook.received" && !testClient) || runningTest}
                 className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
               >
                 {runningTest ? "Running..." : "Run test"}

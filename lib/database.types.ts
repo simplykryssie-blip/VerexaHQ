@@ -14584,8 +14584,10 @@ export type Database = {
       run_automation_test: {
         Args: {
           p_automation_id: string
-          p_client_id: string
+          p_client_id: string | null
           p_engagement_id?: string
+          p_webhook_event_type?: string
+          p_webhook_payload?: Json
         }
         Returns: string
       }

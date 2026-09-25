@@ -16,7 +16,12 @@
       "start_next_automation_step",
       "claim_webhook_event",
       "mark_webhook_event_processed",
-      "fire_webhook_automations"
+      "fire_webhook_automations",
+      "claim_due_pending_automation_steps",
+      "claim_blocked_automation_runs",
+      "fire_task_assignment_automations",
+      "fire_invoice_created_automations",
+      "fire_payment_failed_automations"
     ]
   },
 
@@ -52,7 +57,7 @@
       "decide_automation_step": { "args": "p_pending_step_id uuid, p_decided_option text", "isSecurityDefiner": true },
       "approve_automation_step": { "args": "p_pending_step_id uuid", "isSecurityDefiner": true },
       "reject_automation_step": { "args": "p_pending_step_id uuid, p_reason text", "isSecurityDefiner": true },
-      "run_automation_test": { "args": "p_automation_id uuid, p_client_id uuid, p_engagement_id uuid", "isSecurityDefiner": true },
+      "run_automation_test": { "args": "p_automation_id uuid, p_client_id uuid, p_engagement_id uuid, p_webhook_event_type text, p_webhook_payload jsonb", "isSecurityDefiner": true },
       "validate_automation": { "args": "p_automation_id uuid", "isSecurityDefiner": true },
       "acknowledge_automation_run": { "args": "p_run_id uuid", "isSecurityDefiner": true },
       "reorder_automation_step": { "args": "p_step_id uuid, p_direction text", "isSecurityDefiner": true },
@@ -62,7 +67,10 @@
       "rotate_webhook_integration_secret": { "args": "p_integration_id uuid", "isSecurityDefiner": true },
       "claim_webhook_event": { "args": "p_integration_id uuid, p_event_type text, p_external_id text, p_payload jsonb, p_is_test boolean", "isSecurityDefiner": true },
       "mark_webhook_event_processed": { "args": "p_event_id uuid, p_status text, p_error text", "isSecurityDefiner": true },
-      "fire_webhook_automations": { "args": "p_integration_id uuid, p_event_type text, p_payload jsonb, p_is_test boolean", "isSecurityDefiner": true }
+      "fire_webhook_automations": { "args": "p_integration_id uuid, p_event_type text, p_payload jsonb, p_is_test boolean", "isSecurityDefiner": true },
+      "claim_due_pending_automation_steps": { "args": "p_limit integer, p_stale_after_seconds integer", "isSecurityDefiner": true },
+      "claim_blocked_automation_runs": { "args": "p_limit integer, p_stale_after_seconds integer", "isSecurityDefiner": true },
+      "known_automation_trigger_types": { "args": "", "isSecurityDefiner": false }
     }
   }
 }
