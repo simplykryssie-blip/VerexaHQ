@@ -5,7 +5,9 @@ import {
   retrieveCardDetails,
   setCustomerDefaultPaymentMethod,
   getSoleSubscriptionItem,
+  createDelayedStartSubscription,
 } from "@/lib/stripe/client";
+import { isProductionEnvironment } from "@/lib/env";
 import type { Database, Json } from "@/lib/database.types";
 
 type WorkspaceSubscriptionUpdate = Database["public"]["Tables"]["workspace_subscriptions"]["Update"];
@@ -447,7 +449,12 @@ export async function handleTrialWillEnd(
  */
 export async function handleSetupCheckoutCompleted(
   supabase: ReturnType<typeof createServiceClient>,
-  session: { id: string; customer: string | { id: string }; setup_intent: string | { id: string } | null; metadata?: { workspace_id?: string } }
+  session: {
+    id: string;
+    customer: string | { id: string };
+    setup_intent: string | { id: string } | null;
+    metadata?: { workspace_id?: string; legacy_migration_anchor?: string };
+  }
 ): Promise<{ skipped?: string }> {
   const workspaceId = session.metadata?.workspace_id;
   if (!workspaceId) return { skipped: "missing workspace_id metadata" };
@@ -474,6 +481,43 @@ export async function handleSetupCheckoutCompleted(
       card_exp_year: cardResult.data.expYear,
     })
     .eq("workspace_id", workspaceId);
+
+  // Self-service legacy setup (see app/api/billing/legacy-payment-setup):
+  // the customer just confirmed a real card on a workspace that has never
+  // had a Subscription -- create it now, anchored to the future date this
+  // setup session was issued with, so the period already paid for outside
+  // Stripe isn't double-charged. Guarded on stripe_subscription_id still
+  // being null so a retried/duplicate webhook delivery never creates a
+  // second Subscription.
+  const legacyMigrationAnchor = session.metadata?.legacy_migration_anchor;
+  if (legacyMigrationAnchor) {
+    const { data: sub } = await supabase
+      .from("workspace_subscriptions")
+      .select("stripe_subscription_id, plan_id, platform_subscription_plans(stripe_price_id, stripe_test_price_id)")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+
+    if (sub && !sub.stripe_subscription_id) {
+      const plan = sub.platform_subscription_plans as { stripe_price_id: string | null; stripe_test_price_id: string | null } | null;
+      const priceId = isProductionEnvironment() ? plan?.stripe_price_id : plan?.stripe_test_price_id;
+      if (priceId) {
+        const subResult = await createDelayedStartSubscription({
+          customerId: stripeCustomerId,
+          priceId,
+          billingCycleAnchorUnix: Math.floor(new Date(legacyMigrationAnchor).getTime() / 1000),
+          defaultPaymentMethodId: pmResult.data.paymentMethodId,
+          metadata: { workspace_id: workspaceId, first_period_end: legacyMigrationAnchor },
+        });
+        if (subResult.ok) {
+          await supabase
+            .from("workspace_subscriptions")
+            .update({ stripe_subscription_id: subResult.data.id, first_period_end: legacyMigrationAnchor })
+            .eq("workspace_id", workspaceId)
+            .is("stripe_subscription_id", null);
+        }
+      }
+    }
+  }
 
   return {};
 }
