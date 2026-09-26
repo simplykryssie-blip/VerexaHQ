@@ -12750,6 +12750,10 @@ export type Database = {
       decrypt_zoom_secret: { Args: { p_ciphertext: string }; Returns: string }
       delete_client_email: { Args: { p_email_id: string }; Returns: undefined }
       delete_client_phone: { Args: { p_phone_id: string }; Returns: undefined }
+      delete_clients: {
+        Args: { p_client_ids: string[] }
+        Returns: { client_id: string; deleted: boolean; reason: string | null }[]
+      }
       delete_installed_template: {
         Args: { p_installation_id: string; p_workspace_id: string }
         Returns: undefined
