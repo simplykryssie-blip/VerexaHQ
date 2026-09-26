@@ -21,32 +21,61 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const canRun = Boolean(supabaseUrl && serviceRoleKey);
+const canRun = Boolean(supabaseUrl && anonKey && serviceRoleKey);
 
 function requireEnv() {
   if (!canRun) {
     throw new Error(
-      "NEXT_PUBLIC_SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY are not set. This suite requires an isolated " +
-        "Supabase test project to run against -- set both env vars (see .env.local.example) rather than letting " +
-        "this skip silently."
+      "NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and/or SUPABASE_SERVICE_ROLE_KEY are not set. " +
+        "This suite requires an isolated Supabase test project to run against -- set all three env vars " +
+        "(see .env.local.example) rather than letting this skip silently."
     );
   }
 }
 
 describe("workflow-to-workflow chain depth guard", () => {
   let service: SupabaseClient;
+  let userClient: SupabaseClient;
+  let testUserId: string;
+  const testEmail = `chain-depth-test-${Date.now()}@example.invalid`;
+  const testPassword = `Cd-${Math.random().toString(36).slice(2)}!Aa1`;
   const cleanupWorkspaceIds: string[] = [];
 
-  beforeAll(() => {
+  beforeAll(async () => {
     requireEnv();
     service = createClient(supabaseUrl!, serviceRoleKey!);
+
+    // Publishing a fixture automation requires a real authenticated user:
+    // enforce_automation_publish_validation_trg (this same PR's own
+    // migration) runs has_permission(...) on any automation going live.
+    // Platform-admin bypasses the workspace-membership check, which is
+    // fine here since this suite is about chain-depth limiting, not
+    // permission scoping.
+    const { data: created, error: createError } = await service.auth.admin.createUser({
+      email: testEmail,
+      password: testPassword,
+      email_confirm: true,
+    });
+    expect(createError).toBeNull();
+    testUserId = created!.user!.id;
+
+    const { error: profileError } = await service.from("user_profiles").update({ is_platform_admin: true }).eq("id", testUserId);
+    expect(profileError).toBeNull();
+
+    userClient = createClient(supabaseUrl!, anonKey!);
+    const { error: signInError } = await userClient.auth.signInWithPassword({ email: testEmail, password: testPassword });
+    expect(signInError).toBeNull();
   });
 
   afterAll(async () => {
     if (!canRun) return;
     if (cleanupWorkspaceIds.length > 0) {
       await service.from("workspaces").delete().in("id", cleanupWorkspaceIds);
+    }
+    if (testUserId) {
+      await service.auth.admin.deleteUser(testUserId);
     }
   });
 
@@ -63,16 +92,20 @@ describe("workflow-to-workflow chain depth guard", () => {
   // pointing at `targetAutomationId` (or none, for a leaf that just ends).
   async function makeAutomation(workspaceId: string, name: string, targetAutomationId: string | null) {
     const slug = `${name.toLowerCase().replace(/\s+/g, "-")}-${Math.floor(Math.random() * 1e6)}`;
+    // Insert as a draft first (enforce_automation_publish_validation_trg
+    // only runs its checks when a row is going live), add the step, then
+    // publish via the authenticated userClient.
     const { data: automation, error: automationError } = await service
       .from("automations")
-      .insert({ workspace_id: workspaceId, name, slug, trigger_type: "lead.created", is_enabled: true, status: "published" })
+      .insert({ workspace_id: workspaceId, name, slug, trigger_type: "lead.created", is_enabled: false, status: "draft" })
       .select("id")
       .single();
     expect(automationError).toBeNull();
+    const automationId = automation!.id as string;
 
     if (targetAutomationId) {
       const { error: stepError } = await service.from("automation_steps").insert({
-        automation_id: automation!.id,
+        automation_id: automationId,
         display_order: 1,
         action_type: "start_workflow",
         action_config: { automation_id: targetAutomationId },
@@ -80,7 +113,7 @@ describe("workflow-to-workflow chain depth guard", () => {
       expect(stepError).toBeNull();
     } else {
       const { error: stepError } = await service.from("automation_steps").insert({
-        automation_id: automation!.id,
+        automation_id: automationId,
         display_order: 1,
         action_type: "end_workflow",
         action_config: {},
@@ -88,7 +121,13 @@ describe("workflow-to-workflow chain depth guard", () => {
       expect(stepError).toBeNull();
     }
 
-    return automation!.id as string;
+    const { error: publishError } = await userClient
+      .from("automations")
+      .update({ is_enabled: true, status: "published" })
+      .eq("id", automationId);
+    expect(publishError).toBeNull();
+
+    return automationId;
   }
 
   async function startRun(automationId: string, workspaceId: string) {

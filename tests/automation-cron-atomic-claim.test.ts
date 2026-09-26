@@ -9,41 +9,70 @@
 // atomically claim rows via `for update skip locked` so two concurrent
 // claimers never both get the same row.
 //
-// Requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the
-// environment, pointed at an isolated test project (never production).
-// Fails loudly rather than skipping when they're missing, matching
-// tests/database-contract-guard.test.ts's own reasoning: a silently-skipped
-// guard is a false green in CI.
+// Requires NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and
+// SUPABASE_SERVICE_ROLE_KEY in the environment, pointed at an isolated test
+// project (never production). Fails loudly rather than skipping when
+// they're missing, matching tests/database-contract-guard.test.ts's own
+// reasoning: a silently-skipped guard is a false green in CI.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const canRun = Boolean(supabaseUrl && serviceRoleKey);
+const canRun = Boolean(supabaseUrl && anonKey && serviceRoleKey);
 
 function requireEnv() {
   if (!canRun) {
     throw new Error(
-      "NEXT_PUBLIC_SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY are not set. This suite requires an isolated " +
-        "Supabase test project to run against -- set both env vars (see .env.local.example) rather than letting " +
-        "this skip silently."
+      "NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and/or SUPABASE_SERVICE_ROLE_KEY are not set. " +
+        "This suite requires an isolated Supabase test project to run against -- set all three env vars " +
+        "(see .env.local.example) rather than letting this skip silently."
     );
   }
 }
 
 describe("automation cron atomic claim", () => {
   let service: SupabaseClient;
+  let userClient: SupabaseClient;
+  let testUserId: string;
+  const testEmail = `cron-claim-test-${Date.now()}@example.invalid`;
+  const testPassword = `Cc-${Math.random().toString(36).slice(2)}!Aa1`;
   const cleanupWorkspaceIds: string[] = [];
 
-  beforeAll(() => {
+  beforeAll(async () => {
     requireEnv();
     service = createClient(supabaseUrl!, serviceRoleKey!);
+
+    // Publishing a fixture automation requires a real authenticated user:
+    // enforce_automation_publish_validation_trg (this same PR's own
+    // migration) runs has_permission(...) on any automation going live.
+    // Platform-admin bypasses the workspace-membership check, which is
+    // fine here since this suite is about cron claim atomicity, not
+    // permission scoping.
+    const { data: created, error: createError } = await service.auth.admin.createUser({
+      email: testEmail,
+      password: testPassword,
+      email_confirm: true,
+    });
+    expect(createError).toBeNull();
+    testUserId = created!.user!.id;
+
+    const { error: profileError } = await service.from("user_profiles").update({ is_platform_admin: true }).eq("id", testUserId);
+    expect(profileError).toBeNull();
+
+    userClient = createClient(supabaseUrl!, anonKey!);
+    const { error: signInError } = await userClient.auth.signInWithPassword({ email: testEmail, password: testPassword });
+    expect(signInError).toBeNull();
   });
 
   afterAll(async () => {
     if (!canRun) return;
     if (cleanupWorkspaceIds.length > 0) {
       await service.from("workspaces").delete().in("id", cleanupWorkspaceIds);
+    }
+    if (testUserId) {
+      await service.auth.admin.deleteUser(testUserId);
     }
   });
 
@@ -56,25 +85,48 @@ describe("automation cron atomic claim", () => {
     return data!.id as string;
   }
 
-  it("two concurrent claim_due_pending_automation_steps calls never both claim the same row", async () => {
-    const workspaceId = await makeWorkspace("Claim Race Test");
-    const { data: automation, error: automationError } = await service
+  // Insert as a draft (no auth/steps required until a row goes live), add
+  // a step (required before it can publish), then publish via the
+  // authenticated userClient.
+  async function makeAutomation(workspaceId: string, name: string, stepOverrides: Record<string, unknown> = {}) {
+    const { data, error } = await service
       .from("automations")
-      .insert({ workspace_id: workspaceId, name: "Claim Test", slug: `claim-test-${Date.now()}`, trigger_type: "lead.created", status: "published", is_enabled: true })
+      .insert({
+        workspace_id: workspaceId,
+        name,
+        slug: `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+        trigger_type: "lead.created",
+        is_enabled: false,
+        status: "draft",
+      })
       .select("id")
       .single();
-    expect(automationError).toBeNull();
+    expect(error).toBeNull();
+    const automationId = data!.id as string;
 
-    const { data: step, error: stepError } = await service
+    const { data: stepData, error: stepError } = await service
       .from("automation_steps")
-      .insert({ automation_id: automation!.id, display_order: 1, action_type: "add_note", action_config: { body: "test" }, delay_minutes: 5 })
+      .insert({ automation_id: automationId, display_order: 1, action_type: "add_note", action_config: { body: "test" }, ...stepOverrides })
       .select("id")
       .single();
     expect(stepError).toBeNull();
 
+    const { error: publishError } = await userClient
+      .from("automations")
+      .update({ is_enabled: true, status: "published" })
+      .eq("id", automationId);
+    expect(publishError).toBeNull();
+
+    return { automationId, stepId: stepData!.id as string };
+  }
+
+  it("two concurrent claim_due_pending_automation_steps calls never both claim the same row", async () => {
+    const workspaceId = await makeWorkspace("Claim Race Test");
+    const { automationId, stepId } = await makeAutomation(workspaceId, "Claim Test", { delay_minutes: 5 });
+
     const { data: run, error: runError } = await service
       .from("automation_runs")
-      .insert({ workspace_id: workspaceId, automation_id: automation!.id, status: "running", trigger_snapshot: {} })
+      .insert({ workspace_id: workspaceId, automation_id: automationId, status: "running", trigger_snapshot: {} })
       .select("id")
       .single();
     expect(runError).toBeNull();
@@ -82,7 +134,7 @@ describe("automation cron atomic claim", () => {
     const { error: pendingError } = await service.from("automation_pending_steps").insert({
       workspace_id: workspaceId,
       run_id: run!.id,
-      automation_step_id: step!.id,
+      automation_step_id: stepId,
       status: "pending_delay",
       scheduled_for: new Date(Date.now() - 1000).toISOString(),
     });
@@ -106,19 +158,10 @@ describe("automation cron atomic claim", () => {
 
   it("a claimed row is not reclaimed until it goes stale, and releasing it (claimed_at = null) makes it claimable again immediately", async () => {
     const workspaceId = await makeWorkspace("Claim Release Test");
-    const { data: automation } = await service
-      .from("automations")
-      .insert({ workspace_id: workspaceId, name: "Release Test", slug: `release-test-${Date.now()}`, trigger_type: "lead.created", status: "published", is_enabled: true })
-      .select("id")
-      .single();
-    const { data: step } = await service
-      .from("automation_steps")
-      .insert({ automation_id: automation!.id, display_order: 1, action_type: "add_note", action_config: { body: "test" } })
-      .select("id")
-      .single();
+    const { automationId, stepId } = await makeAutomation(workspaceId, "Release Test");
     const { data: run } = await service
       .from("automation_runs")
-      .insert({ workspace_id: workspaceId, automation_id: automation!.id, status: "running", trigger_snapshot: {} })
+      .insert({ workspace_id: workspaceId, automation_id: automationId, status: "running", trigger_snapshot: {} })
       .select("id")
       .single();
     const { data: pending } = await service
@@ -126,7 +169,7 @@ describe("automation cron atomic claim", () => {
       .insert({
         workspace_id: workspaceId,
         run_id: run!.id,
-        automation_step_id: step!.id,
+        automation_step_id: stepId,
         status: "pending_delay",
         scheduled_for: new Date(Date.now() - 1000).toISOString(),
       })
@@ -147,14 +190,10 @@ describe("automation cron atomic claim", () => {
 
   it("two concurrent claim_blocked_automation_runs calls never both claim the same run", async () => {
     const workspaceId = await makeWorkspace("Blocked Claim Race Test");
-    const { data: automation } = await service
-      .from("automations")
-      .insert({ workspace_id: workspaceId, name: "Blocked Claim Test", slug: `blocked-claim-test-${Date.now()}`, trigger_type: "lead.created", status: "published", is_enabled: true })
-      .select("id")
-      .single();
+    const { automationId } = await makeAutomation(workspaceId, "Blocked Claim Test");
     const { data: run, error: runError } = await service
       .from("automation_runs")
-      .insert({ workspace_id: workspaceId, automation_id: automation!.id, status: "running", trigger_snapshot: {}, blocked_at: new Date().toISOString() })
+      .insert({ workspace_id: workspaceId, automation_id: automationId, status: "running", trigger_snapshot: {}, blocked_at: new Date().toISOString() })
       .select("id")
       .single();
     expect(runError).toBeNull();

@@ -6,40 +6,71 @@
 // were deliberately NOT added -- no document-review-decision concept exists
 // anywhere in the schema to fire them from.
 //
-// Requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the
-// environment, pointed at an isolated test project (never production).
-// Fails loudly rather than skipping when they're missing, matching
-// tests/database-contract-guard.test.ts's own reasoning.
+// Requires NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and
+// SUPABASE_SERVICE_ROLE_KEY in the environment, pointed at an isolated test
+// project (never production). Fails loudly rather than skipping when
+// they're missing, matching tests/database-contract-guard.test.ts's own
+// reasoning.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const canRun = Boolean(supabaseUrl && serviceRoleKey);
+const canRun = Boolean(supabaseUrl && anonKey && serviceRoleKey);
 
 function requireEnv() {
   if (!canRun) {
     throw new Error(
-      "NEXT_PUBLIC_SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY are not set. This suite requires an isolated " +
-        "Supabase test project to run against -- set both env vars (see .env.local.example) rather than letting " +
-        "this skip silently."
+      "NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and/or SUPABASE_SERVICE_ROLE_KEY are not set. " +
+        "This suite requires an isolated Supabase test project to run against -- set all three env vars " +
+        "(see .env.local.example) rather than letting this skip silently."
     );
   }
 }
 
 describe("automation missing-trigger wire-up", () => {
   let service: SupabaseClient;
+  let userClient: SupabaseClient;
+  let testUserId: string;
+  const testEmail = `missing-triggers-test-${Date.now()}@example.invalid`;
+  const testPassword = `Mt-${Math.random().toString(36).slice(2)}!Aa1`;
   const cleanupWorkspaceIds: string[] = [];
 
-  beforeAll(() => {
+  beforeAll(async () => {
     requireEnv();
     service = createClient(supabaseUrl!, serviceRoleKey!);
+
+    // A real authenticated user is required to publish a fixture automation:
+    // enforce_automation_publish_validation_trg (this same PR's own
+    // migration) runs has_permission(...) on any automation going live,
+    // which resolves via auth.uid() -- a raw service-role insert has no
+    // user context at all. Platform-admin bypasses has_permission's
+    // workspace-membership check entirely, which is fine here since this
+    // suite is about trigger wire-up, not permission scoping.
+    const { data: created, error: createError } = await service.auth.admin.createUser({
+      email: testEmail,
+      password: testPassword,
+      email_confirm: true,
+    });
+    expect(createError).toBeNull();
+    testUserId = created!.user!.id;
+
+    const { error: profileError } = await service.from("user_profiles").update({ is_platform_admin: true }).eq("id", testUserId);
+    expect(profileError).toBeNull();
+
+    userClient = createClient(supabaseUrl!, anonKey!);
+    const { error: signInError } = await userClient.auth.signInWithPassword({ email: testEmail, password: testPassword });
+    expect(signInError).toBeNull();
   });
 
   afterAll(async () => {
     if (!canRun) return;
     if (cleanupWorkspaceIds.length > 0) {
       await service.from("workspaces").delete().in("id", cleanupWorkspaceIds);
+    }
+    if (testUserId) {
+      await service.auth.admin.deleteUser(testUserId);
     }
   });
 
@@ -54,13 +85,31 @@ describe("automation missing-trigger wire-up", () => {
 
   async function makeAutomation(workspaceId: string, triggerType: string) {
     const slug = `${triggerType.replace(/\./g, "-")}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    // Insert as a draft first (enforce_automation_publish_validation_trg
+    // only runs its checks when a row is going live, so this insert needs
+    // no auth context or steps yet), add a step, then publish via the
+    // authenticated userClient -- the step and the real user context are
+    // both required before this can go live.
     const { data, error } = await service
       .from("automations")
-      .insert({ workspace_id: workspaceId, name: slug, slug, trigger_type: triggerType, is_enabled: true, status: "published" })
+      .insert({ workspace_id: workspaceId, name: slug, slug, trigger_type: triggerType, is_enabled: false, status: "draft" })
       .select("id")
       .single();
     expect(error).toBeNull();
-    return data!.id as string;
+    const automationId = data!.id as string;
+
+    const { error: stepError } = await service
+      .from("automation_steps")
+      .insert({ automation_id: automationId, display_order: 0, action_type: "add_note", action_config: { body: "test note" } });
+    expect(stepError).toBeNull();
+
+    const { error: publishError } = await userClient
+      .from("automations")
+      .update({ is_enabled: true, status: "published" })
+      .eq("id", automationId);
+    expect(publishError).toBeNull();
+
+    return automationId;
   }
 
   async function makeClient(workspaceId: string) {

@@ -32,16 +32,43 @@ function requireEnv() {
 
 describe("workspace-authorized workflow retry", () => {
   let service: SupabaseClient;
+  let publisherClient: SupabaseClient;
+  let publisherUserId: string;
+  const publisherEmail = `retry-publisher-${Date.now()}@example.invalid`;
+  const publisherPassword = `Rp-${Math.random().toString(36).slice(2)}!Aa1`;
   const cleanupWorkspaceIds: string[] = [];
   const cleanupUserIds: string[] = [];
 
-  beforeAll(() => {
+  beforeAll(async () => {
     requireEnv();
     service = createClient(supabaseUrl!, serviceRoleKey!);
+
+    // A separate, platform-admin fixture user solely to publish
+    // makeFailedRun's automation: enforce_automation_publish_validation_trg
+    // (this same PR's own migration) runs has_permission(...) on any
+    // automation going live, which a raw service-role insert has no
+    // context to satisfy. Kept distinct from makeAuthorizedStaffClient
+    // below, which is the actual thing under test (workspace-scoped
+    // retry authorization) and must stay a plain, non-admin staff member.
+    const { data: created, error: createError } = await service.auth.admin.createUser({
+      email: publisherEmail,
+      password: publisherPassword,
+      email_confirm: true,
+    });
+    expect(createError).toBeNull();
+    publisherUserId = created!.user!.id;
+    const { error: profileError } = await service.from("user_profiles").update({ is_platform_admin: true }).eq("id", publisherUserId);
+    expect(profileError).toBeNull();
+    publisherClient = createClient(supabaseUrl!, anonKey!);
+    const { error: signInError } = await publisherClient.auth.signInWithPassword({ email: publisherEmail, password: publisherPassword });
+    expect(signInError).toBeNull();
   });
 
   afterAll(async () => {
     if (!canRun) return;
+    if (publisherUserId) {
+      await service.auth.admin.deleteUser(publisherUserId);
+    }
     if (cleanupWorkspaceIds.length > 0) {
       await service.from("workspaces").delete().in("id", cleanupWorkspaceIds);
     }
@@ -107,7 +134,7 @@ describe("workspace-authorized workflow retry", () => {
     const slug = `retry-test-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     const { data: automation } = await service
       .from("automations")
-      .insert({ workspace_id: workspaceId, name: slug, slug, trigger_type: "lead.created", is_enabled: true, status: "published" })
+      .insert({ workspace_id: workspaceId, name: slug, slug, trigger_type: "lead.created", is_enabled: false, status: "draft" })
       .select("id")
       .single();
     const { data: step } = await service
@@ -115,6 +142,11 @@ describe("workspace-authorized workflow retry", () => {
       .insert({ automation_id: automation!.id, display_order: 1, action_type: "add_note", action_config: { body: "test note" } })
       .select("id")
       .single();
+    const { error: publishError } = await publisherClient
+      .from("automations")
+      .update({ is_enabled: true, status: "published" })
+      .eq("id", automation!.id);
+    expect(publishError).toBeNull();
     const { data: client } = await service
       .from("clients")
       .insert({ workspace_id: workspaceId, first_name: "Retry", last_name: "Test", client_type: "individual", lifecycle_status: "active" })
