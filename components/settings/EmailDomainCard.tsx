@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Copy, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -34,6 +35,33 @@ export function EmailDomainCard({ emailDomain }: { emailDomain: EmailDomain }) {
   const [verifying, setVerifying] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  async function copyDnsValue(key: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedKey(key);
+      window.setTimeout(() => setCopiedKey((current) => (current === key ? null : current)), 1600);
+    } catch {
+      toast.show("Couldn’t copy the DNS value. Please copy it manually.", "error");
+    }
+  }
+
+  function CopyDnsButton({ recordIndex, field, value }: { recordIndex: number; field: string; value: string }) {
+    const key = recordIndex + "-" + field;
+    const copied = copiedKey === key;
+    return (
+      <button
+        type="button"
+        onClick={() => copyDnsValue(key, value)}
+        aria-label={"Copy " + field + " for DNS record " + (recordIndex + 1)}
+        title={copied ? "Copied" : "Copy " + field}
+        className="ml-2 inline-flex shrink-0 items-center justify-center rounded-md p-1 text-muted hover:bg-surfaceMuted hover:text-ink"
+      >
+        {copied ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
+      </button>
+    );
+  }
 
   async function addDomain(e: React.FormEvent) {
     e.preventDefault();
@@ -148,11 +176,31 @@ export function EmailDomainCard({ emailDomain }: { emailDomain: EmailDomain }) {
               <tbody className="divide-y divide-border">
                 {emailDomain.dns_records.map((r, i) => (
                   <tr key={i}>
-                    <td className="px-3 py-2 font-mono">{r.type}</td>
-                    <td className="max-w-[180px] truncate px-3 py-2 font-mono" title={r.name}>{r.name}</td>
-                    <td className="max-w-[260px] truncate px-3 py-2 font-mono" title={r.value}>{r.value}</td>
+                    <td className="px-3 py-2 font-mono">
+                      <div className="flex items-center whitespace-nowrap">
+                        <span>{r.type}</span>
+                        <CopyDnsButton recordIndex={i} field="DNS type" value={r.type} />
+                      </div>
+                    </td>
+                    <td className="max-w-[220px] px-3 py-2 font-mono" title={r.name}>
+                      <div className="flex min-w-0 items-center">
+                        <span className="truncate">{r.name}</span>
+                        <CopyDnsButton recordIndex={i} field="DNS name" value={r.name} />
+                      </div>
+                    </td>
+                    <td className="max-w-[320px] px-3 py-2 font-mono" title={r.value}>
+                      <div className="flex min-w-0 items-center">
+                        <span className="truncate">{r.value}</span>
+                        <CopyDnsButton recordIndex={i} field="DNS value" value={r.value} />
+                      </div>
+                    </td>
                     {emailDomain.dns_records.some((rec) => rec.priority !== undefined) && (
-                      <td className="px-3 py-2 font-mono">{r.priority ?? ""}</td>
+                      <td className="px-3 py-2 font-mono">
+                        <div className="flex items-center whitespace-nowrap">
+                          <span>{r.priority ?? ""}</span>
+                          {r.priority !== undefined && <CopyDnsButton recordIndex={i} field="DNS priority" value={String(r.priority)} />}
+                        </div>
+                      </td>
                     )}
                   </tr>
                 ))}
