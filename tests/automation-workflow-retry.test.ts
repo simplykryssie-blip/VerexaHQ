@@ -51,7 +51,8 @@ describe("workspace-authorized workflow retry", () => {
   });
 
   async function makeWorkspace(name: string) {
-    const slug = `${name}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    const slugBase = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const slug = `${slugBase}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
     const { data, error } = await service.from("workspaces").insert({ name, slug }).select("id").single();
     expect(error).toBeNull();
     cleanupWorkspaceIds.push(data!.id);
