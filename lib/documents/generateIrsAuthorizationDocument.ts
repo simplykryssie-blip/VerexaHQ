@@ -176,7 +176,14 @@ export async function generateIrsAuthorizationDocument({
       mime_type: "application/pdf",
       file_size_bytes: blob.size,
       uploaded_by: user?.id,
-      visibility: "internal",
+      // client_visible (not the "internal" every other signature-request
+      // document uses) so this shows up in the client's own portal
+      // Documents list automatically -- the whole point of this document is
+      // for the client to act on it, unlike an internal staff file. The
+      // copy-signing-link button on the detail page still works exactly the
+      // same as before; this just adds a second way for the client to find
+      // and sign it without needing that link sent to them separately.
+      visibility: "client_visible",
       category: "IRS Form 8821",
     })
     .select("id")
