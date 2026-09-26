@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, PDFTextField, PDFCheckBox, PDFRadioGroup, PDFDropdown } from "pdf-lib";
 import { renderTemplate } from "@/lib/templates/render";
 
 // `template` is free text that may contain zero or more {{merge_field}}
@@ -40,12 +40,30 @@ export async function renderPdfTemplate({
     for (const mapping of fieldMappings) {
       if (mapping.kind !== "acroform") continue;
       const value = renderTemplate(mapping.template, values);
-      if (!value) continue;
       try {
-        form.getTextField(mapping.pdfFieldName).setText(value);
+        const field = form.getField(mapping.pdfFieldName);
+        if (field instanceof PDFCheckBox) {
+          // A checkbox has no text to render -- its mapped "template" is
+          // just a truthy/falsy merge value (booleans render as "true"/""
+          // via renderTemplate). Any of the common truthy spellings checks
+          // it; anything else (including an empty/unresolved value) leaves
+          // it unchecked rather than the old behavior of always attempting
+          // a literal "x", which threw on getTextField() and was silently
+          // swallowed by the catch below -- checkboxes never actually got
+          // filled at all.
+          if (/^(x|true|1|yes|on)$/i.test(value.trim())) field.check();
+          else field.uncheck();
+        } else if (!value) {
+          continue;
+        } else if (field instanceof PDFTextField) {
+          field.setText(value);
+        } else if (field instanceof PDFRadioGroup || field instanceof PDFDropdown) {
+          field.select(value);
+        }
       } catch {
-        // The PDF field was renamed or removed since this mapping was set
-        // up -- skip it rather than failing the whole document.
+        // The PDF field was renamed/removed since this mapping was set up,
+        // or the value doesn't match one of a radio/dropdown's real options
+        // -- skip it rather than failing the whole document.
       }
     }
     form.flatten();

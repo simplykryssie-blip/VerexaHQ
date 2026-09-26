@@ -2209,7 +2209,7 @@ export function WorkflowBuilder({
     setTestError(null);
     const { data: runId, error } = await supabase.rpc("run_automation_test", {
       p_automation_id: automationId,
-      p_client_id: isWebhookTrigger ? null : testClient!.id,
+      p_client_id: (isWebhookTrigger ? null : testClient!.id) as never,
       p_webhook_event_type: isWebhookTrigger ? testWebhookEventType.trim() || undefined : undefined,
       p_webhook_payload: isWebhookTrigger ? webhookPayload : undefined,
     });

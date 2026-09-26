@@ -36,7 +36,9 @@ export default async function NewIrsAuthorizationPage({ params }: { params: { id
     await Promise.all([
       supabase
         .from("clients")
-        .select("id, client_type, first_name, last_name, business_name, primary_email, address_line1, address_line2, city, state, postal_code")
+        .select(
+          "id, client_type, first_name, last_name, business_name, primary_email, primary_phone, address_line1, address_line2, city, state, postal_code"
+        )
         .eq("id", params.id)
         .single(),
       supabase
@@ -48,7 +50,7 @@ export default async function NewIrsAuthorizationPage({ params }: { params: { id
       supabase.from("workspace_users").select("user_id").eq("workspace_id", workspace.id).eq("status", "active"),
       supabase
         .from("engagement_letter_templates")
-        .select("id, name")
+        .select("id, name, pdf_field_mappings")
         .eq("workspace_id", workspace.id)
         .eq("source_type", "pdf")
         .not("pdf_field_mode", "is", null)
@@ -82,6 +84,14 @@ export default async function NewIrsAuthorizationPage({ params }: { params: { id
 
   const clientAddress = [client.address_line1, client.address_line2, client.city, client.state, client.postal_code].filter(Boolean).join(", ");
 
+  // A template with no field mappings at all would generate a completely
+  // blank 8821 -- excluded here rather than deleted, since it may already be
+  // referenced by a past signature_requests row.
+  const usableTemplates = (templates ?? []).filter((t) => {
+    const mappings = t.pdf_field_mappings as unknown[] | null;
+    return Array.isArray(mappings) && mappings.length > 0;
+  });
+
   return (
     <>
       <PageHeader backHref={`/clients/${client.id}`} backLabel={`Back to ${clientDisplayName(client)}`} title="New IRS Authorization" />
@@ -93,10 +103,11 @@ export default async function NewIrsAuthorizationPage({ params }: { params: { id
             clientName={clientDisplayName(client)}
             clientEmail={client.primary_email}
             clientAddress={clientAddress}
+            clientPhone={client.primary_phone ?? ""}
             defaultTaxpayerType={client.client_type !== "individual" ? "business" : "individual"}
             engagements={engagements}
             staffOptions={staffOptions}
-            templates={templates ?? []}
+            templates={usableTemplates.map((t) => ({ id: t.id, name: t.name }))}
             firmName={workspace.name}
             firmAddress={contact?.mailing_address ?? ""}
             firmPhone={branding?.support_phone ?? contact?.phone ?? ""}

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { SectionCard } from "@/components/ui/SectionCard";
 import Link from "next/link";
 import { IRS_AUTHORIZATION_STATUS_LABELS, IRS_AUTHORIZATION_STATUS_TONE, type IrsAuthorizationStatus } from "@/lib/irsAuthorizationStatus";
-import type { IrsTaxMatterRow } from "@/lib/irsAuthorization/types";
+import type { IrsTaxMatterRow, IrsDesignee } from "@/lib/irsAuthorization/types";
 import { IrsAuthorizationStatusPanel } from "./IrsAuthorizationStatusPanel";
 import { CopySigningLinkButton } from "./CopySigningLinkButton";
 
@@ -40,7 +40,8 @@ export default async function IrsAuthorizationDetailPage({ params }: { params: {
   const { data: authorization } = await supabase
     .from("irs_authorizations")
     .select(
-      `id, workspace_id, client_id, engagement_id, taxpayer_type, designee_name, designee_caf_number,
+      `id, workspace_id, client_id, engagement_id, taxpayer_type, designees, plan_number,
+       specific_use_not_on_caf, retain_prior_authorizations, intermediate_service_provider, additional_designees_attached,
        tax_matters, status, staff_note, submitted_at, authorized_at, created_at,
        attachment_id, signature_request_id,
        clients(id, client_type, first_name, last_name, business_name)`
@@ -68,6 +69,7 @@ export default async function IrsAuthorizationDetailPage({ params }: { params: {
     business_name: string | null;
   };
   const taxMatters = (authorization.tax_matters ?? []) as IrsTaxMatterRow[];
+  const designees = (authorization.designees ?? []) as IrsDesignee[];
   const status = authorization.status as IrsAuthorizationStatus;
 
   const [{ data: canManage }, { data: attachment }, { data: signer }] = await Promise.all([
@@ -101,7 +103,10 @@ export default async function IrsAuthorizationDetailPage({ params }: { params: {
         description={
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
             <span className="capitalize">{authorization.taxpayer_type} taxpayer</span>
-            <span>Designee: {authorization.designee_name}{authorization.designee_caf_number ? ` (CAF ${authorization.designee_caf_number})` : ""}</span>
+            <span>
+              Designee{designees.length > 1 ? "s" : ""}:{" "}
+              {designees.map((d) => `${d.name}${d.caf_number ? ` (CAF ${d.caf_number})` : ""}`).join("; ") || "None"}
+            </span>
             <Badge tone={IRS_AUTHORIZATION_STATUS_TONE[status]}>{IRS_AUTHORIZATION_STATUS_LABELS[status]}</Badge>
           </div>
         }
@@ -135,7 +140,26 @@ export default async function IrsAuthorizationDetailPage({ params }: { params: {
               </table>
             </div>
           )}
+          {authorization.intermediate_service_provider && (
+            <p className="mt-2 text-xs text-muted">Access via an Intermediate Service Provider is authorized.</p>
+          )}
         </SectionCard>
+
+        {(authorization.plan_number || authorization.specific_use_not_on_caf || authorization.retain_prior_authorizations || authorization.additional_designees_attached) && (
+          <SectionCard title="Additional details">
+            <dl className="space-y-1.5 text-sm text-slate">
+              {authorization.plan_number && (
+                <div className="flex justify-between">
+                  <dt className="text-muted">Plan number</dt>
+                  <dd>{authorization.plan_number}</dd>
+                </div>
+              )}
+              {authorization.specific_use_not_on_caf && <p>Specific use not recorded on CAF.</p>}
+              {authorization.retain_prior_authorizations && <p>Prior tax information authorizations are retained.</p>}
+              {authorization.additional_designees_attached && <p>Additional designees beyond the two above are attached.</p>}
+            </dl>
+          </SectionCard>
+        )}
 
         <SectionCard title="Document & signature">
           <dl className="space-y-3 text-sm">

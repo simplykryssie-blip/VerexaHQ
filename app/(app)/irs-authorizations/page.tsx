@@ -46,7 +46,7 @@ export default async function IrsAuthorizationsPage() {
 
   const { data: authorizations } = await supabase
     .from("irs_authorizations")
-    .select("id, taxpayer_type, designee_name, status, created_at, clients(id, client_type, first_name, last_name, business_name)")
+    .select("id, taxpayer_type, designees, status, created_at, clients(id, client_type, first_name, last_name, business_name)")
     .eq("workspace_id", workspace.id)
     .order("created_at", { ascending: false });
 
@@ -106,7 +106,9 @@ export default async function IrsAuthorizationsPage() {
                         </Link>
                       </td>
                       <td className="px-4 py-2.5 capitalize text-slate">{row.taxpayer_type}</td>
-                      <td className="px-4 py-2.5 text-slate">{row.designee_name}</td>
+                      <td className="px-4 py-2.5 text-slate">
+                        {((row.designees as unknown as { name: string }[] | null) ?? []).map((d) => d.name).join(", ") || "--"}
+                      </td>
                       <td className="px-4 py-2.5">
                         <Badge tone={IRS_AUTHORIZATION_STATUS_TONE[status]}>{IRS_AUTHORIZATION_STATUS_LABELS[status]}</Badge>
                       </td>

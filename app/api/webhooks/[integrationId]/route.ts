@@ -71,7 +71,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ int
     .rpc("claim_webhook_event", {
       p_integration_id: integration.id,
       p_event_type: eventType,
-      p_external_id: externalId ?? null,
+      p_external_id: (externalId ?? null) as never,
       p_payload: payload as never,
       p_is_test: isTest,
     })
