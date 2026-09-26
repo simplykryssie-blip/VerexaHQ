@@ -39,7 +39,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               className="pointer-events-auto flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-3 text-sm shadow-lg"
             >
               <Icon size={16} className={COLORS[t.variant]} aria-hidden="true" />
-              <span className="text-slate">{t.message}</span>
+              <span className="whitespace-pre-line text-slate">{t.message}</span>
               <button
                 type="button"
                 onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}

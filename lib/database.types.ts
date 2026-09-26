@@ -928,6 +928,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           automation_step_id: string
+          claimed_at: string | null
           created_at: string
           decided_option: string | null
           id: string
@@ -941,6 +942,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           automation_step_id: string
+          claimed_at?: string | null
           created_at?: string
           decided_option?: string | null
           id?: string
@@ -954,6 +956,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           automation_step_id?: string
+          claimed_at?: string | null
           created_at?: string
           decided_option?: string | null
           id?: string
@@ -987,6 +990,58 @@ export type Database = {
           },
         ]
       }
+      automation_run_retry_attempts: {
+        Row: {
+          attempt_number: number
+          id: string
+          retried_at: string
+          retried_by: string | null
+          run_id: string
+          step_id_at_retry: string | null
+          workspace_id: string
+        }
+        Insert: {
+          attempt_number: number
+          id?: string
+          retried_at?: string
+          retried_by?: string | null
+          run_id: string
+          step_id_at_retry?: string | null
+          workspace_id: string
+        }
+        Update: {
+          attempt_number?: number
+          id?: string
+          retried_at?: string
+          retried_by?: string | null
+          run_id?: string
+          step_id_at_retry?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_run_retry_attempts_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "automation_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_run_retry_attempts_step_id_at_retry_fkey"
+            columns: ["step_id_at_retry"]
+            isOneToOne: false
+            referencedRelation: "automation_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_run_retry_attempts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_runs: {
         Row: {
           acknowledged_at: string | null
@@ -994,6 +1049,7 @@ export type Database = {
           automation_id: string
           blocked_at: string | null
           blocked_step_id: string | null
+          chain_depth: number
           client_id: string | null
           completed_at: string | null
           connection_id: string | null
@@ -1002,7 +1058,9 @@ export type Database = {
           id: string
           is_test: boolean
           onboarding_id: string | null
+          parent_run_id: string | null
           partner_prospect_id: string | null
+          resume_claimed_at: string | null
           started_at: string
           status: string
           trigger_snapshot: Json
@@ -1014,6 +1072,7 @@ export type Database = {
           automation_id: string
           blocked_at?: string | null
           blocked_step_id?: string | null
+          chain_depth?: number
           client_id?: string | null
           completed_at?: string | null
           connection_id?: string | null
@@ -1022,7 +1081,9 @@ export type Database = {
           id?: string
           is_test?: boolean
           onboarding_id?: string | null
+          parent_run_id?: string | null
           partner_prospect_id?: string | null
+          resume_claimed_at?: string | null
           started_at?: string
           status?: string
           trigger_snapshot?: Json
@@ -1034,6 +1095,7 @@ export type Database = {
           automation_id?: string
           blocked_at?: string | null
           blocked_step_id?: string | null
+          chain_depth?: number
           client_id?: string | null
           completed_at?: string | null
           connection_id?: string | null
@@ -1042,7 +1104,9 @@ export type Database = {
           id?: string
           is_test?: boolean
           onboarding_id?: string | null
+          parent_run_id?: string | null
           partner_prospect_id?: string | null
+          resume_claimed_at?: string | null
           started_at?: string
           status?: string
           trigger_snapshot?: Json
@@ -1110,6 +1174,13 @@ export type Database = {
             columns: ["onboarding_id"]
             isOneToOne: false
             referencedRelation: "partner_onboardings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_runs_parent_run_id_fkey"
+            columns: ["parent_run_id"]
+            isOneToOne: false
+            referencedRelation: "automation_runs"
             referencedColumns: ["id"]
           },
           {
@@ -10301,6 +10372,8 @@ export type Database = {
           event_type: string
           external_id: string | null
           id: string
+          integration_id: string | null
+          is_test: boolean
           last_error: string | null
           payload: Json
           processed_at: string | null
@@ -10314,6 +10387,8 @@ export type Database = {
           event_type: string
           external_id?: string | null
           id?: string
+          integration_id?: string | null
+          is_test?: boolean
           last_error?: string | null
           payload?: Json
           processed_at?: string | null
@@ -10327,6 +10402,8 @@ export type Database = {
           event_type?: string
           external_id?: string | null
           id?: string
+          integration_id?: string | null
+          is_test?: boolean
           last_error?: string | null
           payload?: Json
           processed_at?: string | null
@@ -10337,7 +10414,68 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "webhook_events_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "webhook_integrations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "webhook_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_integrations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          last_event_at: string | null
+          name: string
+          provider: string
+          signing_secret: string
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_event_at?: string | null
+          name: string
+          provider?: string
+          signing_secret: string
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_event_at?: string | null
+          name?: string
+          provider?: string
+          signing_secret?: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_integrations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_integrations_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -12288,6 +12426,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      claim_blocked_automation_runs: {
+        Args: { p_limit?: number; p_stale_after_seconds?: number }
+        Returns: { id: string; blocked_step_id: string | null }[]
+      }
+      claim_due_pending_automation_steps: {
+        Args: { p_limit?: number; p_stale_after_seconds?: number }
+        Returns: { id: string; run_id: string; workspace_id: string; automation_step_id: string }[]
+      }
       claim_pending_paid_seat: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -12317,6 +12463,20 @@ export type Database = {
         Returns: {
           id: string
           should_process: boolean
+        }[]
+      }
+      claim_webhook_event: {
+        Args: {
+          p_event_type: string
+          p_external_id: string | null
+          p_integration_id: string
+          p_is_test?: boolean
+          p_payload: Json
+        }
+        Returns: {
+          id: string
+          should_process: boolean
+          workspace_id: string
         }[]
       }
       compare_config_object_versions: {
@@ -12666,6 +12826,13 @@ export type Database = {
         }
         Returns: string
       }
+      create_webhook_integration: {
+        Args: { p_name: string; p_provider: string; p_workspace_id: string }
+        Returns: {
+          id: string
+          signing_secret: string
+        }[]
+      }
       create_workflow_pipeline: {
         Args: { p_name: string; p_workspace_id: string }
         Returns: string
@@ -12886,6 +13053,15 @@ export type Database = {
       fire_date_reminder_automations: { Args: never; Returns: number }
       fire_invoice_overdue_automations: { Args: never; Returns: number }
       fire_task_overdue_automations: { Args: never; Returns: number }
+      fire_webhook_automations: {
+        Args: {
+          p_event_type: string
+          p_integration_id: string
+          p_is_test?: boolean
+          p_payload: Json
+        }
+        Returns: undefined
+      }
       flag_organizer_field_for_info: {
         Args: {
           p_instance_index?: number
@@ -13683,6 +13859,10 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: boolean
       }
+      known_automation_trigger_types: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
       learning_hub_reachable_workspaces: {
         Args: { p_owner_workspace_id: string }
         Returns: {
@@ -13815,6 +13995,10 @@ export type Database = {
       }
       mark_ready_for_client_review: {
         Args: { p_engagement_id: string }
+        Returns: undefined
+      }
+      mark_webhook_event_processed: {
+        Args: { p_error?: string; p_event_id: string; p_status: string }
         Returns: undefined
       }
       maybe_queue_usage_warning: {
@@ -14358,7 +14542,7 @@ export type Database = {
       }
       retry_failed_automation_run: {
         Args: { p_run_id: string }
-        Returns: undefined
+        Returns: Json
       }
       reveal_client_ein: { Args: { p_client_id: string }; Returns: string }
       reveal_client_itin: { Args: { p_client_id: string }; Returns: string }
@@ -14393,11 +14577,17 @@ export type Database = {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
       }
+      rotate_webhook_integration_secret: {
+        Args: { p_integration_id: string }
+        Returns: string
+      }
       run_automation_test: {
         Args: {
           p_automation_id: string
-          p_client_id: string
+          p_client_id: string | null
           p_engagement_id?: string
+          p_webhook_event_type?: string
+          p_webhook_payload?: Json
         }
         Returns: string
       }

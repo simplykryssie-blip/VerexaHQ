@@ -74,6 +74,8 @@ export const TRIGGER_TYPES = [
   { value: "document.uploaded", label: "A document is uploaded", category: "documents", description: "Fires when a document is uploaded.", keywords: "documents upload" },
   { value: "task.created", label: "A task is created", category: "tasks", description: "Fires when a task is created.", keywords: "task new created" },
   { value: "task.completed", label: "A task is completed", category: "tasks", description: "Fires when a task is marked complete.", keywords: "task done complete" },
+  { value: "task.assigned", label: "A task is assigned to staff", category: "tasks", description: "Fires the first time a task gets an assignee (it had none before).", keywords: "task assign staff owner" },
+  { value: "task.reassigned", label: "A task is reassigned to different staff", category: "tasks", description: "Fires when a task's assignee changes from one staff member to another.", keywords: "task reassign staff transfer owner" },
   { value: "client_message.received", label: "A client sends a message", category: "communication", description: "Fires when a client replies or sends a portal message.", keywords: "message reply customer replied" },
   { value: "task.overdue", label: "A task becomes overdue", category: "tasks", description: "Fires when a task's due date passes with it still open (checked every 6 hours).", keywords: "task overdue late" },
   { value: "webhook.received", label: "A webhook is received", category: "webhooks_integrations", description: "Fires when an external tool posts JSON to this workflow's webhook URL.", keywords: "webhook inbound integration api zapier" },
@@ -85,10 +87,12 @@ export const TRIGGER_TYPES = [
   { value: "email.bounced", label: "An automated email bounces", category: "communication", description: "Fires when an email sent by a workflow bounces.", keywords: "email bounced failed" },
   { value: "sms.delivered", label: "An automated text is delivered", category: "communication", description: "Fires when a text sent by a workflow is delivered.", keywords: "sms text delivered" },
   { value: "sms.failed", label: "An automated text fails to deliver", category: "communication", description: "Fires when a text sent by a workflow fails to deliver.", keywords: "sms text failed error" },
+  { value: "invoice.created", label: "An invoice is created", category: "billing", description: "Fires the moment any invoice record exists, including drafts -- before it's sent.", keywords: "invoice billing created new draft" },
   { value: "invoice.sent", label: "An invoice is sent", category: "billing", description: "Fires when an invoice is sent to a client.", keywords: "invoice billing sent" },
   { value: "invoice.paid", label: "An invoice is paid in full", category: "billing", description: "Fires when an invoice is paid in full.", keywords: "invoice paid payment" },
   { value: "invoice.overdue", label: "An invoice becomes overdue", category: "billing", description: "Fires when an invoice's due date passes unpaid (checked every 6 hours).", keywords: "invoice overdue late payment" },
   { value: "payment_plan.installment_paid", label: "A payment plan installment is paid", category: "billing", description: "Fires when a payment plan installment is paid.", keywords: "payment plan installment paid" },
+  { value: "payment.failed", label: "A payment fails", category: "billing", description: "Fires when a card charge or payment attempt fails (a decline, an expired card, etc).", keywords: "payment failed declined card error" },
   { value: "engagement_share.created", label: "A connected PTIN shares an engagement for review", category: "ero_ptin", description: "Fires in the ERO's workspace when a connected PTIN sends an engagement in for review. Runs in addition to the built-in reviewer notification -- use it for custom routing (e.g. Slack, round-robin).", keywords: "ero ptin share review connected office" },
   { value: "firm_package.purchased", label: "A connected firm purchases a package", category: "ero_ptin", description: "Fires in your workspace when a connected firm checks out and pays for the package you assigned them (e.g. a tax software or bank product package) -- use it to automate onboarding onto whatever they chose.", keywords: "package purchase checkout software bank connected firm ero ptin" },
   { value: "partner_package.purchased", label: "A new partner purchases a package", category: "ero_ptin", description: "Fires in your workspace when someone with no Verexa workspace buys a package directly on your own website or checkout (e.g. a software/banking package) -- use it to start their onboarding without requiring them to have a Verexa account first.", keywords: "package purchase checkout new partner prospect no workspace website external" },
@@ -315,6 +319,7 @@ export function TriggerFields({
   pipelines = [],
   tagOptions = [],
   webhookUrl,
+  webhookIntegrations = [],
   disabled,
   onTagDraftChange,
   tagDraft,
@@ -329,6 +334,7 @@ export function TriggerFields({
   pipelines?: PipelineOption[];
   tagOptions?: string[];
   webhookUrl?: string;
+  webhookIntegrations?: TemplateOption[];
   disabled?: boolean;
   /** See TagListInput's onDraftChange -- lets the Save trigger button fold
    * in a typed-but-uncommitted tag at save time instead of losing it to the
@@ -385,6 +391,40 @@ export function TriggerFields({
             POST JSON to this URL. An <code>email</code> or <code>phone</code> field finds or creates a matching lead; every
             field in the body becomes available to this run&apos;s conditions and merge fields.
           </span>
+        </div>
+      )}
+
+      {triggerType === "webhook.received" && (
+        <div className="col-span-2 flex flex-col gap-1 border-t border-border pt-3 text-xs text-muted">
+          Or start from a configured webhook integration (Settings &rarr; Webhooks) -- signature-verified, supports Stripe
+          and replay-safe delivery, and lets a run resume mid-workflow on a matching later event.
+          <select
+            disabled={disabled}
+            value={(config.integration_id as string) ?? ""}
+            onChange={(e) => onConfigChange({ ...config, integration_id: e.target.value || undefined })}
+            className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+          >
+            <option value="">Don&apos;t use a webhook integration</option>
+            {webhookIntegrations.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+          {Boolean(config.integration_id) && (
+            <input
+              disabled={disabled}
+              value={(config.event_type as string) ?? ""}
+              onChange={(e) => onConfigChange({ ...config, event_type: e.target.value || undefined })}
+              placeholder="Event type (optional -- any event from this integration if blank)"
+              className="mt-1 rounded-lg border border-border px-3 py-2 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            />
+          )}
+          {webhookIntegrations.length === 0 && (
+            <span className="mt-1 text-[11px] normal-case text-warning">
+              No webhook integration configured for this workspace yet -- add one in Settings first.
+            </span>
+          )}
         </div>
       )}
 
