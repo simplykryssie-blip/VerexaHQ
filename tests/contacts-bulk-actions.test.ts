@@ -16,6 +16,7 @@ import {
   partitionForBulkStatus,
   tagsAfterBulkRemove,
   rowsHavingTag,
+  summarizeDeleteClientsResult,
 } from "@/app/(app)/clients/bulkContactActions";
 import { createFakeSupabase, type FixtureResult } from "./helpers/fakeSupabase";
 import { WORKSPACE_FIXTURE } from "./fixtures/clientRecords";
@@ -107,6 +108,49 @@ describe("rowsHavingTag", () => {
 
   it("treats a null tags array as having no tags", () => {
     expect(rowsHavingTag([{ id: "c1", tags: null }], "vip")).toEqual([]);
+  });
+});
+
+// Contacts Reconciliation Audit -- bulk hard delete. summarizeDeleteClientsResult
+// turns delete_clients' per-row RPC result into the three buckets
+// ContactsBulkTable's toast needs, distinguishing the one expected/common
+// skip reason (already an established client) from anything unanticipated.
+describe("summarizeDeleteClientsResult", () => {
+  it("counts successfully deleted rows", () => {
+    const summary = summarizeDeleteClientsResult([
+      { client_id: "c1", deleted: true, reason: null },
+      { client_id: "c2", deleted: true, reason: null },
+    ]);
+    expect(summary.deletedCount).toBe(2);
+    expect(summary.establishedClientSkips).toEqual([]);
+    expect(summary.otherSkips).toEqual([]);
+  });
+
+  it("buckets an established-client skip separately from an unexpected failure", () => {
+    const summary = summarizeDeleteClientsResult([
+      { client_id: "c1", deleted: true, reason: null },
+      { client_id: "c2", deleted: false, reason: "Has become an established client (2 engagement(s)) -- archive instead of deleting" },
+      { client_id: "c3", deleted: false, reason: "Could not delete: some other constraint violation" },
+    ]);
+    expect(summary.deletedCount).toBe(1);
+    expect(summary.establishedClientSkips).toEqual([
+      { id: "c2", reason: "Has become an established client (2 engagement(s)) -- archive instead of deleting" },
+    ]);
+    expect(summary.otherSkips).toEqual([{ id: "c3", reason: "Could not delete: some other constraint violation" }]);
+  });
+
+  it("handles an empty result set without throwing", () => {
+    const summary = summarizeDeleteClientsResult([]);
+    expect(summary).toEqual({ deletedCount: 0, establishedClientSkips: [], otherSkips: [] });
+  });
+
+  it("treats insufficient-permissions and not-found skips as 'other', not established-client", () => {
+    const summary = summarizeDeleteClientsResult([
+      { client_id: "c1", deleted: false, reason: "Insufficient permissions" },
+      { client_id: "c2", deleted: false, reason: "Contact not found" },
+    ]);
+    expect(summary.establishedClientSkips).toEqual([]);
+    expect(summary.otherSkips.map((s) => s.id)).toEqual(["c1", "c2"]);
   });
 });
 

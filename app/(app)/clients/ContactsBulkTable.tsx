@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Tag, Download, X, UserCog, Tags as TagsIcon, ChevronDown, Archive, ArchiveRestore } from "lucide-react";
+import { Tag, Download, X, UserCog, Tags as TagsIcon, ChevronDown, Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/Confirm";
@@ -17,8 +17,10 @@ import {
   tagsAfterBulkRemove,
   rowsHavingTag,
   MAX_BULK_SELECT_ALL,
+  summarizeDeleteClientsResult,
   type BulkStatusValue,
   type SearchClientsFilters,
+  type DeleteClientsResultRow,
 } from "./bulkContactActions";
 
 type StaffOption = { value: string; label: string };
@@ -81,6 +83,7 @@ export function ContactsBulkTable({
   workspaceId,
   canManage,
   canEdit,
+  canDelete,
   staffOptions,
   activeFilters,
   totalCount,
@@ -94,6 +97,11 @@ export function ContactsBulkTable({
    * mark_client_lost and the single-client assignment form already require,
    * since these mutate existing contacts rather than create new ones. */
   canEdit: boolean;
+  /** Gates bulk hard delete -- clients.delete, already granted to Owner/
+   * Admin/ERO and already the RLS policy's own gate on a direct `clients`
+   * DELETE; separate from canEdit since this is a destructive, distinct
+   * permission a workspace may want to grant more narrowly than edit. */
+  canDelete: boolean;
   staffOptions: StaffOption[];
   /** The exact filters this page's own search_clients call used, so
    * "select all matching" (Phase 3) can reissue the identical query
@@ -131,6 +139,7 @@ export function ContactsBulkTable({
   const [applyingAssign, setApplyingAssign] = useState(false);
   const [applyingArchive, setApplyingArchive] = useState(false);
   const [applyingRestore, setApplyingRestore] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const selectedRows = useMemo(
     () => (allFilteredRows ?? rows).filter((r) => selected.has(r.id)),
@@ -342,6 +351,44 @@ export function ContactsBulkTable({
     router.refresh();
   }
 
+  // Hard delete: a single server-side call carrying the whole selection
+  // (never a client-side loop over individual per-row deletes) -- delete_clients
+  // itself decides, per contact, whether it's eligible (no engagement/
+  // invoice/payment/quote history -- i.e. never became an established
+  // client) and does the actual owned-data-graph cleanup, so this component
+  // only has to present the confirmation and the resulting summary.
+  async function applyDelete() {
+    const confirmed = await confirm({
+      title: `Permanently delete ${selectedRows.length} contact${selectedRows.length === 1 ? "" : "s"}?`,
+      body:
+        "This permanently deletes each selected contact and everything owned only by them -- tasks, notes, documents, appointments, messages, portal access, and any other contact-specific records. This cannot be undone. " +
+        "Contacts that have already become an established client (an engagement, invoice, payment, or quote on file) are skipped, not deleted -- archive those instead.",
+      confirmLabel: "Delete permanently",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed) return;
+
+    setDeleting(true);
+    const { data, error } = await supabase.rpc("delete_clients", { p_client_ids: selectedRows.map((r) => r.id) });
+    setDeleting(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+
+    const { deletedCount, establishedClientSkips, otherSkips } = summarizeDeleteClientsResult((data ?? []) as DeleteClientsResultRow[]);
+    const parts: string[] = [];
+    if (deletedCount > 0) parts.push(`Deleted ${deletedCount} contact${deletedCount === 1 ? "" : "s"}`);
+    if (establishedClientSkips.length > 0) {
+      parts.push(`${establishedClientSkips.length} skipped -- already an established client (archive instead)`);
+    }
+    if (otherSkips.length > 0) parts.push(`${otherSkips.length} could not be deleted (${otherSkips[0].reason})`);
+
+    toast.show(parts.join("; ") || "Nothing was deleted", otherSkips.length > 0 || deletedCount === 0 ? "error" : "success");
+    clearSelection();
+    router.refresh();
+  }
+
   if (rows.length === 0) {
     return <EmptyState message={emptyMessage} action={emptyAction} />;
   }
@@ -517,6 +564,16 @@ export function ContactsBulkTable({
               className="inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-surface px-2.5 py-1 text-xs font-medium text-accent hover:bg-accent/10"
             >
               <Download size={13} /> Export CSV
+            </button>
+          )}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={() => void applyDelete()}
+              disabled={deleting}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-danger/40 bg-surface px-2.5 py-1 text-xs font-medium text-danger hover:bg-danger/10 disabled:opacity-60"
+            >
+              <Trash2 size={13} /> {deleting ? "Deleting..." : "Delete"}
             </button>
           )}
           <button

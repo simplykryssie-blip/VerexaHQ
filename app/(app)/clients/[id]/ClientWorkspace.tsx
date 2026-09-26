@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { QuickActions } from "./QuickActions";
 import { ConvertLeadButton } from "./ConvertLeadButton";
@@ -17,7 +18,7 @@ import { FileUp, MessageSquare, Receipt as ReceiptIcon, NotebookPen } from "luci
 import { Badge } from "@/components/ui/Badge";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { clientStatusTone } from "@/lib/clientStatus";
-import { ClientTabsBody, displayName, type ClientTab } from "./ClientTabsBody";
+import { ClientTabsBody, displayName, TABS, type ClientTab } from "./ClientTabsBody";
 import {
   type ContactRow,
   type AddressRow,
@@ -173,7 +174,14 @@ export function ClientWorkspace(props: ClientWorkspaceProps) {
   automationStatus,
   additionalSigners,
   } = props;
-  const [tab, setTab] = useState<ClientTab>("Details");
+  // Lets Quick View's stat tiles (ClientQuickViewDrawer) link straight to a
+  // specific tab on the full record instead of always landing on Details --
+  // the initial value only, so switching tabs afterward still just updates
+  // local state the way it always has.
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const initialTab = (TABS as readonly string[]).includes(requestedTab ?? "") ? (requestedTab as ClientTab) : "Details";
+  const [tab, setTab] = useState<ClientTab>(initialTab);
   const showStaffRoles = !isIndependentTier(workspace);
 
   const openEngagement = engagements.find((e) => e.status !== "Completed" && e.status !== "Archived");
