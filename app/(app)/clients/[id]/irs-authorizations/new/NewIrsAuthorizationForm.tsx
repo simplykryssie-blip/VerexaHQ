@@ -11,6 +11,11 @@ import type { Irs8821OrganizerPrefill } from "@/lib/organizerPrefill8821";
 
 const TAX_INFO_TYPE_OPTIONS = ["Income", "Employment", "Payroll", "Excise", "Estate", "Gift", "Civil Penalty", "Sec. 4980H Payments", "Other"];
 const EXTERNAL_DESIGNEE = "__external__";
+// The actual uploaded 8821 PDF's Section 3 table has exactly 3 rows
+// (Table_Line3 BodyRow1-3) -- a 4th row typed here would render nowhere on
+// the generated document, so the UI caps it here instead of silently
+// dropping data at render time.
+const MAX_TAX_MATTER_ROWS = 3;
 
 function emptyRow(): IrsTaxMatterRow {
   return { tax_info_type: "", tax_form_number: "", years_or_periods: "", specific_matters: "" };
@@ -468,14 +473,19 @@ export function NewIrsAuthorizationForm({
       <div>
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-slate">Tax matters</p>
-          <button
-            type="button"
-            onClick={() => setTaxMatters((prev) => [...prev, emptyRow()])}
-            className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
-          >
-            <Plus size={13} /> Add row
-          </button>
+          {taxMatters.length < MAX_TAX_MATTER_ROWS && (
+            <button
+              type="button"
+              onClick={() => setTaxMatters((prev) => [...prev, emptyRow()])}
+              className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+            >
+              <Plus size={13} /> Add row
+            </button>
+          )}
         </div>
+        {taxMatters.length >= MAX_TAX_MATTER_ROWS && (
+          <p className="mt-1 text-xs text-muted">Form 8821 has room for {MAX_TAX_MATTER_ROWS} tax matter rows on this line.</p>
+        )}
         <label className="mt-2 flex items-center gap-1.5 text-xs text-slate">
           <input
             type="checkbox"
@@ -544,7 +554,20 @@ export function NewIrsAuthorizationForm({
 
       <div className="space-y-1.5 rounded-xl border border-border p-3">
         <label className="flex items-center gap-1.5 text-sm text-slate">
-          <input type="checkbox" checked={specificUseNotOnCaf} onChange={(e) => setSpecificUseNotOnCaf(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={specificUseNotOnCaf}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              setSpecificUseNotOnCaf(checked);
+              // The form's own instructions say to skip line 5 when line 4 is
+              // checked -- hiding line 5's checkbox below without also
+              // clearing it would leave it silently still-checked, tripping
+              // the Section 4/5 conflict validation with no visible box left
+              // to uncheck.
+              if (checked) setRetainPriorAuthorizations(false);
+            }}
+          />
           Specific use not recorded on Centralized Authorization File (CAF)
         </label>
         {!specificUseNotOnCaf && (
