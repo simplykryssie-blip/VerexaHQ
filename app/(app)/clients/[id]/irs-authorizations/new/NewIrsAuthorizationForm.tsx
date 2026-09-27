@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Eye } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
-import { generateIrsAuthorizationDocument } from "@/lib/documents/generateIrsAuthorizationDocument";
+import { generateIrsAuthorizationDocument, previewIrsAuthorizationDocument } from "@/lib/documents/generateIrsAuthorizationDocument";
 import type { IrsTaxMatterRow, IrsDesignee } from "@/lib/irsAuthorization/types";
 import type { Irs8821OrganizerPrefill } from "@/lib/organizerPrefill8821";
 
@@ -36,6 +36,7 @@ export function NewIrsAuthorizationForm({
   clientEmail,
   clientAddress,
   clientPhone,
+  clientHasTin,
   defaultTaxpayerType,
   engagements,
   staffOptions,
@@ -52,6 +53,7 @@ export function NewIrsAuthorizationForm({
   clientEmail: string | null;
   clientAddress: string;
   clientPhone: string;
+  clientHasTin: boolean;
   defaultTaxpayerType: "individual" | "business";
   engagements: { id: string; label: string; taxYear: number | null }[];
   staffOptions: { id: string; name: string; cafNumber: string | null }[];
@@ -102,6 +104,7 @@ export function NewIrsAuthorizationForm({
   const [specificUseNotOnCaf, setSpecificUseNotOnCaf] = useState(false);
   const [retainPriorAuthorizations, setRetainPriorAuthorizations] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function updateRow(index: number, patch: Partial<IrsTaxMatterRow>) {
@@ -121,26 +124,8 @@ export function NewIrsAuthorizationForm({
     updateDesignee(index, { staffSelection: staffId, name: staff?.name ?? "", cafNumber: staff?.cafNumber ?? "" });
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-
-    if (designees.length === 0 || designees.some((d) => !d.name.trim())) {
-      setError("Every designee needs a name.");
-      return;
-    }
-    if (!templateId) {
-      setError("Choose the uploaded IRS Form 8821 PDF template.");
-      return;
-    }
-    const cleanedMatters = taxMatters.filter((r) => r.tax_info_type || r.tax_form_number || r.years_or_periods || r.specific_matters);
-    if (cleanedMatters.length === 0) {
-      setError("Add at least one tax matter row.");
-      return;
-    }
-
-    setSaving(true);
-    const designeePayload: IrsDesignee[] = designees.map((d) => ({
+  function buildDesigneePayload(): IrsDesignee[] {
+    return designees.map((d) => ({
       user_id: d.staffSelection === EXTERNAL_DESIGNEE ? null : d.staffSelection,
       name: d.name.trim(),
       caf_number: d.cafNumber.trim() || null,
@@ -152,6 +137,81 @@ export function NewIrsAuthorizationForm({
       new_fax: d.newFax,
       receives_notices: d.receivesNotices,
     }));
+  }
+
+  function getCleanedMatters(): IrsTaxMatterRow[] {
+    return taxMatters.filter((r) => r.tax_info_type || r.tax_form_number || r.years_or_periods || r.specific_matters);
+  }
+
+  // Based on the real Form 8821's own stated requirements, not arbitrary
+  // Verexa rules -- checked before Send (hard gate) and shown on-screen so
+  // the preparer knows exactly what's missing and where, per the form's own
+  // instructions and instruction text ("Don't sign this form unless all
+  // applicable lines have been completed").
+  function getValidationIssues(cleanedMatters: IrsTaxMatterRow[]): string[] {
+    const issues: string[] = [];
+    if (!clientName.trim()) issues.push("Taxpayer name is missing on the client record.");
+    if (!clientAddress.trim()) issues.push("Taxpayer address is missing on the client record.");
+    if (!clientHasTin) issues.push("Taxpayer has no SSN/ITIN/EIN on file -- Form 8821 requires a taxpayer identification number.");
+    if (designees.length === 0 || designees.some((d) => !d.name.trim())) issues.push("Every designee needs a name (Section 2).");
+    if (cleanedMatters.length === 0) issues.push("Add at least one row of tax information (Section 3).");
+    if (specificUseNotOnCaf && retainPriorAuthorizations) {
+      issues.push('Section 4 and 5 conflict: the form says "If the line 4 box is checked, skip line 5" -- uncheck one.');
+    }
+    return issues;
+  }
+
+  async function handlePreview() {
+    setError(null);
+    setPreviewing(true);
+    const result = await previewIrsAuthorizationDocument({
+      supabase,
+      workspaceId,
+      clientId,
+      clientName,
+      clientAddress,
+      clientPhone,
+      firmName,
+      firmAddress,
+      firmPhone,
+      templateId,
+      designees: buildDesigneePayload(),
+      taxMatters: getCleanedMatters(),
+      planNumber: planNumber.trim() || null,
+      specificUseNotOnCaf,
+      retainPriorAuthorizations,
+      intermediateServiceProvider,
+      additionalDesigneesAttached,
+    });
+    setPreviewing(false);
+    if ("error" in result) {
+      toast.show(`Could not generate a preview: ${result.error}`, "error");
+      return;
+    }
+    // A fresh blob URL each time so re-previewing after a correction always
+    // opens the newly-rendered PDF, never a stale cached tab.
+    const blob = new Blob([result.pdfBytes as unknown as BlobPart], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (!templateId) {
+      setError("Choose the uploaded IRS Form 8821 PDF template.");
+      return;
+    }
+    const cleanedMatters = getCleanedMatters();
+    const issues = getValidationIssues(cleanedMatters);
+    if (issues.length > 0) {
+      setError(issues.map((i) => `- ${i}`).join("\n"));
+      return;
+    }
+
+    setSaving(true);
+    const designeePayload = buildDesigneePayload();
 
     const { data: authorizationId, error: createError } = await supabase.rpc("create_irs_authorization", {
       p_workspace_id: workspaceId,
@@ -495,9 +555,17 @@ export function NewIrsAuthorizationForm({
         )}
       </div>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <p className="whitespace-pre-line text-sm text-danger">{error}</p>}
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          disabled={previewing || !templateId}
+          onClick={handlePreview}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-sm font-medium text-slate hover:bg-surfaceMuted disabled:opacity-60"
+        >
+          <Eye size={14} /> {previewing ? "Generating preview..." : "Preview 8821"}
+        </button>
         <button
           type="submit"
           disabled={saving}

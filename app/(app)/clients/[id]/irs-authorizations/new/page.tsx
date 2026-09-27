@@ -37,7 +37,7 @@ export default async function NewIrsAuthorizationPage({ params }: { params: { id
       supabase
         .from("clients")
         .select(
-          "id, client_type, first_name, last_name, business_name, primary_email, primary_phone, address_line1, address_line2, city, state, postal_code"
+          "id, client_type, first_name, last_name, business_name, primary_email, primary_phone, address_line1, address_line2, city, state, postal_code, ssn_last4, itin_last4, ein_last4"
         )
         .eq("id", params.id)
         .single(),
@@ -104,6 +104,7 @@ export default async function NewIrsAuthorizationPage({ params }: { params: { id
             clientEmail={client.primary_email}
             clientAddress={clientAddress}
             clientPhone={client.primary_phone ?? ""}
+            clientHasTin={Boolean(client.ssn_last4 || client.itin_last4 || client.ein_last4)}
             defaultTaxpayerType={client.client_type !== "individual" ? "business" : "individual"}
             engagements={engagements}
             staffOptions={staffOptions}
