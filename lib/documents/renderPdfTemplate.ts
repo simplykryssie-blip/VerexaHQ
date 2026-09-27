@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb, PDFTextField, PDFCheckBox, PDFRadioGroup, PDFDropdown } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, PDFTextField, PDFCheckBox, PDFRadioGroup, PDFDropdown, PDFName, PDFString, PDFHexString, PDFDict } from "pdf-lib";
 import { renderTemplate } from "@/lib/templates/render";
 
 // `template` is free text that may contain zero or more {{merge_field}}
@@ -106,7 +106,35 @@ export type DetectedPdfField = {
   // without a visual position to overlay it on.
   page: number | null;
   rect: { xPct: number; yPct: number; widthPct: number; heightPct: number } | null;
+  // The PDF spec's standard tooltip/accessible-name entry (/TU) -- a
+  // professionally-authored form (IRS's own fillable PDFs included) often
+  // embeds a real human-readable description here ("Taxpayer name") distinct
+  // from the field's raw, usually-generic internal name (f1_6). Null when
+  // absent, which is common for fields with no accessibility text set.
+  tooltip: string | null;
+  // Real, valid values for a radio group/dropdown/option list -- undefined
+  // for a plain text field or checkbox, where it doesn't apply.
+  options?: string[];
 };
+
+function readFieldTooltip(dict: PDFDict): string | null {
+  try {
+    const v = dict.lookup(PDFName.of("TU"));
+    if (v instanceof PDFString || v instanceof PDFHexString) return v.decodeText();
+  } catch {
+    // no /TU entry, or it's not a text-like value
+  }
+  try {
+    const parent = dict.lookup(PDFName.of("Parent"));
+    if (parent instanceof PDFDict) {
+      const v = parent.lookup(PDFName.of("TU"));
+      if (v instanceof PDFString || v instanceof PDFHexString) return v.decodeText();
+    }
+  } catch {
+    // no parent, or no /TU on it either
+  }
+  return null;
+}
 
 // Inspects an uploaded PDF for real fillable form fields (AcroForm), for the
 // template editor to decide whether to offer the field-mapping list
@@ -122,12 +150,21 @@ export async function detectPdfFormFields(bytes: Uint8Array): Promise<DetectedPd
   return form.getFields().map((f) => {
     const name = f.getName();
     const type = f.constructor.name;
+    const tooltip = readFieldTooltip(f.acroField.dict);
+    let options: string[] | undefined;
+    if ("getOptions" in f && typeof (f as { getOptions?: unknown }).getOptions === "function") {
+      try {
+        options = (f as unknown as { getOptions: () => string[] }).getOptions();
+      } catch {
+        // not actually a choice field, or it has no options
+      }
+    }
     const widget = f.acroField.getWidgets()[0];
-    if (!widget) return { name, type, page: null, rect: null };
+    if (!widget) return { name, type, page: null, rect: null, tooltip, options };
 
     const ref = pdfDoc.context.getObjectRef(widget.dict);
     const page = ref ? pdfDoc.findPageForAnnotationRef(ref) : undefined;
-    if (!page) return { name, type, page: null, rect: null };
+    if (!page) return { name, type, page: null, rect: null, tooltip, options };
 
     const pageIndex = pages.indexOf(page);
     const { width: pageWidth, height: pageHeight } = page.getSize();
@@ -135,6 +172,7 @@ export async function detectPdfFormFields(bytes: Uint8Array): Promise<DetectedPd
 
     return {
       name,
+      options,
       type,
       page: pageIndex,
       rect: {
@@ -145,6 +183,7 @@ export async function detectPdfFormFields(bytes: Uint8Array): Promise<DetectedPd
         widthPct: width / pageWidth,
         heightPct: height / pageHeight,
       },
+      tooltip,
     };
   });
 }

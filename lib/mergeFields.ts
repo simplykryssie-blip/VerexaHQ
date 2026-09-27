@@ -12,10 +12,18 @@
 //   picker -- just not auto-fillable.
 export type MergeFieldKind = "auto" | "manual";
 
+// Distinguishes a field whose resolved value is meant to be a truthy/falsy
+// checkbox state (rendered as "true"/"" by renderTemplate) from an ordinary
+// text value -- lets a PDF-field mapper (e.g. AcroFormFieldMapper) filter its
+// merge-field picker so a boolean token isn't offered for a text field and
+// vice versa. Defaults to "text" when omitted.
+export type MergeFieldValueKind = "text" | "boolean";
+
 export type MergeFieldDef = {
   token: string;
   label: string;
   kind: MergeFieldKind;
+  valueKind?: MergeFieldValueKind;
   source?: string;
   /** Realistic placeholder used only in this builder's sandbox preview. */
   sample: string;
@@ -119,16 +127,16 @@ export const MERGE_FIELD_GROUPS: { group: string; fields: MergeFieldDef[] }[] = 
         { token: `designee_${n}_ptin`, label: `Designee ${n} -- PTIN`, kind: "auto" as const, source: "user_profiles.ptin_encrypted (revealed transiently, never stored)", sample: "P01234567" },
         { token: `designee_${n}_phone`, label: `Designee ${n} -- telephone`, kind: "auto" as const, source: `authorization designee ${n}`, sample: "(337) 555-0100" },
         { token: `designee_${n}_fax`, label: `Designee ${n} -- fax`, kind: "auto" as const, source: `authorization designee ${n}`, sample: "(337) 555-0101" },
-        { token: `designee_${n}_new_address`, label: `Designee ${n} -- new address (checkbox)`, kind: "auto" as const, source: `authorization designee ${n}`, sample: "true" },
-        { token: `designee_${n}_new_telephone`, label: `Designee ${n} -- new telephone (checkbox)`, kind: "auto" as const, source: `authorization designee ${n}`, sample: "true" },
-        { token: `designee_${n}_new_fax`, label: `Designee ${n} -- new fax (checkbox)`, kind: "auto" as const, source: `authorization designee ${n}`, sample: "true" },
-        { token: `designee_${n}_receives_notices`, label: `Designee ${n} -- receives notices (checkbox)`, kind: "auto" as const, source: `authorization designee ${n}`, sample: "true" },
+        { token: `designee_${n}_new_address`, label: `Designee ${n} -- new address (checkbox)`, kind: "auto" as const, valueKind: "boolean" as const, source: `authorization designee ${n}`, sample: "true" },
+        { token: `designee_${n}_new_telephone`, label: `Designee ${n} -- new telephone (checkbox)`, kind: "auto" as const, valueKind: "boolean" as const, source: `authorization designee ${n}`, sample: "true" },
+        { token: `designee_${n}_new_fax`, label: `Designee ${n} -- new fax (checkbox)`, kind: "auto" as const, valueKind: "boolean" as const, source: `authorization designee ${n}`, sample: "true" },
+        { token: `designee_${n}_receives_notices`, label: `Designee ${n} -- receives notices (checkbox)`, kind: "auto" as const, valueKind: "boolean" as const, source: `authorization designee ${n}`, sample: "true" },
       ]),
-      { token: "additional_designees_attached", label: "Additional designees attached (checkbox)", kind: "auto", source: "irs_authorizations.additional_designees_attached", sample: "true" },
-      { token: "intermediate_service_provider", label: "Intermediate Service Provider (checkbox)", kind: "auto", source: "irs_authorizations.intermediate_service_provider", sample: "true" },
-      { token: "specific_use_not_on_caf", label: "Specific use not recorded on CAF (checkbox)", kind: "auto", source: "irs_authorizations.specific_use_not_on_caf", sample: "true" },
-      { token: "retain_prior_authorizations", label: "Retain prior authorizations (checkbox)", kind: "auto", source: "irs_authorizations.retain_prior_authorizations", sample: "true" },
-      ...([1, 2, 3, 4, 5, 6] as const).flatMap((n) => [
+      { token: "additional_designees_attached", label: "Additional designees attached (checkbox)", kind: "auto", valueKind: "boolean", source: "irs_authorizations.additional_designees_attached", sample: "true" },
+      { token: "intermediate_service_provider", label: "Intermediate Service Provider (checkbox)", kind: "auto", valueKind: "boolean", source: "irs_authorizations.intermediate_service_provider", sample: "true" },
+      { token: "specific_use_not_on_caf", label: "Specific use not recorded on CAF (checkbox)", kind: "auto", valueKind: "boolean", source: "irs_authorizations.specific_use_not_on_caf", sample: "true" },
+      { token: "retain_prior_authorizations", label: "Retain prior authorizations (checkbox)", kind: "auto", valueKind: "boolean", source: "irs_authorizations.retain_prior_authorizations", sample: "true" },
+      ...([1, 2, 3] as const).flatMap((n) => [
         { token: `tax_matter_${n}_type`, label: `Tax matter ${n} -- type`, kind: "auto" as const, source: `authorization tax matter row ${n}`, sample: n === 1 ? "Income" : "" },
         { token: `tax_matter_${n}_form`, label: `Tax matter ${n} -- form number`, kind: "auto" as const, source: `authorization tax matter row ${n}`, sample: n === 1 ? "1040" : "" },
         { token: `tax_matter_${n}_years`, label: `Tax matter ${n} -- year(s)/period(s)`, kind: "auto" as const, source: `authorization tax matter row ${n}`, sample: n === 1 ? "2023, 2024" : "" },
