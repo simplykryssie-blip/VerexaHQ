@@ -4038,6 +4038,8 @@ export type Database = {
           created_by: string | null
           custom_css: string | null
           folder_id: string | null
+          form_kind: string | null
+          form_version: string | null
           id: string
           is_public: boolean
           merge_fields: Json
@@ -4061,6 +4063,8 @@ export type Database = {
           created_by?: string | null
           custom_css?: string | null
           folder_id?: string | null
+          form_kind?: string | null
+          form_version?: string | null
           id?: string
           is_public?: boolean
           merge_fields?: Json
@@ -4084,6 +4088,8 @@ export type Database = {
           created_by?: string | null
           custom_css?: string | null
           folder_id?: string | null
+          form_kind?: string | null
+          form_version?: string | null
           id?: string
           is_public?: boolean
           merge_fields?: Json
@@ -12920,6 +12926,7 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      bytea_to_text: { Args: { data: string }; Returns: string }
       can_access_admin_ai: { Args: never; Returns: boolean }
       can_use_network_messaging: {
         Args: { p_workspace_id: string }
@@ -14358,6 +14365,131 @@ export type Database = {
         Returns: boolean
       }
       hash_firm_secret: { Args: { p_plaintext: string }; Returns: string }
+      http: {
+        Args: { request: Database["public"]["CompositeTypes"]["http_request"] }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+        SetofOptions: {
+          from: "http_request"
+          to: "http_response"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      http_delete:
+        | {
+            Args: { uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { content: string; content_type: string; uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+      http_get:
+        | {
+            Args: { uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { data: Json; uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+      http_head: {
+        Args: { uri: string }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+        SetofOptions: {
+          from: "*"
+          to: "http_response"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      http_header: {
+        Args: { field: string; value: string }
+        Returns: Database["public"]["CompositeTypes"]["http_header"]
+        SetofOptions: {
+          from: "*"
+          to: "http_header"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      http_list_curlopt: {
+        Args: never
+        Returns: {
+          curlopt: string
+          value: string
+        }[]
+      }
+      http_patch: {
+        Args: { content: string; content_type: string; uri: string }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+        SetofOptions: {
+          from: "*"
+          to: "http_response"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      http_post:
+        | {
+            Args: { content: string; content_type: string; uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { data: Json; uri: string }
+            Returns: Database["public"]["CompositeTypes"]["http_response"]
+            SetofOptions: {
+              from: "*"
+              to: "http_response"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+      http_put: {
+        Args: { content: string; content_type: string; uri: string }
+        Returns: Database["public"]["CompositeTypes"]["http_response"]
+        SetofOptions: {
+          from: "*"
+          to: "http_response"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      http_reset_curlopt: { Args: never; Returns: boolean }
+      http_set_curlopt: {
+        Args: { curlopt: string; value: string }
+        Returns: boolean
+      }
       import_bank_product_transactions: {
         Args: { p_rows: Json; p_workspace_id: string }
         Returns: Json
@@ -15757,6 +15889,7 @@ export type Database = {
           passed: boolean
         }[]
       }
+      text_to_bytea: { Args: { data: string }; Returns: string }
       track_signature_view_by_token: {
         Args: { p_ip_address?: string; p_token: string }
         Returns: undefined
@@ -15903,6 +16036,20 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      urlencode:
+        | { Args: { data: Json }; Returns: string }
+        | {
+            Args: { string: string }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.urlencode(string => bytea), public.urlencode(string => varchar). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
+        | {
+            Args: { string: string }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.urlencode(string => bytea), public.urlencode(string => varchar). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
       validate_automation: {
         Args: { p_automation_id: string }
         Returns: {
@@ -15981,7 +16128,23 @@ export type Database = {
         | "Skipped"
     }
     CompositeTypes: {
-      [_ in never]: never
+      http_header: {
+        field: string | null
+        value: string | null
+      }
+      http_request: {
+        method: unknown
+        uri: string | null
+        headers: Database["public"]["CompositeTypes"]["http_header"][] | null
+        content_type: string | null
+        content: string | null
+      }
+      http_response: {
+        status: number | null
+        content_type: string | null
+        headers: Database["public"]["CompositeTypes"]["http_header"][] | null
+        content: string | null
+      }
     }
   }
 }

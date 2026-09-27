@@ -53,8 +53,10 @@ export default async function NewIrsAuthorizationPage({ params }: { params: { id
         .select("id, name, pdf_field_mappings")
         .eq("workspace_id", workspace.id)
         .eq("source_type", "pdf")
+        .eq("form_kind", "irs_8821")
         .not("pdf_field_mode", "is", null)
-        .order("name"),
+        .order("form_version", { ascending: false })
+        .order("created_at", { ascending: false }),
       supabase.from("workspaces").select("name, phone, mailing_address").eq("id", workspace.id).single(),
       supabase.from("branding").select("support_phone").eq("workspace_id", workspace.id).maybeSingle(),
       getIrs8821OrganizerPrefill(supabase, params.id),
