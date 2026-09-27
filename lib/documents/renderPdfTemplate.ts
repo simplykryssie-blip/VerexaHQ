@@ -56,6 +56,12 @@ export async function renderPdfTemplate({
         } else if (!value) {
           continue;
         } else if (field instanceof PDFTextField) {
+          // Auto-size (font size 0) instead of the field's fixed default --
+          // a long value (e.g. a full sentence in a narrow "Specific tax
+          // matters" column) would otherwise render at a fixed size and get
+          // clipped at the field's edge instead of shrinking to fit. Never
+          // hurts a short value, which just renders at its natural size.
+          field.setFontSize(0);
           field.setText(value);
         } else if (field instanceof PDFRadioGroup || field instanceof PDFDropdown) {
           field.select(value);
