@@ -71,7 +71,11 @@ export default async function ClientsPage({
   const tag = searchParams.tag?.trim() || "";
   const q = searchParams.q?.trim() || "";
   const serviceFilter = searchParams.service?.trim() || "";
+  // "unassigned" is a UI sentinel, not a real staff id -- translated below
+  // into search_clients' own p_unassigned_only flag rather than passed
+  // through as p_assigned_staff_id.
   const staffFilter = searchParams.staff?.trim() || "";
+  const unassignedOnly = staffFilter === "unassigned";
   const stageFilter = searchParams.stage?.trim() || "";
   const missingDocuments = searchParams.missingDocs === "1";
   const outstandingBalance = searchParams.balance === "1";
@@ -91,7 +95,8 @@ export default async function ClientsPage({
     p_lifecycle_statuses: status ? [status] : ALL_LIFECYCLE_STATUSES,
     p_tag: tag || undefined,
     p_service_id: serviceFilter || undefined,
-    p_assigned_staff_id: staffFilter || undefined,
+    p_assigned_staff_id: staffFilter && !unassignedOnly ? staffFilter : undefined,
+    p_unassigned_only: unassignedOnly || undefined,
     p_pipeline_stage_name: stageFilter || undefined,
     p_missing_documents: missingDocuments ? true : undefined,
     p_outstanding_balance: outstandingBalance ? true : undefined,
