@@ -490,6 +490,9 @@ export function OverviewTab({
         title="Engagements"
         action={
           <div className="flex items-center gap-3">
+            <Link href="/engagements" className="text-xs font-medium text-slate hover:text-accent hover:underline">
+              View All Engagements
+            </Link>
             <Link href={`/clients/${client.id}/irs-authorizations/new`} className="text-xs font-medium text-accent hover:underline">
               + New IRS Authorization
             </Link>
@@ -509,11 +512,12 @@ export function OverviewTab({
                   <th className="px-4 py-2 font-medium">Number</th>
                   <th className="px-4 py-2 font-medium">Service</th>
                   <th className="px-4 py-2 font-medium">Status</th>
-                  <th className="px-4 py-2 font-medium">Assigned staff</th>
-                  <th className="px-4 py-2 font-medium">Reviewer</th>
+                  <th className="px-4 py-2 font-medium">Team</th>
+                  <th className="px-4 py-2 font-medium">Pipeline</th>
                   <th className="px-4 py-2 font-medium">Priority</th>
                   <th className="px-4 py-2 font-medium">Tax year</th>
-                  <th className="px-4 py-2 font-medium">Next due date</th>
+                  <th className="px-4 py-2 font-medium">Dates</th>
+                  <th className="px-4 py-2 font-medium">Billing</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -535,26 +539,56 @@ export function OverviewTab({
                         <Badge tone={ENGAGEMENT_STATUS_TONE[e.status] ?? "neutral"}>{e.status}</Badge>
                       </td>
                       <td className="px-4 py-2.5 text-slate">
-                        {e.assigned_staff?.display_name ?? "Unassigned"}
-                        {staffDiffers && (
-                          <span className="ml-1 text-xs text-warning" title="Differs from this client's default relationship manager">
-                            (differs from default)
-                          </span>
+                        <div>
+                          {e.assigned_staff?.display_name ?? "Unassigned"}
+                          {staffDiffers && (
+                            <span className="ml-1 text-xs text-warning" title="Differs from this client's default relationship manager">
+                              *
+                            </span>
+                          )}
+                        </div>
+                        {(e.reviewer?.display_name || e.compliance_officer?.display_name) && (
+                          <div className="text-xs text-muted">
+                            {e.reviewer?.display_name && (
+                              <span title={reviewerDiffers ? "Reviewer differs from this client's default reviewer" : undefined}>
+                                Reviewer: {e.reviewer.display_name}
+                                {reviewerDiffers && "*"}
+                              </span>
+                            )}
+                            {e.reviewer?.display_name && e.compliance_officer?.display_name && " · "}
+                            {e.compliance_officer?.display_name && <span>Compliance: {e.compliance_officer.display_name}</span>}
+                          </div>
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-slate">
-                        {e.reviewer?.display_name ?? "--"}
-                        {reviewerDiffers && (
-                          <span className="ml-1 text-xs text-warning" title="Differs from this client's default reviewer">
-                            (differs from default)
-                          </span>
+                        {e.pipeline ? (
+                          <Link href={`/pipelines/${e.pipeline.processId}`} className="hover:text-accent hover:underline">
+                            {e.pipeline.processName ?? "Pipeline"}
+                            {e.pipeline.stageName && <span className="text-muted"> &rarr; {e.pipeline.stageName}</span>}
+                          </Link>
+                        ) : (
+                          <span className="text-muted">--</span>
                         )}
                       </td>
                       <td className="px-4 py-2.5">
                         {e.priority ? <Badge tone={ENGAGEMENT_PRIORITY_TONE[e.priority] ?? "neutral"}>{e.priority}</Badge> : <span className="text-muted">--</span>}
                       </td>
                       <td className="px-4 py-2.5 text-slate">{taxYear ?? "--"}</td>
-                      <td className="px-4 py-2.5 text-slate">{e.due_date ? new Date(e.due_date).toLocaleDateString() : "--"}</td>
+                      <td className="px-4 py-2.5 text-slate">
+                        <div>{e.open_date ? `Started ${new Date(e.open_date).toLocaleDateString()}` : null}</div>
+                        <div className={e.open_date ? "text-xs text-muted" : undefined}>
+                          {e.due_date ? `Due ${new Date(e.due_date).toLocaleDateString()}` : e.open_date ? null : "--"}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        {e.billing_status === "paid" ? (
+                          <Badge tone="success">Paid</Badge>
+                        ) : e.billing_status === "outstanding" ? (
+                          <Badge tone="warning">Outstanding</Badge>
+                        ) : (
+                          <span className="text-muted">--</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -1499,11 +1533,17 @@ export type EngagementRow = {
   status: string;
   priority: string | null;
   due_date: string | null;
+  open_date: string | null;
   assigned_staff: StaffRef;
   reviewer: StaffRef;
   compliance_officer: StaffRef;
   services: { name: string } | null;
   engagement_tax_details: { tax_year: number | null }[] | { tax_year: number | null } | null;
+  /** The engagement's own active pipeline run, if any -- resolved via the
+   * same polymorphic entity_type/entity_id pipeline_runs pattern leads
+   * already use (see getClientWorkspaceData.ts), not a foreign key. */
+  pipeline: { processId: string; processName: string | null; stageName: string | null } | null;
+  billing_status: "paid" | "outstanding" | "none";
 };
 
 function engagementTaxYear(e: EngagementRow): number | null {
