@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { Check, Copy } from "lucide-react";
 
 export type DnsRecord = { record: string; name: string; type: string; ttl: string; status: string; value: string; priority?: number };
 
@@ -34,6 +35,16 @@ export function EmailDomainCard({ emailDomain }: { emailDomain: EmailDomain }) {
   const [verifying, setVerifying] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedCell, setCopiedCell] = useState<string | null>(null);
+
+  // DNS values (especially the DKIM TXT record) are long enough that the
+  // truncated table cell can't be reliably selected and copied by hand --
+  // a dedicated button copies the real, full, untruncated string instead.
+  async function copyCell(key: string, value: string) {
+    await navigator.clipboard.writeText(value);
+    setCopiedCell(key);
+    setTimeout(() => setCopiedCell((current) => (current === key ? null : current)), 2000);
+  }
 
   async function addDomain(e: React.FormEvent) {
     e.preventDefault();
@@ -146,16 +157,44 @@ export function EmailDomainCard({ emailDomain }: { emailDomain: EmailDomain }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {emailDomain.dns_records.map((r, i) => (
-                  <tr key={i}>
-                    <td className="px-3 py-2 font-mono">{r.type}</td>
-                    <td className="max-w-[180px] truncate px-3 py-2 font-mono" title={r.name}>{r.name}</td>
-                    <td className="max-w-[260px] truncate px-3 py-2 font-mono" title={r.value}>{r.value}</td>
-                    {emailDomain.dns_records.some((rec) => rec.priority !== undefined) && (
-                      <td className="px-3 py-2 font-mono">{r.priority ?? ""}</td>
-                    )}
-                  </tr>
-                ))}
+                {emailDomain.dns_records.map((r, i) => {
+                  const nameKey = `${i}-name`;
+                  const valueKey = `${i}-value`;
+                  return (
+                    <tr key={i}>
+                      <td className="px-3 py-2 font-mono">{r.type}</td>
+                      <td className="max-w-[180px] px-3 py-2 font-mono">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate" title={r.name}>{r.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => copyCell(nameKey, r.name)}
+                            title="Copy full value"
+                            className="shrink-0 text-muted hover:text-accent"
+                          >
+                            {copiedCell === nameKey ? <Check size={12} className="text-success" /> : <Copy size={12} />}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="max-w-[260px] px-3 py-2 font-mono">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate" title={r.value}>{r.value}</span>
+                          <button
+                            type="button"
+                            onClick={() => copyCell(valueKey, r.value)}
+                            title="Copy full value"
+                            className="shrink-0 text-muted hover:text-accent"
+                          >
+                            {copiedCell === valueKey ? <Check size={12} className="text-success" /> : <Copy size={12} />}
+                          </button>
+                        </div>
+                      </td>
+                      {emailDomain.dns_records.some((rec) => rec.priority !== undefined) && (
+                        <td className="px-3 py-2 font-mono">{r.priority ?? ""}</td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
