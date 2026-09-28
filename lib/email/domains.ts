@@ -70,32 +70,50 @@ export async function verifyResendDomain(id: string): Promise<ResendResult<{ id:
 
 export type ResendDomainSync = { domain: string; status: "pending" | "verified" | "failed"; dns_records: ResendDnsRecord[] };
 
+function toSync(domain: ResendDomain): ResendDomainSync {
+  const status = domain.status === "verified" ? "verified" : domain.status === "failed" ? "failed" : "pending";
+  return { domain: domain.name, status, dns_records: domain.records };
+}
+
 /**
- * Shared by the interactive "Check verification" endpoint and the recurring
- * cron sweep: triggers Resend's own re-check, then reads back the current
- * state. Returns the domain name Resend actually has on file (not just
- * status) so a caller can correct a workspace's stored domain string if it
- * ever drifts from what's really registered with Resend.
+ * Plain read of Resend's current state for a domain, no side effects.
+ * This is what the recurring cron sweep should use: Resend already
+ * re-checks pending domains against DNS on its own, so a periodic sweep
+ * only needs to read the result, not force a fresh check every run.
+ */
+export async function readResendDomainStatus(resendDomainId: string): Promise<ResendResult<ResendDomainSync>> {
+  const result = await getResendDomain(resendDomainId);
+  if (!result.ok) return result;
+  return { ok: true, data: toSync(result.data) };
+}
+
+/**
+ * Used by the interactive "Check verification" button: explicitly triggers
+ * Resend's re-check, then polls for the settled result instead of reading
+ * back immediately.
  *
  * Resend's /verify endpoint resets the domain to "pending" while it
  * re-runs its DNS check asynchronously (confirmed live: a domain that had
  * been fully verified read back as "pending" immediately after calling
  * /verify again, with nothing about its DNS having changed). Reading the
- * status back immediately after triggering it therefore almost always
- * captures that momentary reset rather than the real, settled result --
- * a correctly-configured domain could never durably show "verified" this
- * way, since every check (button click or 15-minute cron sweep) re-armed
- * its own false negative. A short pause gives Resend's check a real chance
- * to finish before we read the outcome.
+ * status back immediately after triggering it therefore often captures
+ * that momentary reset rather than the real, settled result. Polling a
+ * few times with increasing delays (instead of one fixed sleep) lets the
+ * check exit early once Resend settles, while still giving a slow check
+ * more than a single 4-second window to finish.
  */
 export async function syncResendDomainStatus(resendDomainId: string): Promise<ResendResult<ResendDomainSync>> {
   await verifyResendDomain(resendDomainId);
-  await new Promise((resolve) => setTimeout(resolve, 4000));
-  const result = await getResendDomain(resendDomainId);
-  if (!result.ok) return result;
 
-  const status = result.data.status === "verified" ? "verified" : result.data.status === "failed" ? "failed" : "pending";
-  return { ok: true, data: { domain: result.data.name, status, dns_records: result.data.records } };
+  const pollDelaysMs = [2000, 2000, 2000, 4000];
+  let result = await getResendDomain(resendDomainId);
+  for (const delay of pollDelaysMs) {
+    if (result.ok && result.data.status !== "pending") break;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    result = await getResendDomain(resendDomainId);
+  }
+  if (!result.ok) return result;
+  return { ok: true, data: toSync(result.data) };
 }
 
 export async function deleteResendDomain(id: string): Promise<ResendResult<{ deleted: boolean }>> {

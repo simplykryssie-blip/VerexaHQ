@@ -15304,6 +15304,7 @@ export type Database = {
           p_query?: string
           p_service_id?: string
           p_tag?: string
+          p_unassigned_only?: boolean
           p_workspace_id: string
         }
         Returns: {

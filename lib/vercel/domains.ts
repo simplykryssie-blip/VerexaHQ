@@ -61,7 +61,13 @@ export async function addProjectDomain(domain: string): Promise<VercelResult<Ver
   }
 
   const body = await res.json().catch(() => null);
-  if (body?.error?.code === "domain_already_exists") {
+  // Vercel's actual code for "this domain is already attached somewhere in
+  // your account" is domain_taken (confirmed against a live case: the
+  // message reads "Cannot add X since it's already in use by one of your
+  // projects" even when X is already attached -- and verified -- on this
+  // exact same project). domain_already_exists is kept as a fallback in
+  // case Vercel returns that code in some other version of this response.
+  if (body?.error?.code === "domain_taken" || body?.error?.code === "domain_already_exists") {
     return getProjectDomain(domain).then((result) =>
       result.ok && result.data ? { ok: true, data: result.data } : { ok: false, reason: body.error.message ?? "Domain already exists." }
     );

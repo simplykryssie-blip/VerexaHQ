@@ -1,3 +1,196 @@
+# Addendum — 2026-09-28: Bookkeeping Services Assessment automation audited — confirmed broken, NOT fixed (audit only, no code/config changed)
+
+**READ THIS FIRST.** This is the newest handoff state. This addendum was
+written on `claude/verexa-remove-services-vaqbfx` before this branch merged
+`main` in — `main` had, in parallel, its own newer "Zoom/Resend/DNS/
+signing-link fixes... live IRS 8821 production outage" addendum (still
+immediately below this one, unedited) plus a "Both Fix Now items shipped"
+addendum below that. Both are real, both stand, neither conflicts with this
+one. One correction this merge makes: this addendum's own Roadmap section
+below originally listed the Stripe Payment Link mapping and nested
+`package_purchase.package_name` items as "untouched since 2026-09-20" —
+that was accurate when written, but `main`'s 2026-09-24 addendum (below)
+shipped both (PRs #330, #331) before this merge happened. Fixed below,
+don't trust the git history's line-by-line diff on this section to explain
+why it changed after the fact. The 2026-09-23 addendum that used to sit at
+the top of this file is folded into the chronological log further down
+(`## Addendum — 2026-09-23`) — everything it describes is still
+accurate/current, nothing in it was touched this session.
+
+## 🔴 NEW FIX NOW: "Bookkeeping Services — Assessment & Decision Workflow" is live and completely non-functional
+
+Automation `8b53a8b3-93f4-4ca4-93d7-98b72707e5a3`, workspace MKB Financial
+Group (`2896bf43-95db-420f-9bb5-8854f537bbd1`), `status='published'`,
+`is_enabled=true` — **this is a real, currently-armed production
+automation**, not a draft. The user asked for a full execution/logic audit
+against a detailed expected-behavior spec, explicitly **"DO NOT MODIFY
+ANYTHING YET"** — this was audit-only. Nothing was changed: not the
+automation config, not the engine code, not anything else. Full 13-section
+audit report is in this session's transcript; summary of the confirmed
+(code-verified, not guessed) findings below.
+
+**Bottom line: every execution path — VA completes on time, VA misses the
+SLA, Needs More Info, ERO Review, any combination — converges on the same
+outcome.** One client email goes out (with a blank `{{client_first_name}}`
+greeting, see below), one unassigned task gets created, and ~2 calendar
+days later the run silently marks itself `automation_runs.status =
+'completed'` having executed **none** of the four decision branches and
+none of the escalation logic. This was traced through the actual engine
+code (`execute_automation_step`, `start_next_automation_step`,
+`should_advance_wait_until_step`, `evaluate_automation_conditions`,
+`_evaluate_condition_list`, `decide_automation_step`,
+`fire_service_interest_automations`), not inferred from the canvas.
+
+**Confirmed root causes (all independently fatal, several stack):**
+1. **Wrong trigger.** Live `trigger_type = 'client.service_interest_selected'`
+   (fires on a `client_service_interests` insert), not `organizer.submitted`
+   on the "Bookkeeping Services Assessment" organizer
+   (`283d6989-94b2-45d8-8eed-4f91702950f1`) as the spec requires. Confirmed
+   no automation anywhere in this workspace uses that organizer as a
+   trigger at all.
+2. **VA-review completion is undetectable.** "Wait for Assessment Review"'s
+   `wait_conditions` checks `task.status`, which resolves via
+   `p_context->>'task_id'` — a flat context key `create_task` **never
+   populates** (it only writes the per-step `created_tasks[step_id]` map).
+   The condition can never become true; the step only ever advances via the
+   `wait_timeout_days: 2` timeout, regardless of what the VA actually does.
+3. **The post-wait branch node has two edges with the identical
+   condition** (`task.overdue == "false"` on both "completed" and "not
+   completed" branches) — the engine always takes the first
+   (`sort_order`-first) match, so the escalation edge is permanently dead
+   code. Independently, `task.overdue` is also always `'false'` due to the
+   same broken `task_id` lookup as #2.
+4. **The Review Decision node never pauses for a human at all.** Its
+   `action_config` is `{}` — missing `decision_mode: "review_queue"` (and
+   `decision_options`), both required by `decide_automation_step` before any
+   human decision UI can act on it. No `pending_decision` row is ever
+   created.
+5. **All four `run.decision` branch-edge values use the wrong syntax** —
+   bare `"Approved"`/`"Denied"`/etc instead of the required
+   `"<decision_step_id>|<option>"` format (confirmed by reading
+   `decide_automation_step`, which writes decisions keyed that way). Would
+   never match even if #4 were fixed.
+6. **Needs More Info and ERO Review both dead-end into `end_workflow`**
+   instead of looping back to the Review Decision node — confirmed no edge
+   from either wait step (or downstream of them) targets the decision step.
+7. **Krystal escalation path is unreachable** (via #3) and additionally
+   broken on its own: one of the two "notify Krystal" steps
+   (`staff_id=01f48dd9-...`) actually targets **`admin@mkbfinancialgroup.com`
+   (the Administrative Staff/VA account)**, not Krystal
+   (`838c3f09-...=krystal@mkbfinancialgroup.com`, confirmed correct on the
+   *other* notification step). There is also no wait step at all after
+   "Krystal Review Task" is created — nothing to loop back on even in
+   principle.
+8. **No mechanism assigns the VA-review task to anyone.** `create_task`'s
+   `assigned_staff_id` isn't set on this step; the engine's `assign_user`
+   action type only changes `clients.relationship_manager_id` /
+   `engagements.assigned_staff_id` (client/engagement ownership), not a
+   task's assignee — confirmed there is no "assign to VA" concept the
+   engine understands beyond a literal hardcoded staff UUID.
+9. **All 6 client-facing email templates use `{{client_first_name}}`**,
+   which the automation's render context never provides (it provides
+   `first_name`) — confirmed via `renderTemplate`'s silent
+   unmatched-token-to-empty-string behavior. Every client email in this
+   workflow greets with a blank name. **Same recurring bug class already
+   logged once before in this file** (2026-08-23 addendum, `{{client_first_name}}`/`{{firm_phone}}` on the lead-welcome templates) — worth
+   the repo-wide sweep this file has flagged before but never scheduled.
+10. **"2 business days" is actually 2 calendar days.** `wait_timeout_days`
+    uses `make_interval(days => n)` — no business-day awareness exists for
+    `until_condition`/duration delays; the only business-day-aware primitive
+    in the engine (`business_hours_delay`) isn't used anywhere in this
+    automation.
+
+**What's actually fine, confirmed positive:** the 6 email templates'
+content/tone is correct (5-business-days client-facing copy, no
+internal-deadline leakage in the delay email); `send_email` correctly
+resolves the client's real primary email; `send_notification` correctly
+resolves staff and sends both channels when configured; the Approved/Denied
+branches' own downstream steps (tags, stage moves, tasks, emails) are
+individually well-formed and don't over-automate the client into Scope &
+Pricing/Onboarding/Active Bookkeeping without a human step; pipeline stage
+ordering (`New Assessment` → `Assessment Under Review` → `Scope & Pricing`
+→ ... → `Closed`) has no backward-move conflicts for any of the configured
+transitions; `run-pending-automation-steps` polls every 1 minute, so the
+engine's own reaction latency is not the bottleneck anywhere.
+
+**Not done, explicitly**: no fix was applied. A full "Recommended Fixes"
+list (10 items, one per root cause above, each naming the exact
+config/value change) exists in this session's transcript — read it before
+touching this automation. Do not attempt a fix without confirming with the
+user first; several of the fixes (decision-node `decision_mode`/
+`decision_options`, all four edge values, both loop-back edges, the
+Krystal `staff_id`, the VA task's `assigned_staff_id`, the email
+merge-field mismatch) need to land together, since the node graph is
+currently self-consistent-looking but non-functional end to end — a partial
+fix could leave it in a worse, harder-to-diagnose state (e.g. fixing only
+the decision node without fixing the loop-backs would make Approved/Denied
+work but leave Needs More Info/ERO Review still dead-ending).
+
+## Roadmap — updated
+
+Full detail behind every 2026-09-23 line item below (Contacts Pass 1-6,
+Contact Sharing Phases 0-5, the MKB production change, the Vercel check) is
+now in the chronological log (`## Addendum — 2026-09-23`) rather than
+repeated here — nothing in that work was touched this session.
+
+### 🟢 Complete
+- Contacts Consolidated Pass 1-6 (branch `claude/verexa-remove-services-vaqbfx`
+  only, not on `main` — see `## Addendum — 2026-09-23`).
+- Contact Sharing Phases 0-5 — DB/RPC/Storage layer only (same branch, not
+  on `main`). **UI is not complete, do not mark this fully done.**
+
+### 🔴 Fix Now
+1. **Bookkeeping Services — Assessment & Decision Workflow automation is
+   live and non-functional** — see this addendum's own section above.
+   Audit only, not fixed.
+2. **Live production outage: IRS Form 8821 creation and viewing both
+   broken, for every workspace.** Found and already fixed by a parallel
+   session on `claude/verexa-schema-mismatch-i8c19u` (commit `e55b060`) —
+   see that branch's own 2026-09-28 addendum immediately below this one for
+   the full story. That branch is the subject of open PR #342 into `main`
+   as of this merge — check whether #342 has landed before assuming this
+   outage is still live; if it hasn't, this is still the single most urgent
+   item in this whole file.
+
+~~External Stripe Payment Link → Verexa Package/Buyer mapping~~ and
+~~`partner_onboarding.created` nested `package_purchase.package_name`
+resolution~~ — **both resolved, correcting this section's own earlier
+"untouched since 2026-09-20" claim.** `main`'s 2026-09-24 addendum (below)
+shipped both: the nested-field condition was found to never have been
+broken (PR #330, a migration-history-hygiene fix only); the Payment Link
+mapping is PR #331, partially resolved (buyer/workspace identity for a
+brand-new external purchaser is still explicitly open — see that
+addendum's own "still unsolved" note).
+
+### 🟡 Backlog
+- Contact Sharing Phase 6+ (UI) — see `## Addendum — 2026-09-23`.
+- Whether MKB's `ero_office` upgrade (2026-09-23) surfaced anything that
+  needs cleanup (Partners directory, EFIN, network messaging) — not yet
+  checked.
+- Repo-wide `{{client_first_name}}`-style merge-field sweep — now confirmed
+  on a *third* automation (this one), after the 2026-08-23 lead-welcome
+  templates and whatever else hasn't been checked yet. Worth actually
+  scheduling this pass instead of re-discovering the same bug class
+  automation by automation.
+- (pre-existing, untouched) repo-wide accidental PostgreSQL overload audit;
+  billing hardening items; partner automation visibility; remaining module
+  roadmap.
+
+### 🔵 Deferred (unchanged)
+- Hard delete (Contacts Pass 1-6 reconfirmed this stays deferred).
+- client-level Stripe Customer / saved payment methods.
+- IRS Transcript/8821; other documented deferred items.
+
+### ⚪ Product decisions (unchanged since 2026-09-23)
+- No supported way to change an existing workspace's tier/`workspace_type`
+  post-creation — see `## Addendum — 2026-09-23` for the MKB precedent and
+  why it was safe there but wouldn't be for a billed workspace.
+- (pre-existing, untouched) Multi-office Firm details; Workspace PTIN
+  leave/take-client-history behavior; platform-admin included-seat naming;
+  SMS activation-fee decision; other documented decisions.
+
+---
+
 # Addendum — 2026-09-28: Zoom/Resend/DNS/signing-link fixes shipped; live IRS 8821 production outage found and fixed same session
 
 **READ THIS FIRST.** This is the newest handoff state. It supersedes nothing below (all prior items stand). The 8821 outage described further down was found AND fixed within this same addendum's session — commit `e55b060` on `claude/verexa-schema-mismatch-i8c19u`, not yet merged to `main` (holds with the rest of this branch's unmerged work, same "bundle it all into one PR" instruction as before).
@@ -54,7 +247,9 @@ Shipped in PR #331:
 
 # Addendum — 2026-09-20: Contacts closed; Stripe Payment Link architecture clarified
 
-**READ THIS FIRST.** This is the newest handoff state.
+This was the top-of-file addendum before the 2026-09-23 one above replaced
+it. Kept here verbatim as the chronological record — its Fix Now items are
+still open, see the updated roadmap above for current status.
 
 ## Contacts: 🟢 COMPLETE
 The full Contacts completion pass is closed (PRs #290–#299): remaining filters, archive/restore, cross-page selection, tasks, rich Notes, billing transaction display, signature PDF/audit trail, GHL guard, navigation, CSV, and the final stale `search_clients` overload fix.
@@ -377,6 +572,142 @@ merged app (every route from both branches builds, including `/partners`,
 **Not yet done**: pushing this merge, and a real click-through test in a
 browser (this was a code-level merge verification only) -- check whether
 those happened after this note, since it was written before either.
+
+## Addendum — 2026-09-23: Contacts Pass 1-6 shipped; Contact Sharing Phases 0-5 shipped (DB/RPC/Storage only, no UI); MKB manually upgraded to ERO Office
+
+Branch state: still on `claude/verexa-remove-services-vaqbfx`, small
+divergence from `main` — `main` has 3 commits this branch lacks (`d2383fe`
+service/category automation + Review Queue runtime, `838196a` #324 service
+category deletion FK fix, `d369c17` #323 Services category management);
+this branch has 14 commits `main` lacks, ending in `5087719` (7 Contacts
+Pass commits below, the Contact Sharing commit below, and 7 earlier
+dashboard/bugfix commits, `a54bded` through `f5b10df`, already covered by
+earlier entries in this log). Neither side merged into the other. Check
+`git rev-list --left-right --count origin/main...origin/claude/verexa-remove-services-vaqbfx`
+before trusting this — it drifts every time either side ships.
+
+**Contacts Consolidated Implementation, Pass 1-6 — 🟢 complete, this branch
+only, not on `main`.** Six isolated-commit passes, each tested and pushed.
+Do not confuse this with the unrelated "Contacts completion pass"
+(PRs #290-299) already on `main`, described further down in this log — that
+was a different round of Contacts work on a different branch
+(`claude/verexa-schema-mismatch-i8c19u`). This one:
+- Pass 1 (`095f373`): consistent phone display, phone-format-agnostic
+  search, sub-Contact input types.
+- Pass 2 (`312dd8a`): unified Add Contact Information control, structured
+  `street2`, single-primary-address enforcement.
+- Pass 3 (`ae658c4`): Quick-View flyout trimmed to a real overview; Timeline
+  tab wired in.
+- Pass 4 (`e8dd3d9`): conservative blur-time name normalization
+  (`lib/name.ts`'s `normalizeName`) — only touches uniformly-all-lower or
+  all-upper input, never mixed-case.
+- Pass 5 (`43d3551`): `DocumentWorkspace`'s "Show activity" panel is now
+  document-scoped only (`DOCUMENT_ACTIVITY_TYPES` filter), no longer a
+  duplicate of the general Timeline tab.
+- Pass 6 (`d839d12`): `RevertToLeadButton` — Client→Lead lifecycle
+  reversion, the mirror of the existing Lead→Client conversion.
+
+Explicitly deferred by the task that produced these: **Hard Delete** (still
+deferred), and (at the time) **Independent-PTIN→ERO Contact sharing** — no
+longer fully deferred, see next.
+
+**Contact Sharing (Independent PTIN → ERO) — Phases 0-5 shipped (DB/RPC/Storage
+only). UI explicitly NOT started — stop there until asked to continue.** New
+feature area. Went through four locked, sequential passes: (1) a
+comprehensive architecture audit, (2) a schema+workflow design audit, (3) a
+reconciliation pass resolving 10 flagged ambiguities to zero blockers, (4)
+actual implementation, strictly scoped to Phases 0-5 by explicit
+instruction — do not build the UI without a new, explicit ask.
+
+What it does: an Independent PTIN workspace can share selected Contact
+data/documents with its one active connected ERO through an explicit
+request → approve → transfer workflow, producing a durable, versioned,
+destination-owned copy (`ero_retained_contacts` + full-snapshot version
+history) that survives the source Contact being hard-deleted or the
+connection being revoked later.
+
+Shipped, commit `5087719`, pushed to `claude/verexa-remove-services-vaqbfx`:
+- **Phase 0**: self-verifying migration enforcing one-active-ERO-per-PTIN
+  at the DB level (`firm_connections_one_active_ero_per_child_idx`).
+- **Phase 1**: 11 new tables (`contact_shares`, `contact_share_categories`,
+  `contact_share_actions`, `ero_retained_contacts` + 4 current-state child
+  tables, `ero_retained_contact_versions`,
+  `ero_retained_contact_version_fields` (EAV full-snapshot model),
+  `contact_document_transfers`) with RLS (source-side identifiers have no
+  FK by design — same pattern already used by `clients.source_workspace_id`
+  in the existing `copy_shared_engagement` precedent), 3 new permissions.
+- **Phase 2**: exactly 7 new `SECURITY DEFINER` RPCs — `create_contact_share`,
+  `request_contact_share_update`, `respond_to_contact_share`,
+  `execute_contact_share_transfer`, `mark_contact_document_transferred`,
+  `withdraw_contact_share`, `resubmit_contact_share`. Explicit
+  `initiated_by` column resolves which side must approve, never inferred.
+- **Phase 3**: `app/api/contact-shares/[id]/approve/route.ts` — two-phase
+  document transfer (RPC creates rows with `transferred_at = NULL`; this
+  route does the actual Storage byte-copy under the service role, retry-safe,
+  existence-checked before copying, only confirms after the destination
+  object is verified present).
+- **Phase 4**: `tests/fixtures/database-contract-baseline.json` updated with
+  all 7 new RPC signatures (database-contract-guard's backing RPC,
+  `run_database_contract_guard`, still doesn't exist in production — a
+  pre-existing gap, not this session's to fix; compliance was verified
+  manually instead).
+- **Phase 5**: `tests/contact-sharing-schema.test.ts` (37 tests) plus
+  extensive live rolled-back-transaction verification against production
+  (share/approve/transfer/zero-diff/idempotency/RLS/one-active-ERO/
+  disconnect/hard-delete flows all confirmed live). Not live-tested: the
+  actual document/attachment transfer path (no synthetic attachment was
+  created in verification) and a real reconnect-to-ERO cycle after
+  disconnect (only the underlying find-or-create identity-key logic was
+  exercised).
+
+Next step for whoever picks this up: Phase 6+ UI — Share-with-ERO
+button/category picker, ERO share-request review UI, retained-Contact
+viewer, update-request UI, notification surfacing. None of it exists yet.
+Don't start it without confirming that's actually what's being asked for.
+
+**Production data change (outside any app code path): MKB Financial Group
+upgraded to ERO Office; VA invited.** At the user's explicit request and
+after two rounds of `AskUserQuestion` confirmation (the first request was
+literally "add a seat," which turned out to require a tier change first —
+MKB was `workspace_type = 'independent_ptin'`, which per `canInviteStaff()`
+in `lib/workspaceCapabilities.ts` has zero included seats and is
+hard-blocked from inviting staff at all):
+- `workspaces.workspace_type` for MKB Financial Group
+  (`2896bf43-95db-420f-9bb5-8854f537bbd1`) changed from `independent_ptin`
+  to `ero_office` via a direct, real (not rolled back) SQL `UPDATE`. There
+  is no supported in-app or RPC path to do this for an existing workspace —
+  checked thoroughly; `workspace_type` is read-only everywhere in the app,
+  including every `platform-admin` page. Safe as a raw data edit only
+  because MKB is `is_billing_exempt = true` and has no
+  `workspace_subscriptions` row at all — no Stripe plan/subscription exists
+  to reconcile. This would not be safe to repeat for a real paying
+  workspace without first designing an actual upgrade flow.
+- An invitation was created for `admin@mkbfinancialgroup.com` as
+  Administrative Staff, via the real `create_workspace_invitation` RPC
+  (impersonated as MKB's owner, `krystal@mkbfinancialgroup.com` —
+  `838c3f09-da48-4963-8917-aacc70a780e2`), token
+  `fcebc653-0baa-4b70-8a59-d194ef868014`, expires 2026-09-30. Because this
+  was created via direct DB access rather than the app's own authenticated
+  session, no invitation email went out through Resend — the accept URL
+  (`https://verexahq.com/accept-invitation?token=fcebc653-0baa-4b70-8a59-d194ef868014`)
+  was handed directly to the user to forward to the VA themselves, matching
+  the app's own designed fallback UX for when email delivery isn't
+  configured.
+- Not yet verified: MKB now has `ero_office`-tier features exposed that it
+  never had before and that were never exercised for this specific
+  workspace — EFIN field, the `/partners` directory,
+  `ERO_MANAGEMENT_NAV_ITEMS`, `can_use_network_messaging`. Nothing was
+  observed broken, but nobody has actually opened MKB's workspace in a
+  browser since the change.
+
+**Vercel — checked, nothing was broken, nothing was changed.** Checked in
+response to "fix all the errors in Vercel deployment": production (`main`,
+latest `838196a`) is `READY`, and this branch's own latest deployment
+(commit `5087719`) is also `READY`. The `ERROR` deployments found in
+Vercel's history all belonged to `feat/service-category-automation-routing`
+and `fix/workflow-tag-editor-state` — both branches' own later pushes
+superseded them with `READY` builds. No current/unresolved deployment error
+existed; no action was taken.
 
 ## Addendum — 2026-09-20: Contacts completion pass closed out; search_clients stale-overload fixed; future cleanup backlog
 
