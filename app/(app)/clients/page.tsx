@@ -318,18 +318,30 @@ export default async function ClientsPage({
         }
       />
       <div className="flex-1 px-8 py-6">
-        <div className="mb-2 flex flex-wrap gap-2">
-          {STATUS_FILTERS.map((f) => (
-            <Link
-              key={f.value}
-              href={f.value ? `/clients?status=${f.value}${statusQuery}` : `/clients?${statusQuery.replace(/^&/, "")}`}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                status === f.value ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
-              }`}
-            >
-              {f.label}
-            </Link>
-          ))}
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
+            {STATUS_FILTERS.map((f) => (
+              <Link
+                key={f.value}
+                href={f.value ? `/clients?status=${f.value}${statusQuery}` : `/clients?${statusQuery.replace(/^&/, "")}`}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  status === f.value ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
+                }`}
+              >
+                {f.label}
+              </Link>
+            ))}
+          </div>
+          {/* Client assignment lives here now (bulk "Assign to" above), but
+              task/engagement bulk reassignment has no Contacts-shaped
+              equivalent (different tables, different role columns -- see
+              /assignments' own Tasks/Engagements tabs). This is the one
+              remaining secondary entry point into that page now that it's
+              off the primary nav; the Dashboard's "Unassigned Engagements"
+              widget is the other. */}
+          <Link href="/assignments?tab=tasks" className="text-xs font-medium text-muted hover:text-accent hover:underline">
+            Reassign tasks &amp; engagements
+          </Link>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft transition hover:shadow-softHover">
