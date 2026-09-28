@@ -32,9 +32,9 @@ describe("ClientQuickViewDrawer -- no longer embeds the full Contact tab system"
     expect(drawerSource).toContain("<QuickActions");
   });
 
-  it("keeps a single, unambiguous 'Open Full Record' action", () => {
-    expect(drawerSource).toMatch(/Open [Ff]ull [Rr]ecord/);
-    expect(drawerSource).toContain("function expand()");
+  it("keeps a single, unambiguous 'open full record' action", () => {
+    expect(drawerSource).toMatch(/Open [Ff]ull [Rr]ecord|View full contact record/);
+    expect(drawerSource).toContain("function goToFullRecord(");
   });
 
   it("applies formatPhone to the primary phone in the header, same as the rest of Contacts (Pass 1)", () => {
