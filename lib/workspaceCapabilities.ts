@@ -46,3 +46,13 @@ export function isEroOfficeTier(workspace: WorkspaceTypeLike): boolean {
 export function isNetworkReportTier(workspace: WorkspaceTypeLike): boolean {
   return isEroOfficeTier(workspace) || isServiceBureauTier(workspace);
 }
+
+// An ERO Office or Service Bureau workspace can legitimately need to send
+// from more than one domain (e.g. operating under two firm brands under
+// one account); every other workspace type stays capped at one. Same
+// exact tier set as isNetworkReportTier, named for this feature since the
+// two gates are conceptually unrelated and shouldn't imply one covers the
+// other just because they happen to share a definition today.
+export function canUseMultipleSendingDomains(workspace: WorkspaceTypeLike): boolean {
+  return isEroOfficeTier(workspace) || isServiceBureauTier(workspace);
+}

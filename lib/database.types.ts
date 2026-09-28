@@ -11093,6 +11093,7 @@ export type Database = {
           domain: string
           from_local_part: string
           id: string
+          is_primary: boolean
           resend_domain_id: string
           status: string
           updated_at: string
@@ -11105,6 +11106,7 @@ export type Database = {
           domain: string
           from_local_part?: string
           id?: string
+          is_primary?: boolean
           resend_domain_id: string
           status?: string
           updated_at?: string
@@ -11117,6 +11119,7 @@ export type Database = {
           domain?: string
           from_local_part?: string
           id?: string
+          is_primary?: boolean
           resend_domain_id?: string
           status?: string
           updated_at?: string
@@ -11127,7 +11130,7 @@ export type Database = {
           {
             foreignKeyName: "workspace_email_domains_workspace_id_fkey"
             columns: ["workspace_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -15528,6 +15531,10 @@ export type Database = {
           p_resource_type: string
           p_workspace_id: string
         }
+        Returns: undefined
+      }
+      set_workspace_email_domain_primary: {
+        Args: { p_domain_id: string }
         Returns: undefined
       }
       set_workspace_ghl_connection: {

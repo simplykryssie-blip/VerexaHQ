@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace, workspaceOperationalError, isWorkspaceStatusOperational } from "@/lib/workspace";
 import { createResendDomain } from "@/lib/email/domains";
+import { canUseMultipleSendingDomains } from "@/lib/workspaceCapabilities";
 
 export async function POST(request: Request) {
   const workspace = await getCurrentWorkspace();
@@ -35,8 +36,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Enter a valid domain, e.g. yourfirm.com -- no spaces, @ symbols, or extra text." }, { status: 400 });
   }
 
-  const { data: existing } = await supabase.from("workspace_email_domains").select("id").eq("workspace_id", workspace.id).maybeSingle();
-  if (existing) {
+  const { data: existingDomains } = await supabase.from("workspace_email_domains").select("id").eq("workspace_id", workspace.id);
+  const hasExisting = (existingDomains?.length ?? 0) > 0;
+  if (hasExisting && !canUseMultipleSendingDomains(workspace)) {
     return NextResponse.json({ error: "This workspace already has a sending domain. Remove it before adding a new one." }, { status: 409 });
   }
 
@@ -54,6 +56,12 @@ export async function POST(request: Request) {
       status: result.data.status === "verified" ? "verified" : "pending",
       dns_records: result.data.records,
       verified_at: result.data.status === "verified" ? new Date().toISOString() : null,
+      // The first domain a workspace adds is its primary by default (the
+      // column's own default); an additional domain (only reachable when
+      // canUseMultipleSendingDomains passed above) starts as non-primary --
+      // the existing primary keeps being used to send until explicitly
+      // switched via set_workspace_email_domain_primary.
+      ...(hasExisting ? { is_primary: false } : {}),
     })
     .select()
     .single();
