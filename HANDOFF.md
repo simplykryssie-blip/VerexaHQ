@@ -1,3 +1,245 @@
+# Addendum — 2026-09-28: Zoom/Resend/DNS/signing-link fixes shipped; 🔴 IRS 8821 is currently broken in production (schema mismatch, fix in progress)
+
+**READ THIS FIRST.** This is the newest handoff state. It supersedes nothing below (all prior items stand), but adds one urgent, currently-unresolved production break — see the 🔴 section.
+
+## Shipped and merged to `main` this session
+
+1. **Zoom OAuth "Application not found" in production — root-caused and fixed.** Not a code bug: `ZOOM_CLIENT_ID` in Vercel was stale/mismatched with the registered app. Could not read the value directly (Claude Code's own credential-materialization guard blocks that, correctly, even with API access) — root-caused via timing correlation instead, walked the user through fixing it in the Vercel dashboard herself, then diagnosed two follow-on errors as she went: an "Invalid redirect" (the new Client ID's redirect allow-list didn't yet include the production callback URL — Zoom apps in Strict Mode have **separate** Development/Production Client ID+Secret pairs, each with its own redirect allow-list) and one transient DNS/Zoom hiccup (self-resolved). Verified end-to-end: a real Zoom account is now connected for MKB Financial Group in `user_zoom_connections` (`status: "connected"`). Also walked her through adding `ZOOM_WEBHOOK_SECRET_TOKEN` to Vercel (this token does double duty — HMAC signature verification on every webhook, and Zoom's CRC handshake on `endpoint.url_validation` — `app/api/zoom/webhook/route.ts`), which had been a known gap. **No code changed for any of this — config-only, exactly per her ask not to touch code for a Zoom problem before confirming it wasn't code.**
+
+2. **Orphaned Vercel custom domain removed.** `mkbfinancialgroup.com` was still attached to the shared Vercel project (`prj_ce8ecRjdkPTPONnQiZ5Ur859BdAu`) with no corresponding `site_websites.custom_domain` value pointing at it anymore — the normal attach/detach flow (`app/api/websites/[id]/attach-domain/route.ts`) was verified NOT buggy, so the DB field must have been cleared through some other path before this session. No Vercel MCP tool exists to remove a project domain (only `add_project_domain`), so this needed the user to remove it by hand in the Vercel dashboard; verified gone afterward via the Domains API.
+
+3. **Resend sending-domain verification stuck permanently on "Pending" — real race condition, fixed. PR #341.** `syncResendDomainStatus()` (`lib/email/domains.ts`) called Resend's `/domains/:id/verify` and then immediately read the domain back — but `/verify` resets Resend's own status to `"pending"` while it asynchronously re-checks DNS, so the read almost always captured that momentary reset instead of the real, settled result. Confirmed live: a domain Resend had already fully verified read back as `"pending"` immediately after re-triggering verify, with no DNS change in between. Every check — the "Check verification" button *and* the 15-minute cron sweep (`app/api/cron/verify-pending-email-domains/route.ts`) — was re-arming its own false negative, so a correctly-configured domain could never durably show verified. Fixed with a 4-second delay before reading the result back. **Not fully closed for the one real domain that surfaced it**: MKB Financial Group's `mkbfinancialgroup.com` was still reading "pending" after the fix, across several checks spanning minutes, with 3 of 4 DNS records consistently pending and only the CNAME verified — a pattern more consistent with genuine slow DNS propagation than the race condition (which this fix already closes). Did not force the DB row to "verified" by hand since Resend itself still says pending — check again now that propagation has had more time.
+
+4. **DNS record copy-button truncation — fixed by merging a pre-existing, more complete branch instead of writing a new one. PR #339.** Found via screenshots during the Resend troubleshooting above: long DNS values were truncated with no reliable way to copy them. Started writing a quick fix directly in `EmailDomainCard.tsx`, then discovered `feature/dns-record-copy-ux` already existed, unmerged, with a more thorough solution (shared `CopyIconButton`/`CopyRecordButton` components in a new `components/CopyIconButton.tsx`, a `lib/clipboard.ts` helper with a `document.execCommand` fallback for non-secure contexts, applied across `WebsiteSettings.tsx`'s DNS verification and ownership-challenge sections, 11 passing tests). Merged that branch instead of shipping a redundant, worse duplicate; my own quick fix was abandoned unmerged on `fix/email-domain-dns-copy`.
+
+5. **Serious, previously-unknown production bug: every real client signing link was broken. Found opportunistically, not reported by the user. PR #340.** `signature_requests` has two foreign keys into `attachments` (`signature_requests_attachment_id_fkey` and `signature_requests_final_pdf_attachment_id_fkey`, confirmed live via `pg_constraint`), which makes an unqualified `attachments(...)` embed ambiguous for PostgREST. `/api/sign/[token]/file`'s embed was unqualified, and the route only ever destructured `data`, never `error` — so PostgREST's resulting error was silently swallowed and **every real signer, regardless of whether their link was actually valid, hit the generic "invalid or expired signing link" 404.** Fixed by qualifying the embed with the real FK name and checking `error` explicitly. This had been broken since whichever migration added the second FK (the final-PDF feature) — worth a broader sweep for any other silently-swallowed-error embeds if anyone has time (search for destructuring only `data` from a `.select().maybeSingle()` on a table with more than one FK into the same target).
+
+## 🔴 IRS Form 8821 is currently broken in production — creation AND viewing, for every workspace
+
+Discovered while answering the user's question about where 8821 merge-field data comes from and adding a "preview before send" step to the New IRS Authorization form (that preview feature itself is done, committed to `claude/verexa-schema-mismatch-i8c19u`, and works correctly against the *old* schema — but the old schema is no longer what's live, see below).
+
+**What happened**: earlier this session (before a context-compaction boundary), a full rebuild of IRS 8821 was built on `feature/irs-8821-designees-signature-sync` (26 commits: real multi-designee model, PTIN reveal, checkbox fields, signature sync, its own "Preview 8821" step, PDF field-mapper rebuild). Its migrations were applied **directly to production** at some point (confirmed live: `supabase_migrations.schema_migrations` on `daxpavvsotvsyqqntddc` includes `20260926153836_irs_8821_designees_and_fields`, `20260926153922_irs_8821_signature_sync_trigger`, `20260927091529_irs_8821_template_kind_and_version`) — **but that branch's frontend was never deployed**, and it was then explicitly excluded from a later "merge everything" pass this session (the user's call: "just the 3 small fix branches for now," not knowing at the time this branch was the one keeping production's 8821 feature alive).
+
+**Confirmed broken right now, live:**
+- `create_irs_authorization`'s production signature is completely different from what `main`/`claude/verexa-schema-mismatch-i8c19u`'s frontend calls: production takes `(p_workspace_id, p_client_id, p_engagement_id, p_taxpayer_type, p_designees jsonb, p_tax_matters, p_plan_number, p_specific_use_not_on_caf, p_retain_prior_authorizations, p_intermediate_service_provider, p_additional_designees_attached)`; the deployed frontend still calls the old 6-arg `(..., p_designee_user_id uuid, p_tax_matters)` version, which PostgREST can't find. **Every attempt to create a new 8821 authorization fails outright** — confirmed live by the user hitting exactly this error.
+- The `irs_authorizations` table itself changed: `designee_user_id`/`designee_name`/`designee_caf_number` columns are **gone**, replaced by a `designees jsonb` column plus new `plan_number`/`specific_use_not_on_caf`/`retain_prior_authorizations`/`intermediate_service_provider`/`additional_designees_attached` columns. The detail page (`app/(app)/irs-authorizations/[id]/page.tsx`) still selects the now-nonexistent `designee_name`/`designee_caf_number` columns — **viewing any existing 8821 authorization is also broken**, not just creating a new one.
+
+**Fix approach, decided with the user**: rather than patch the old code path forward or attempt a full merge of that 26-commit branch (it also carries ~125 other migration files — automation executor rewrites, workflow chain depth guard, contract guard, generic webhook infra, contacts/dashboard work — none of which are live in production; only the 3 8821-specific migrations above are), the plan is to bring over **just the 8821-scoped files** from `feature/irs-8821-designees-signature-sync` (new designee model, the form, the detail page, its own preview step, the PDF field mapper rebuild) so the app matches what's already live, and leave the rest of that branch alone.
+
+**Not yet done as of this addendum** — pick this up next: actually cherry-picking/porting the 8821-scoped files, verifying against production's real live schema, running the quality gates, and shipping. The user's own new-preview-step commit (`ef01357` on `claude/verexa-schema-mismatch-i8c19u`) is very likely to be entirely superseded by that branch's own already-built "Preview 8821" step rather than kept.
+
+## Separate, still-open, deliberately NOT touched this session
+
+The other ~125 migration files unique to `feature/irs-8821-designees-signature-sync` (dated late Oct through Nov 1: automation executor rewrites, `workflow_chain_depth_guard`, `database_contract_guard`, generic webhook infrastructure + test mode, all the Contacts phase migrations, dashboard widget consolidation, several `20261101*` files) are **not applied to production at all** and were deliberately left alone this session — merging/applying all of that was judged too large and risky to bundle into an urgent 8821 hotfix. This is the same body of work already tracked separately as "automation reconciliation (big, 15 commits)" — treat it as its own project with its own careful review, not something to absorb as a side effect of the next person's bug fix. **Useful technique for spotting this kind of drift in the future**: compare a branch's migration filenames against `select version from supabase_migrations.schema_migrations` on the live project directly — a migration file with no matching live version was never actually applied anywhere, no matter how old or "done-sounding" its commit message is.
+
+# Addendum — 2026-09-24: Both 🔴 Fix Now items shipped (PRs #330, #331)
+
+**READ THIS FIRST.** This is the newest handoff state. It supersedes the two 🔴 Fix Now items below; the rest of the 2026-09-20 addendum (Contacts status, architecture background) still applies and is left as-is underneath.
+
+## Item 2 — nested `package_purchase.package_name` condition: 🟢 RESOLVED, was never actually broken
+
+Live-verified before any change: `_evaluate_condition_list`'s nested-path fallback already correctly resolves `package_purchase.package_name` in both shapes this codebase produces (flat literal-dotted key and nested object). Its self-test `test_condition_evaluator_nested_field_resolution()` was run live against production — all 5 checks passed. HANDOFF's suspicion was wrong; no fix to the evaluator's logic was needed.
+
+What *was* real: a 6th occurrence of the "changed-argument-list overload without a DROP FUNCTION" bug class (same family as `create_engagement`/`create_client`/`set_firm_tax_profile`/`search_clients`). `20260927050000_decision_step.sql` redefines `_evaluate_condition_list` with the old 5-arg signature and no `DROP FUNCTION` — but that migration was never actually applied to production (its whole feature contribution is superseded by the already-live `20260923000006_review_queue_decision_automation_runtime.sql`). PR #330 added `20261031060000_drop_stale_evaluate_condition_list_overload.sql`, a migration-history-hygiene no-op, applied to production and re-verified live: exactly one `_evaluate_condition_list` overload exists (`(jsonb,jsonb,uuid,uuid,uuid,uuid,uuid)`).
+
+## Item 1 — External Stripe Payment Link → Verexa Package mapping: 🟡 PARTIALLY RESOLVED
+
+Shipped in PR #331:
+- `app/api/stripe/webhook/connect/route.ts` now falls back to the existing `handleExternalPartnerPurchaseCheckoutCompleted` matcher (`session.payment_link` → `firm_packages.stripe_payment_link_id`) whenever the primary metadata-driven handlers skip and the session actually carries a `payment_link`. This logic already existed and was already correct — it was just unreachable for any workspace using the Stripe-Connect webhook (it was only wired into the standalone `/api/partner-purchase-webhook/[token]` route). No new matching logic was written.
+- The Packages edit page (`app/(app)/settings/packages/[id]/page.tsx`, `components/settings/PackageEditForm.tsx`) now exposes and saves `stripe_payment_link_id`, `stripe_payment_link_url`, `stripe_price_id`, `stripe_product_id`, and `purchase_purpose` — the schema columns already existed (`20260920142055_partner_purchase_stripe_mapping_and_purpose.sql`) but no UI ever wrote to them.
+
+**Still unsolved, deliberately out of scope:** buyer/workspace identity for a *brand-new* external purchaser with no prior Verexa account. `partner_prospects.linked_user_id`/`linked_workspace_id`/`linked_firm_connection_id` remain unwritten placeholder columns — there is still no claim/signup flow connecting a Stripe purchase to a real Verexa login/workspace. This is the "#2" half of the "Buyer identity is a separate problem" section below, and it is still open. Do not consider Item 1 fully closed until that's addressed.
+
+---
+
+# Addendum — 2026-09-20: Contacts closed; Stripe Payment Link architecture clarified
+
+**READ THIS FIRST.** This is the newest handoff state.
+
+## Contacts: 🟢 COMPLETE
+The full Contacts completion pass is closed (PRs #290–#299): remaining filters, archive/restore, cross-page selection, tasks, rich Notes, billing transaction display, signature PDF/audit trail, GHL guard, navigation, CSV, and the final stale `search_clients` overload fix.
+
+The stale 11-argument `search_clients` overload was removed by `20261031050000_drop_stale_search_clients_overload.sql`. Production was verified to have exactly one canonical 14-argument function with `SECURITY DEFINER` intact.
+
+Contacts deferred:
+- 🔵 Client-level Stripe Customer / saved-payment-method relationship.
+- 🔵 Hard delete; archive is the intended removal mechanism.
+
+Future 🟡 cleanup: repo-wide audit of accidental PostgreSQL overloads. Four confirmed historical examples are `create_engagement`, `create_client`, `set_firm_tax_profile`, and `search_clients`. Do not delete other overloads without per-function caller/migration verification.
+
+---
+
+## CRITICAL: The real package sales flow uses external Stripe Payment Links
+
+The user's actual setup is:
+1. Package/product created in Stripe.
+2. Stripe **Payment Link** created.
+3. Payment Link placed directly in the public website HTML.
+4. Corresponding package separately created in **Verexa → Packages**.
+
+The Verexa Packages UI currently does **not** ask for a Stripe Payment Link, Stripe Price ID, or Stripe Product ID.
+
+Therefore the real architecture gap is:
+
+> **How does a Stripe Payment Link purchase tell Verexa which Verexa package was purchased?**
+
+Do not infer this from customer name or price alone.
+
+### Existing code verified
+
+`app/api/stripe/webhook/connect/route.ts` verifies the Stripe signature, maps `event.account` to the connected Verexa workspace, claims events for idempotency, handles `checkout.session.completed`, and expects metadata such as `type` and `purchase_id`. For `type === "firm_package_purchase"` it calls `handleFirmPackagePurchaseCheckoutCompleted()`.
+
+`lib/stripe/handleFirmPackagePurchase.ts` expects `session.metadata.purchase_id`, finds the existing `firm_package_purchases` row, marks it active, stores Stripe IDs, and updates the related `firm_connections.package_id`.
+
+The DB chain is:
+
+**purchase active → `fire_firm_package_purchase_automations` → `_get_or_create_partner_onboarding()` → `partner_onboardings` → `partner_onboarding.created` → onboarding automation**
+
+That chain is valid only after Verexa can identify the correct package/purchase/connection. A manually-created external Payment Link may complete without the Verexa `purchase_id` metadata the current handler expects. Do not claim the real website flow is currently end-to-end.
+
+---
+
+## Preferred long-term architecture
+
+Keep Stripe as the payment processor and keep the public website's Stripe Payment Links.
+
+Make **Verexa Packages the business/package source of truth** and explicitly map each Verexa package to Stripe identifiers, conceptually:
+- Verexa package ID
+- Stripe connected account
+- Stripe Product ID
+- Stripe Price ID
+- Stripe Payment Link ID/URL
+
+Target flow:
+
+**Website → Stripe Payment Link → Stripe webhook → Verexa package mapping → `firm_package_purchase` → `partner_onboarding` → onboarding workflow**
+
+Do not:
+- match package by customer name;
+- match package by price alone;
+- create duplicate Verexa packages merely to mirror Stripe;
+- replace Payment Links with Verexa-hosted checkout unless an audit proves it is necessary.
+
+Stripe handles payment. Verexa owns the package/business relationship and onboarding.
+
+### Buyer identity is a separate problem
+
+We must solve:
+1. Which Verexa package did they buy?
+2. Which partner/firm/workspace/connection does the purchaser belong to?
+
+Payment Link mapping can solve #1, but not automatically #2 for a brand-new public-site purchaser. The existing canonical partner identity is `firm_connection`, not a Stripe customer name.
+
+Audit the existing public purchase/signup/onboarding flow before designing any new identity mechanism.
+
+---
+
+## 🔴 NEW FIX NOW: External Stripe Payment Link → Verexa Package/Buyer mapping
+
+**READ-ONLY AUDIT FIRST. Do not implement during the first audit.**
+
+Audit:
+- Verexa Packages create/edit UI
+- Stripe Product/Price/Payment Link storage/creation
+- public website package links
+- Connect webhook handling
+- `firm_package_purchases` creation
+- buyer identity/workspace/`firm_connection` creation
+- public signup/onboarding routes
+- Stripe metadata on the real external Payment Links, if any
+- relevant DB columns/constraints
+
+Determine:
+1. What Stripe sends when a Payment Link checkout completes.
+2. Whether the webhook receives Payment Link ID and/or Price/Product IDs.
+3. Whether the external Payment Links contain Verexa-specific metadata.
+4. How Payment Link → Verexa Package can be made deterministic.
+5. How the purchaser is currently identified.
+6. How a brand-new purchaser can become the correct partner/firm connection without guessing.
+7. Minimum schema/UI changes required.
+8. Whether Payment Links should remain the supported model or Verexa-generated Checkout Sessions are actually required.
+
+**User preference:** keep Stripe Payment Links on the public website, but explicitly connect each one to its Verexa package.
+
+---
+
+## 🔴 Existing FIX NOW: nested package-name automation condition
+
+Separate from the Stripe mapping issue.
+
+`partner_onboarding.created` context contains nested `package_purchase.package_name`, while the condition editor exposes `package_purchase.package_name`. The generic evaluator appears to treat unknown fields as literal top-level keys instead of traversing dotted paths.
+
+Verify production behavior. If broken, fix nested-field resolution narrowly. Preserve `partner_onboarding.created`. Do **not** replace it with `firm_package.purchased` and do not redesign the Stripe/package flow as part of that fix.
+
+---
+
+## Partner onboarding architecture remains
+
+**Service Bureau → ERO → PTIN → Tax Clients**
+
+or **ERO → PTIN → Tax Clients**
+
+or **Independent PTIN → Tax Clients**
+
+Partner onboarding is separate from Verexa platform customer onboarding. `firm_connections` is the canonical partner relationship.
+
+`firm_package.purchased` remains the generic purchase/business event.
+
+`partner_onboarding.created` remains the onboarding-specific trigger.
+
+---
+
+## Current roadmap
+
+### 🟢 Complete
+1. Policies & Account Lifecycle
+2. Legal Acceptance & Archive
+3. Suspension/Archive
+4. Billing live verification
+5. Dashboard Easy-Fix #1
+6. Contacts completion
+7. `partner_onboarding.created` nested `package_purchase.package_name` resolution — verified already correct; dead 5-arg overload dropped (PR #330)
+8. External Stripe Payment Link → Verexa Package matching on the Connect webhook, Packages UI Stripe-mapping fields (PR #331)
+
+### 🔴 Fix Now
+1. Buyer/workspace identity for a brand-new external Payment Link purchaser (no prior Verexa account) — still unsolved; see Item 1 in the 2026-09-24 addendum above. Needs a claim/signup flow connecting a Stripe purchase to a real Verexa login/workspace before `partner_prospects.linked_user_id`/`linked_workspace_id`/`linked_firm_connection_id` mean anything.
+
+### 🟡 Backlog
+- repo-wide accidental PostgreSQL overload audit
+- billing hardening: usage-meter reconciliation, phone-rental row locking, suspension notification dedupe, payment-failed timezone dedupe, DB non-negativity, generic client-payment Stripe-ID uniqueness, paid-seat auto-removal, broader automation concurrency/row claiming
+- partner automation visibility
+- remaining module roadmap
+
+### 🔵 Deferred
+- client-level Stripe Customer / saved payment methods
+- hard delete
+- IRS Transcript/8821
+- other documented deferred items
+
+### ⚪ Product decisions
+- Multi-office Firm details
+- Workspace PTIN leave/take-client-history behavior
+- platform-admin included-seat naming
+- SMS activation-fee decision
+- other documented decisions
+
+---
+
+## Next Claude session rules
+1. **Audit first.**
+2. State what existing code actually does.
+3. Identify the smallest architectural gap.
+4. Resolve product decisions before coding.
+5. Write a narrow implementation prompt.
+6. Implement only after audit approval.
+7. Test.
+8. Verify production where appropriate.
+9. Update `HANDOFF.md` with what actually shipped.
+
+Never claim live verification unless it actually happened.
+
+---
+
 # Session Handoff — 2026-08-13
 
 Written for whichever Claude session picks this project up next, likely on
@@ -135,6 +377,82 @@ merged app (every route from both branches builds, including `/partners`,
 **Not yet done**: pushing this merge, and a real click-through test in a
 browser (this was a code-level merge verification only) -- check whether
 those happened after this note, since it was written before either.
+
+## Addendum — 2026-09-20: Contacts completion pass closed out; search_clients stale-overload fixed; future cleanup backlog
+
+Branch: `claude/verexa-schema-mismatch-i8c19u` → `main`. This closes out the
+entire multi-phase Contacts completion pass (Client Type/Email/Phone
+filters, archive/restore, cross-page selection, Client Tasks CRUD, rich-text
+Notes, tax-return/bank-product display, generic signature final PDF,
+signature audit trail, GHL import automation guard — PRs #290-#299, all
+merged). Final Contacts status: 🟢 COMPLETE, 🔴 FIX NOW empty, ⚪ PRODUCT
+DECISIONS empty. Only two intentionally 🔵 DEFERRED items remain: client
+Stripe saved-payment-method/customer relationship (no client-level Stripe
+Customer object exists anywhere in this codebase — building it means
+touching the live payment-critical checkout flow, out of scope for a
+completion pass), and hard delete (never wanted — archive is the only
+removal mechanism).
+
+**Confirmed active defect, fixed (PR #299):** `search_clients` had two
+live overloads in production — a stale pre-Phase-1 11-arg version and the
+intended 14-arg version with `p_client_type`/`p_has_email`/`p_has_phone`.
+`20261031000000_search_clients_type_email_phone_filters.sql` added those
+params via `CREATE OR REPLACE FUNCTION`, which Postgres treats as a new
+function identity when the argument list changes rather than an in-place
+replacement — the stale 11-arg version stayed live and callable alongside
+the new one, and an ordinary unfiltered Contacts search could resolve
+against either overload via PostgREST. Fixed by
+`20261031050000_drop_stale_search_clients_overload.sql` (a plain `DROP
+FUNCTION IF EXISTS` targeting the exact stale positional-type signature).
+Verified post-apply via direct production reads: exactly one
+`search_clients` identity remains, with the canonical 14-arg signature and
+`SECURITY DEFINER` intact.
+
+**This is the fourth confirmed occurrence of the same bug class** in this
+codebase's history — `create_engagement`
+(`20260819142823_drop_stale_create_client_overload.sql` and its own prior
+fix), `create_client`, and `set_firm_tax_profile`
+(`20260923040000_fix_set_firm_tax_profile_duplicate_overload.sql`) all hit
+this exact trap before. `tests/contacts-search-clients-stale-overload.test.ts`
+guards this one specific function going forward, but the underlying trap
+(`CREATE OR REPLACE FUNCTION` with a changed argument list silently
+registers a new overload instead of replacing) is not systematically
+guarded anywhere else in the codebase.
+
+**🟡 Confirmed cleanup backlog item (not acted on this session — out of
+scope for a feature-completion pass, needs its own dedicated pass):**
+
+- **What**: a repo-wide audit for other duplicate function overloads
+  introduced the same way (a later migration's `CREATE OR REPLACE
+  FUNCTION public.some_function(...)` with an argument list that doesn't
+  exactly match an earlier `CREATE OR REPLACE FUNCTION public.some_function(...)`
+  for the same name, with no corresponding `DROP FUNCTION` for the old
+  signature in between).
+- **Why it's flagged**: four confirmed real occurrences of this exact
+  pattern so far (`create_engagement`, `create_client`,
+  `set_firm_tax_profile`, `search_clients`) — enough of a recurring pattern
+  in this codebase's migration history to be worth a systematic pass
+  rather than assuming it's now fully caught.
+- **How to find candidates**: query live production
+  (`select proname, count(*) from pg_proc where pronamespace =
+  'public'::regnamespace group by proname having count(*) > 1 order by
+  count(*) desc;`) to list every function name with more than one live
+  overload, then check each one's overloads against its own migration
+  history to tell a genuine intentional overload (if any exist) apart from
+  an accidental stale one exactly like the four above.
+- **Recommended cleanup/removal condition**: only after confirming, per
+  function, that (a) it has multiple live overloads, (b) the older
+  overload's exact call shape has no legitimate caller (same repo-wide
+  grep-for-callers method used for `search_clients` in this session), and
+  (c) a `DROP FUNCTION` targeting the exact stale signature (this repo's
+  now well-established convention) is written and applied the same way as
+  this session's fix.
+- **Production existence**: not yet confirmed for anything beyond
+  `search_clients` (already fixed) — this is a candidate query to run, not
+  a list of already-confirmed additional stale functions.
+- **Do not treat this as authorization to touch any specific function** —
+  it's a scoped starting point for a future dedicated cleanup pass, not a
+  cleanup ticket for "every old-looking function."
 
 ## Addendum — 2026-09-03: Manus audit triage/fixes, production data cleanup, F-05 test-project setup (blocked on missing baseline schema)
 
