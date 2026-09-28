@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -36,6 +36,18 @@ export function EmailDomainCard({ emailDomain }: { emailDomain: EmailDomain }) {
   const [verifying, setVerifying] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // The cron sweep (app/api/cron/verify-pending-email-domains) can flip
+  // this domain to verified in the background with nobody clicking
+  // anything -- this page has no other way to notice that happened short
+  // of a manual reload. Polling router.refresh() only re-reads this
+  // page's own Supabase query (no Resend API call, no side effects), so
+  // it's safe to run every 30s while unverified.
+  useEffect(() => {
+    if (!emailDomain || emailDomain.status === "verified") return;
+    const interval = setInterval(() => router.refresh(), 30000);
+    return () => clearInterval(interval);
+  }, [emailDomain, router]);
 
   async function addDomain(e: React.FormEvent) {
     e.preventDefault();
