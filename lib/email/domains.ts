@@ -76,9 +76,21 @@ export type ResendDomainSync = { domain: string; status: "pending" | "verified" 
  * state. Returns the domain name Resend actually has on file (not just
  * status) so a caller can correct a workspace's stored domain string if it
  * ever drifts from what's really registered with Resend.
+ *
+ * Resend's /verify endpoint resets the domain to "pending" while it
+ * re-runs its DNS check asynchronously (confirmed live: a domain that had
+ * been fully verified read back as "pending" immediately after calling
+ * /verify again, with nothing about its DNS having changed). Reading the
+ * status back immediately after triggering it therefore almost always
+ * captures that momentary reset rather than the real, settled result --
+ * a correctly-configured domain could never durably show "verified" this
+ * way, since every check (button click or 15-minute cron sweep) re-armed
+ * its own false negative. A short pause gives Resend's check a real chance
+ * to finish before we read the outcome.
  */
 export async function syncResendDomainStatus(resendDomainId: string): Promise<ResendResult<ResendDomainSync>> {
   await verifyResendDomain(resendDomainId);
+  await new Promise((resolve) => setTimeout(resolve, 4000));
   const result = await getResendDomain(resendDomainId);
   if (!result.ok) return result;
 
