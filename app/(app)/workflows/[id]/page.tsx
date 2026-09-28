@@ -100,9 +100,9 @@ export default async function WorkflowDetailPage({ params, searchParams }: { par
         .order("name"),
       supabase
         .from("services")
-        .select("id, name")
+        .select("id, name, status")
         .eq("workspace_id", workspace.id)
-        .eq("status", "published")
+        .neq("status", "archived")
         .order("name"),
       supabase
         .from("engagement_letter_templates")

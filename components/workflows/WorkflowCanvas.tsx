@@ -1068,10 +1068,10 @@ function CanvasInner({
   const decisionSteps = useMemo(
     () =>
       steps
-        .filter((s) => s.action_type === "condition" && (s.action_config as Record<string, unknown> | null)?.decision_mode === "manual")
+        .filter((s) => s.action_type === "condition" && (s.action_config as Record<string, unknown> | null)?.decision_mode === "review_queue")
         .map((s) => ({
           id: s.id,
-          name: s.display_name ?? "Decision",
+          name: s.display_name ?? "Review Queue Decision",
           options: ((s.action_config as Record<string, unknown> | null)?.decision_options as { key: string; label: string }[] | undefined) ?? [],
         })),
     [steps]

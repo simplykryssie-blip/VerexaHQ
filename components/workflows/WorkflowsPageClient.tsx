@@ -6,7 +6,7 @@ import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
 import { StatTile } from "@/components/ui/StatTile";
 import { Button } from "@/components/ui/Button";
 import { WorkflowList, type WorkflowRow } from "@/components/workflows/WorkflowList";
-import type { PipelineOption, TemplateOption } from "@/components/workflows/TriggerFields";
+import type { PipelineOption, ServiceCategoryOption, TemplateOption } from "@/components/workflows/TriggerFields";
 import type { LibraryFolderRow } from "@/components/library/types";
 
 export function WorkflowsPageClient({
@@ -16,6 +16,7 @@ export function WorkflowsPageClient({
   canManage,
   organizerTemplates,
   services,
+  serviceCategories,
   pipelines,
   tagOptions,
 }: {
@@ -25,6 +26,7 @@ export function WorkflowsPageClient({
   canManage: boolean;
   organizerTemplates: TemplateOption[];
   services: TemplateOption[];
+  serviceCategories: ServiceCategoryOption[];
   pipelines: PipelineOption[];
   tagOptions: string[];
 }) {
@@ -71,6 +73,7 @@ export function WorkflowsPageClient({
           canManage={canManage}
           organizerTemplates={organizerTemplates}
           services={services}
+          serviceCategories={serviceCategories}
           pipelines={pipelines}
           tagOptions={tagOptions}
           open={open}

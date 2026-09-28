@@ -1,0 +1,39 @@
+-- Migration history recovery -- confirmed live in production (2026-09-24)
+-- via direct grant inspection (has_function_privilege), byte-for-byte from
+-- the original commit (1fdf57a, on the unmerged claude/verexa-remove-
+-- services-vaqbfx branch) that was never brought to main. This file is a
+-- safe no-op against current production, which already has exactly this
+-- grant; its purpose is so a fresh replay of this migrations directory
+-- converges on the same state production is already in.
+--
+-- Security fix (SD-1, from the SECURITY DEFINER authorization audit):
+-- resolve_organizer_response_service(uuid) is a SECURITY DEFINER function
+-- (bypasses RLS entirely) that was granted EXECUTE to `authenticated` with
+-- no internal authorization check -- any signed-in user, from any
+-- workspace, could call it directly against another workspace's
+-- organizer_responses.id and force a mutation of that row's
+-- resolved_service_id/needs_service_review. Confirmed live via a
+-- rolled-back transaction: an unrelated authenticated caller's call
+-- succeeded with no exception.
+--
+-- Root cause: the originating migration (20260811100848_
+-- organizer_driven_service_attachment) deliberately granted EXECUTE to
+-- authenticated, but no application code has ever called this RPC
+-- directly (confirmed: no `.rpc("resolve_organizer_response_service"` in
+-- app/, components/, or lib/). Every real caller is itself a privileged
+-- SECURITY DEFINER context -- trg_resolve_organizer_response_service()
+-- (the AFTER UPDATE OF status trigger on organizer_responses),
+-- submit_public_organizer_response(), and
+-- submit_public_organizer_response_with_signup() -- none of which need an
+-- end-user JWT: a SECURITY DEFINER function's internal calls execute as
+-- its owner (postgres), which always implicitly retains EXECUTE on
+-- functions it owns, so revoking `authenticated` here does not affect any
+-- of them.
+--
+-- Fix: revoke the unnecessary authenticated grant, restrict to
+-- service_role only -- same grant-level pattern used for the
+-- provision_phone_number_record/bill_and_pause_phone_numbers fix. No
+-- function body, RLS, trigger, or application code is touched.
+
+revoke execute on function public.resolve_organizer_response_service(uuid) from public, anon, authenticated;
+grant execute on function public.resolve_organizer_response_service(uuid) to service_role;

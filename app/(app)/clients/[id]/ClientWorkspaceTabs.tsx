@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Briefcase, CheckSquare, Receipt, ArrowUpRight, FileText, ClipboardCheck, PenLine, RefreshCw, StickyNote, DollarSign, Mail, HelpCircle } from "lucide-react";
 import { taskHref } from "@/lib/taskLink";
 import { formatPhone } from "@/lib/phone";
+import { normalizeName } from "@/lib/name";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 import { createClient } from "@/lib/supabase/client";
@@ -82,7 +83,7 @@ function clientDisplayName(c: { client_type: string; first_name: string | null; 
   // Every non-individual client_type (business/trust/estate/organization)
   // shares the same business_name column as its entity name.
   if (c.client_type !== "individual" && c.business_name) return c.business_name;
-  return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
+  return [c.first_name, c.last_name].filter(Boolean).map((name) => normalizeName(name!)).join(" ") || "Unnamed client";
 }
 
 export function OverviewTab({

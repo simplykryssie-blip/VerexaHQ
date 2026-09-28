@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { CopyIconButton, CopyRecordButton } from "@/components/CopyIconButton";
+import { formatDnsRecordForCopy } from "@/lib/dns/formatDnsRecordForCopy";
 
 export type DnsRecord = { record: string; name: string; type: string; ttl: string; status: string; value: string; priority?: number };
 
@@ -143,17 +145,45 @@ export function EmailDomainCard({ emailDomain }: { emailDomain: EmailDomain }) {
                   <th className="px-3 py-2 font-medium">Name</th>
                   <th className="px-3 py-2 font-medium">Value</th>
                   {emailDomain.dns_records.some((r) => r.priority !== undefined) && <th className="px-3 py-2 font-medium">Priority</th>}
+                  <th className="px-3 py-2 font-medium">
+                    <span className="sr-only">Copy</span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {emailDomain.dns_records.map((r, i) => (
                   <tr key={i}>
-                    <td className="px-3 py-2 font-mono">{r.type}</td>
-                    <td className="max-w-[180px] truncate px-3 py-2 font-mono" title={r.name}>{r.name}</td>
-                    <td className="max-w-[260px] truncate px-3 py-2 font-mono" title={r.value}>{r.value}</td>
+                    <td className="px-3 py-2 font-mono">
+                      <div className="flex items-center gap-1">
+                        <span>{r.type}</span>
+                        <CopyIconButton value={r.type} label="Copy DNS record type" />
+                      </div>
+                    </td>
+                    <td className="max-w-[180px] px-3 py-2 font-mono">
+                      <div className="flex items-center gap-1">
+                        <span className="truncate" title={r.name}>{r.name}</span>
+                        <CopyIconButton value={r.name} label="Copy DNS host/name" />
+                      </div>
+                    </td>
+                    <td className="max-w-[260px] px-3 py-2 font-mono">
+                      <div className="flex items-center gap-1">
+                        <span className="truncate" title={r.value}>{r.value}</span>
+                        <CopyIconButton value={r.value} label="Copy DNS value" />
+                      </div>
+                    </td>
                     {emailDomain.dns_records.some((rec) => rec.priority !== undefined) && (
-                      <td className="px-3 py-2 font-mono">{r.priority ?? ""}</td>
+                      <td className="px-3 py-2 font-mono">
+                        {r.priority !== undefined && (
+                          <div className="flex items-center gap-1">
+                            <span>{r.priority}</span>
+                            <CopyIconButton value={String(r.priority)} label="Copy DNS priority" />
+                          </div>
+                        )}
+                      </td>
                     )}
+                    <td className="px-3 py-2">
+                      <CopyRecordButton text={formatDnsRecordForCopy(r)} />
+                    </td>
                   </tr>
                 ))}
               </tbody>

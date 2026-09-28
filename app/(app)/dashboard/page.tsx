@@ -254,6 +254,7 @@ export default async function DashboardPage() {
       workspaceId={workspace.id}
       onboardingSteps={onboardingDismissed ? null : onboardingSteps}
       seenOnboardingSteps={profileRow?.seen_onboarding_steps ?? []}
+      defaultWidgets={widgets ?? []}
       serviceCategories={serviceCategories}
       staffOptions={staffOptions}
       accountHolderName={accountHolderName}

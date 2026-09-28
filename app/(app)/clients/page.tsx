@@ -110,6 +110,7 @@ export default async function ClientsPage({
     { data: serviceCategoriesRaw },
     { data: canCreate },
     { data: canEdit },
+    { data: canDelete },
     { data: workspaceTags },
     { data: activeMembers },
     { data: membership },
@@ -143,6 +144,11 @@ export default async function ClientsPage({
     // Bulk tag/export stay on the existing clients.create-gated canManage
     // below, unchanged, since that's how they already shipped.
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.edit" }),
+    // Bulk hard delete -- a distinct, more consequential permission than
+    // clients.edit; already exists and is already granted to Owner/Admin/
+    // ERO (it already gates the RLS DELETE policy on `clients` directly),
+    // just never wired to any UI or RPC until this reconciliation pass.
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.delete" }),
     supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id }),
     supabase.from("workspace_users").select("user_id").eq("workspace_id", workspace.id).eq("status", "active"),
     user
@@ -327,6 +333,7 @@ export default async function ClientsPage({
             workspaceId={workspace.id}
             canManage={Boolean(canCreate)}
             canEdit={Boolean(canEdit)}
+            canDelete={Boolean(canDelete)}
             staffOptions={staffFilterOptions}
             activeFilters={searchFilters}
             totalCount={count ?? clients.length}

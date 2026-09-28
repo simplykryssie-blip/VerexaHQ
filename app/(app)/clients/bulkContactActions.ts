@@ -82,6 +82,35 @@ export function partitionForBulkRestore<T extends { lifecycle_status: string }>(
 // a partial, arbitrary subset of what they asked for.
 export const MAX_BULK_SELECT_ALL = 500;
 
+// Contacts Reconciliation Audit -- bulk hard delete. delete_clients (server
+// side, one call per whole selection) reports a per-row outcome rather than
+// a single success/failure so the UI can show exactly which contacts were
+// skipped and why -- "has become an established client" (an engagement,
+// invoice, payment, or quote already exists) is the one expected/common
+// skip reason and gets its own summary line; anything else surfaces as its
+// own line since it means something the caller didn't anticipate.
+export type DeleteClientsResultRow = { client_id: string; deleted: boolean; reason: string | null };
+
+export type DeleteClientsSummary = {
+  deletedCount: number;
+  establishedClientSkips: { id: string; reason: string }[];
+  otherSkips: { id: string; reason: string }[];
+};
+
+const ESTABLISHED_CLIENT_MARKER = "Has become an established client";
+
+export function summarizeDeleteClientsResult(rows: DeleteClientsResultRow[]): DeleteClientsSummary {
+  const deletedCount = rows.filter((r) => r.deleted).length;
+  const skipped = rows.filter((r) => !r.deleted);
+  const establishedClientSkips = skipped
+    .filter((r) => (r.reason ?? "").startsWith(ESTABLISHED_CLIENT_MARKER))
+    .map((r) => ({ id: r.client_id, reason: r.reason ?? "" }));
+  const otherSkips = skipped
+    .filter((r) => !(r.reason ?? "").startsWith(ESTABLISHED_CLIENT_MARKER))
+    .map((r) => ({ id: r.client_id, reason: r.reason ?? "Unknown error" }));
+  return { deletedCount, establishedClientSkips, otherSkips };
+}
+
 /** The subset of search_clients' own filter parameters "select all
  * matching" needs to reissue the same query without pagination -- kept as
  * one type so page.tsx and ContactsBulkTable.tsx can't drift out of sync
