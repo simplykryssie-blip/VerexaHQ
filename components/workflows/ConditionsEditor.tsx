@@ -64,6 +64,7 @@ type ValueKind =
   | "organizer_status"
   | "document_signed_step"
   | "decision_step"
+  | "webhook_integration"
   | "text"
   | "tag"
   | "number"
@@ -204,6 +205,7 @@ const CONDITION_FIELDS: FieldMeta[] = [
 
   { key: "run.document_signed", label: "Document signed? (sent by \"Send a document for signature\")", group: "Workflow", valueKind: "document_signed_step", ops: ["eq", "neq"] },
   { key: "run.decision", label: "Review Queue Decision", group: "Workflow", valueKind: "decision_step", ops: ["eq", "neq"] },
+  { key: "run.webhook_received", label: "A webhook event was received (while waiting)", group: "Workflow", valueKind: "webhook_integration", ops: ["eq", "neq"] },
 
   { key: "package_purchase.package_name", label: "Package name", group: "Package purchase", valueKind: "text", ops: SELECT_OPS },
   { key: "package_purchase.billing_cadence", label: "Package billing cadence", group: "Package purchase", valueKind: "select", options: ["monthly", "annual", "one_time"], ops: SELECT_OPS },
@@ -237,6 +239,8 @@ function ConditionRow({
   documentSignatureSteps,
   decisionSteps,
   tagOptions,
+  firmPackageOptions,
+  webhookIntegrations,
   disabled,
 }: {
   condition: Condition;
@@ -250,6 +254,8 @@ function ConditionRow({
   documentSignatureSteps: DocumentSignatureStepOption[];
   decisionSteps: DecisionStepOption[];
   tagOptions: string[];
+  firmPackageOptions: TemplateOption[];
+  webhookIntegrations: TemplateOption[];
   disabled: boolean;
 }) {
   const meta = fieldMeta(condition.field);
@@ -269,6 +275,9 @@ function ConditionRow({
   // second half's valid values depend entirely on which step is chosen.
   const [decisionStepId, decisionOptionValue] = condition.value.split("|");
   const selectedDecisionStep = decisionSteps.find((s) => s.id === decisionStepId);
+  // "<integration_id>|<event_type>" -- event_type is optional (empty means
+  // "any event from this integration").
+  const [webhookIntegrationId, webhookEventTypeValue] = condition.value.split("|");
 
   function setField(nextField: string) {
     const nextMeta = fieldMeta(nextField);
@@ -462,6 +471,36 @@ function ConditionRow({
             </>
           )}
 
+          {meta.valueKind === "webhook_integration" && (
+            <>
+              <select
+                disabled={disabled}
+                value={webhookIntegrationId ?? ""}
+                onChange={(e) => setValue(`${e.target.value}|${webhookEventTypeValue ?? ""}`)}
+                className={inputClass}
+              >
+                <option value="" disabled>
+                  Choose a webhook integration
+                </option>
+                {webhookIntegrations.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                disabled={disabled || !webhookIntegrationId}
+                value={webhookEventTypeValue ?? ""}
+                onChange={(e) => setValue(`${webhookIntegrationId ?? ""}|${e.target.value}`)}
+                placeholder="Event type (optional -- any event if blank)"
+                className={inputClass}
+              />
+              {webhookIntegrations.length === 0 && (
+                <span className="text-[11px] text-warning">No webhook integration configured for this workspace yet -- add one in Settings first.</span>
+              )}
+            </>
+          )}
+
           {meta.valueKind === "lead_stage" && (
             <select disabled={disabled} value={condition.value} onChange={(e) => setValue(e.target.value)} className={inputClass}>
               <option value="" disabled>
@@ -552,7 +591,20 @@ function ConditionRow({
             </>
           )}
 
-          {meta.valueKind === "text" && (
+          {meta.valueKind === "text" && meta.key === "firm_connection.package_id" && (
+            <select disabled={disabled} value={condition.value} onChange={(e) => setValue(e.target.value)} className={inputClass}>
+              <option value="" disabled>
+                Choose a package
+              </option>
+              {firmPackageOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {meta.valueKind === "text" && meta.key !== "firm_connection.package_id" && (
             <input disabled={disabled} value={condition.value} onChange={(e) => setValue(e.target.value)} className={inputClass} placeholder="Value" />
           )}
 
@@ -601,6 +653,8 @@ export function ConditionsEditor({
   documentSignatureSteps = [],
   decisionSteps = [],
   tagOptions = [],
+  firmPackageOptions = [],
+  webhookIntegrations = [],
   disabled,
 }: {
   conditions: Condition[];
@@ -613,6 +667,8 @@ export function ConditionsEditor({
   documentSignatureSteps?: DocumentSignatureStepOption[];
   decisionSteps?: DecisionStepOption[];
   tagOptions?: string[];
+  firmPackageOptions?: TemplateOption[];
+  webhookIntegrations?: TemplateOption[];
   disabled?: boolean;
 }) {
   function addCondition() {
@@ -670,6 +726,8 @@ export function ConditionsEditor({
                 documentSignatureSteps={documentSignatureSteps}
                 decisionSteps={decisionSteps}
                 tagOptions={tagOptions}
+                firmPackageOptions={firmPackageOptions}
+                webhookIntegrations={webhookIntegrations}
                 disabled={Boolean(disabled)}
               />
             </div>
@@ -701,6 +759,8 @@ export function ConditionGroupsEditor({
   documentSignatureSteps = [],
   decisionSteps = [],
   tagOptions = [],
+  firmPackageOptions = [],
+  webhookIntegrations = [],
   disabled,
 }: {
   groups: ConditionGroup[];
@@ -713,6 +773,8 @@ export function ConditionGroupsEditor({
   documentSignatureSteps?: DocumentSignatureStepOption[];
   decisionSteps?: DecisionStepOption[];
   tagOptions?: string[];
+  firmPackageOptions?: TemplateOption[];
+  webhookIntegrations?: TemplateOption[];
   disabled?: boolean;
 }) {
   function addGroup() {
@@ -777,6 +839,8 @@ export function ConditionGroupsEditor({
               documentSignatureSteps={documentSignatureSteps}
               decisionSteps={decisionSteps}
               tagOptions={tagOptions}
+              firmPackageOptions={firmPackageOptions}
+              webhookIntegrations={webhookIntegrations}
               disabled={disabled}
             />
           </div>
