@@ -127,4 +127,5 @@ export type SearchClientsFilters = {
   p_client_type?: string;
   p_has_email?: boolean;
   p_has_phone?: boolean;
+  p_unassigned_only?: boolean;
 };
