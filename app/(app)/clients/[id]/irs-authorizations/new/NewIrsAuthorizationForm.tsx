@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { generateIrsAuthorizationDocument } from "@/lib/documents/generateIrsAuthorizationDocument";
+import { renderIrsAuthorizationPdf } from "@/lib/documents/renderIrsAuthorizationPdf";
 import type { IrsTaxMatterRow } from "@/lib/irsAuthorization/types";
 import type { Irs8821OrganizerPrefill } from "@/lib/organizerPrefill8821";
 
@@ -65,29 +66,70 @@ export function NewIrsAuthorizationForm({
     return [first];
   });
   const [saving, setSaving] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   function updateRow(index: number, patch: Partial<IrsTaxMatterRow>) {
     setTaxMatters((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-
+  function validate(): IrsTaxMatterRow[] | null {
     if (!designeeUserId) {
       setError("Choose a designee.");
-      return;
+      return null;
     }
     if (!templateId) {
       setError("Choose the uploaded IRS Form 8821 PDF template.");
-      return;
+      return null;
     }
     const cleanedMatters = taxMatters.filter((r) => r.tax_info_type || r.tax_form_number || r.years_or_periods || r.specific_matters);
     if (cleanedMatters.length === 0) {
       setError("Add at least one tax matter row.");
+      return null;
+    }
+    return cleanedMatters;
+  }
+
+  async function handlePreview(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const cleanedMatters = validate();
+    if (!cleanedMatters) return;
+
+    setPreviewing(true);
+    const designee = staffOptions.find((s) => s.id === designeeUserId);
+    const result = await renderIrsAuthorizationPdf({
+      supabase,
+      templateId,
+      clientName,
+      clientAddress,
+      firmName,
+      firmAddress,
+      firmPhone,
+      designeeName: designee?.name ?? "",
+      designeeCafNumber: designee?.cafNumber ?? null,
+      taxMatters: cleanedMatters,
+    });
+    setPreviewing(false);
+    if ("error" in result) {
+      setError(result.error);
       return;
     }
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    const blob = new Blob([result.pdfBytes as unknown as BlobPart], { type: "application/pdf" });
+    setPreviewUrl(URL.createObjectURL(blob));
+  }
+
+  async function handleCreate() {
+    const cleanedMatters = validate();
+    if (!cleanedMatters) return;
 
     setSaving(true);
     const { data: authorizationId, error: createError } = await supabase.rpc("create_irs_authorization", {
@@ -142,7 +184,8 @@ export function NewIrsAuthorizationForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <>
+    <form onSubmit={handlePreview} className="space-y-5">
       <div>
         <p className="text-sm font-medium text-slate">Client</p>
         <p className="text-sm text-ink">{clientName}</p>
@@ -296,12 +339,60 @@ export function NewIrsAuthorizationForm({
       <div className="flex justify-end">
         <button
           type="submit"
-          disabled={saving}
+          disabled={previewing}
           className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
         >
-          {saving ? "Creating..." : "Create & generate document"}
+          {previewing ? "Rendering preview..." : "Preview document"}
         </button>
       </div>
     </form>
+
+    {previewUrl && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="flex h-full max-h-[90vh] w-full max-w-3xl flex-col rounded-2xl bg-surface shadow-soft">
+          <div className="flex items-center justify-between border-b border-border px-5 py-3">
+            <p className="text-sm font-medium text-slate">Preview -- IRS Form 8821 for {clientName}</p>
+            <button
+              type="button"
+              onClick={() => {
+                URL.revokeObjectURL(previewUrl);
+                setPreviewUrl(null);
+              }}
+              className="text-muted hover:text-ink"
+              aria-label="Close preview"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <iframe src={previewUrl} title="IRS Form 8821 preview" className="h-full w-full" />
+          </div>
+          <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+            <p className="text-xs text-muted">Review this against the answers above before you create and send it.</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  URL.revokeObjectURL(previewUrl);
+                  setPreviewUrl(null);
+                }}
+                className="rounded-lg px-3 py-2 text-sm font-medium text-muted hover:text-ink"
+              >
+                Back to edit
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={handleCreate}
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+              >
+                {saving ? "Creating..." : "Create & generate document"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
