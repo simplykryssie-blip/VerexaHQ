@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace, workspaceOperationalError, isWorkspaceStatusOperational } from "@/lib/workspace";
 import { syncResendDomainStatus } from "@/lib/email/domains";
 
-export async function POST() {
+export async function POST(request: Request) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -18,11 +18,12 @@ export async function POST() {
     return NextResponse.json({ error: "You don't have permission to manage this workspace's integrations." }, { status: 403 });
   }
 
-  const { data: existing } = await supabase
-    .from("workspace_email_domains")
-    .select("id, resend_domain_id")
-    .eq("workspace_id", workspace.id)
-    .maybeSingle();
+  // domainId disambiguates which of a workspace's (possibly several)
+  // sending domains to check -- falls back to the primary one so an old
+  // client calling this with no body still does something sensible.
+  const { domainId } = (await request.json().catch(() => ({}))) as { domainId?: string };
+  const query = supabase.from("workspace_email_domains").select("id, resend_domain_id").eq("workspace_id", workspace.id);
+  const { data: existing } = await (domainId ? query.eq("id", domainId) : query.eq("is_primary", true)).maybeSingle();
   if (!existing) {
     return NextResponse.json({ error: "No sending domain configured for this workspace." }, { status: 404 });
   }
