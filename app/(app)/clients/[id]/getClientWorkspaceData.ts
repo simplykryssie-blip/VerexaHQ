@@ -407,6 +407,8 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
       : Promise.resolve({ data: [] as { id: string; subject: string; status: string; sent_at: string | null; created_at: string }[] }),
   ]);
 
+  const TASK_COLUMNS =
+    "id, title, description, status, priority, due_date, engagement_id, client_id, related_organizer_response_id, assigned_staff_id, visibility";
   let tasks: {
     id: string;
     title: string;
@@ -417,16 +419,63 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
     engagement_id: string | null;
     client_id: string | null;
     related_organizer_response_id: string | null;
+    assigned_staff_id: string | null;
+    visibility: string;
   }[] = [];
+  let completedTasks: typeof tasks = [];
   {
     const engagementFilter = engagementIds.length > 0 ? `engagement_id.in.(${engagementIds.join(",")})` : "";
-    const { data: taskRows } = await supabase
-      .from("tasks")
-      .select("id, title, description, status, priority, due_date, engagement_id, client_id, related_organizer_response_id")
-      .or([engagementFilter, `client_id.eq.${client.id}`].filter(Boolean).join(","))
-      .neq("status", "completed")
-      .order("due_date");
+    const taskFilter = [engagementFilter, `client_id.eq.${client.id}`].filter(Boolean).join(",");
+    const [{ data: taskRows }, { data: completedTaskRows }] = await Promise.all([
+      supabase.from("tasks").select(TASK_COLUMNS).or(taskFilter).neq("status", "completed").order("due_date"),
+      // Completed tasks are fetched separately (rather than widening the
+      // query above) so the "Upcoming tasks" widget, which reuses `tasks`,
+      // never has to filter completed ones back out itself.
+      supabase
+        .from("tasks")
+        .select(TASK_COLUMNS)
+        .or(taskFilter)
+        .eq("status", "completed")
+        .order("completed_at", { ascending: false })
+        .limit(20),
+    ]);
     tasks = taskRows ?? [];
+    completedTasks = completedTaskRows ?? [];
+  }
+
+  // Contacts Reconciliation Audit item #7: bank_product_transactions
+  // genuinely tracks refund transfer/advance status but was only ever
+  // surfaced on the Engagement detail page. Read-only here (the existing
+  // engagement-scoped BankProductTransactionForm/BankProductStatusSelect
+  // remain the only way to create/edit one) -- across every engagement this
+  // client has, since a returning client can have bank products from
+  // multiple tax years.
+  let bankProductTransactions: {
+    id: string;
+    engagement_id: string;
+    engagement_number: string | null;
+    bank_partner: string;
+    product_type: string;
+    status: string;
+    disbursed_at: string | null;
+    created_at: string;
+  }[] = [];
+  if (engagementIds.length > 0) {
+    const { data: bankProductRows } = await supabase
+      .from("bank_product_transactions")
+      .select("id, engagement_id, bank_partner, product_type, status, disbursed_at, created_at, engagements(engagement_number)")
+      .in("engagement_id", engagementIds)
+      .order("created_at", { ascending: false });
+    bankProductTransactions = (bankProductRows ?? []).map((b: any) => ({
+      id: b.id,
+      engagement_id: b.engagement_id,
+      engagement_number: b.engagements?.engagement_number ?? null,
+      bank_partner: b.bank_partner,
+      product_type: b.product_type,
+      status: b.status,
+      disbursed_at: b.disbursed_at,
+      created_at: b.created_at,
+    }));
   }
 
   // Real pending-item count on this client's open document requests
@@ -550,6 +599,8 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
     messages: threadMessages ?? [],
     timeline,
     tasks,
+    completedTasks,
+    bankProductTransactions,
     missingDocumentCount,
     organizerTemplates: organizerTemplates ?? [],
     pendingOrganizerTemplateIds,

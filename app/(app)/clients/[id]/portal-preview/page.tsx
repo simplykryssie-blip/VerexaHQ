@@ -6,7 +6,7 @@ import { ClientPortalPreview } from "@/components/portal-preview/ClientPortalPre
 export const dynamic = "force-dynamic";
 
 function clientDisplayName(c: { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }) {
-  return c.client_type === "business" ? c.business_name ?? "Business" : [c.first_name, c.last_name].filter(Boolean).join(" ") || "Client";
+  return c.client_type !== "individual" ? c.business_name ?? "Client" : [c.first_name, c.last_name].filter(Boolean).join(" ") || "Client";
 }
 
 // Read-only staff view of what this client sees in their own Client Portal.

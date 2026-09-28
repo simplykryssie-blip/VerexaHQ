@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, Star, Trash2, Zap } from "lucide-react";
+import { Copy, Star, Trash2, Zap, XCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/EmptyState";
@@ -18,6 +18,7 @@ import {
   defaultTriggerConfig,
   triggerSummary,
   type TemplateOption,
+  type ServiceCategoryOption,
   type PipelineOption,
 } from "@/components/workflows/TriggerFields";
 
@@ -32,6 +33,11 @@ export type WorkflowRow = {
   folder_id: string | null;
   step_count: number;
   run_count: number;
+  /** Total runs with status = 'failed', all-time -- same figure the
+   *  workflow's own Activity panel (/workflows/{id}?activity=1) shows in its
+   *  Runs table, not a "needs attention" queue (there's no acknowledgment
+   *  concept at this list-page level). */
+  failed_run_count: number;
   starred: boolean;
 };
 
@@ -51,6 +57,7 @@ export function WorkflowList({
   canManage,
   organizerTemplates,
   services = [],
+  serviceCategories = [],
   pipelines = [],
   tagOptions = [],
   open,
@@ -62,6 +69,7 @@ export function WorkflowList({
   canManage: boolean;
   organizerTemplates: TemplateOption[];
   services?: TemplateOption[];
+  serviceCategories?: ServiceCategoryOption[];
   pipelines?: PipelineOption[];
   tagOptions?: string[];
   open: boolean;
@@ -277,6 +285,7 @@ export function WorkflowList({
               onConfigChange={setTriggerConfig}
               organizerTemplates={organizerTemplates}
               services={services}
+              serviceCategories={serviceCategories}
               pipelines={pipelines}
               tagOptions={tagOptions}
             />
@@ -332,22 +341,33 @@ export function WorkflowList({
         ) : (
           <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
             {visibleWorkflows.map((w) => (
-              <li key={w.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                <StarButton workspaceId={workspaceId} entityType="automation" entityId={w.id} starred={w.starred} label={w.name} alwaysVisible />
-                <Link href={`/workflows/${w.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-                  <Zap size={16} className={w.is_enabled ? "text-accent" : "text-muted"} />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="truncate text-sm font-medium text-ink">{w.name}</p>
-                      {w.step_count === 0 && <Badge tone="warning">No steps yet</Badge>}
+              <li key={w.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3 sm:flex-1">
+                  <StarButton workspaceId={workspaceId} entityType="automation" entityId={w.id} starred={w.starred} label={w.name} alwaysVisible />
+                  <Link href={`/workflows/${w.id}`} className="flex min-w-0 flex-1 items-center gap-3 py-1 -my-1">
+                    <Zap size={16} className={`shrink-0 ${w.is_enabled ? "text-accent" : "text-muted"}`} />
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <p className="break-words text-sm font-medium text-ink sm:truncate">{w.name}</p>
+                        {w.step_count === 0 && <Badge tone="warning">No steps yet</Badge>}
+                      </div>
+                      <p className="break-words text-xs text-muted sm:truncate">
+                        {triggerSummary(w.trigger_type, w.trigger_config, organizerTemplates, services, serviceCategories, pipelines)} &middot; {w.step_count} step
+                        {w.step_count === 1 ? "" : "s"} &middot; {w.run_count} run{w.run_count === 1 ? "" : "s"}
+                      </p>
                     </div>
-                    <p className="truncate text-xs text-muted">
-                      {triggerSummary(w.trigger_type, w.trigger_config, organizerTemplates, services, pipelines)} &middot; {w.step_count} step
-                      {w.step_count === 1 ? "" : "s"} &middot; {w.run_count} run{w.run_count === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                </Link>
-                <div className="flex shrink-0 items-center gap-3">
+                  </Link>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:shrink-0 sm:gap-3">
+                  {w.failed_run_count > 0 && (
+                    <Link
+                      href={`/workflows/${w.id}?activity=1`}
+                      className="inline-flex items-center gap-1 rounded-full bg-dangerSoft px-2.5 py-0.5 text-xs font-medium text-danger hover:underline"
+                      title="View failed runs in Activity"
+                    >
+                      <XCircle size={12} aria-hidden="true" /> {w.failed_run_count} failed
+                    </Link>
+                  )}
                   {w.status === "draft" ? (
                     <Badge tone="warning">Draft</Badge>
                   ) : w.status === "archived" ? (
@@ -387,7 +407,7 @@ export function WorkflowList({
                         type="button"
                         onClick={() => duplicate(w.id, w.name)}
                         disabled={duplicatingId === w.id}
-                        className="rounded-lg p-1.5 text-muted transition hover:bg-surfaceMuted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50"
+                        className="rounded-lg p-3 text-muted transition hover:bg-surfaceMuted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 sm:p-1.5"
                         aria-label="Duplicate workflow"
                       >
                         <Copy size={14} />
@@ -396,7 +416,7 @@ export function WorkflowList({
                         type="button"
                         onClick={() => remove(w.id)}
                         disabled={deletingId === w.id}
-                        className="rounded-lg p-1.5 text-muted transition hover:bg-dangerSoft hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50"
+                        className="rounded-lg p-3 text-muted transition hover:bg-dangerSoft hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 sm:p-1.5"
                         aria-label="Delete workflow"
                       >
                         <Trash2 size={14} />

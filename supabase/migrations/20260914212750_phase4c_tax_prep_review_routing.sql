@@ -1,3 +1,15 @@
+-- ============================================================================
+-- MIGRATION RECONCILIATION PHASE 1.9 -- RECOVERED FROM PRODUCTION (PR #268)
+--
+-- Did not previously exist in Git main. Applied directly to production
+-- during the MKB Tax Prep + Client Review + F1/F2/NW-1 security work
+-- (PR #268, branch claude/verexa-schema-mismatch-i8c19u, never merged).
+-- This filename's version already exactly matches the real recorded
+-- production version in supabase_migrations.schema_migrations -- no rename
+-- needed. Content verified byte-for-byte (modulo a single trailing
+-- newline) against schema_migrations.statements. Confidence: A -- exact
+-- original recovered.
+-- ============================================================================
 -- Phase 4C Parts 2-4: wire the human organizer-review decision on the
 -- Individual/Sched C intake form (organizer_template_id
 -- 51d0c196-43a7-4e8e-b1e1-0a30d6b3daa4, Summit demo workspace

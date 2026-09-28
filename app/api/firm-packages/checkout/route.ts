@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentWorkspace, workspaceOperationalError } from "@/lib/workspace";
+import { getCurrentWorkspace, workspaceOperationalError, isWorkspaceStatusOperational } from "@/lib/workspace";
 import { createCheckoutSession, createSubscriptionCheckoutSession } from "@/lib/stripe/client";
 import { getWorkspaceConnectAccount } from "@/lib/stripe/workspaceConnect";
 import { isStripeConfigured } from "@/lib/providerStatus";
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   if (!workspace) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
-  if (workspace.status === "suspended") {
+  if (!isWorkspaceStatusOperational(workspace.status)) {
     return NextResponse.json({ error: workspaceOperationalError(workspace) }, { status: 403 });
   }
 

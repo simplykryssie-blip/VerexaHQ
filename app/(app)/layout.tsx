@@ -4,13 +4,14 @@ import { headers } from "next/headers";
 import { Sidebar } from "@/components/Sidebar";
 import { ScrollToTopOnNavigate } from "@/components/ScrollToTopOnNavigate";
 import { ToastProvider } from "@/components/Toast";
+import { ConfirmProvider } from "@/components/Confirm";
 import { GlobalClientDraftBanner } from "@/components/GlobalClientDraftBanner";
 import { BillingCardPrompt } from "@/components/BillingCardPrompt";
 import { SponsorshipTransitionBanner } from "@/components/SponsorshipTransitionBanner";
 import { SuspendedWorkspaceScreen } from "@/components/SuspendedWorkspaceScreen";
 import { AppHeader } from "@/components/AppHeader";
 import { IdleLogout } from "@/components/IdleLogout";
-import { getCurrentWorkspace, isSuspensionRecoveryPath } from "@/lib/workspace";
+import { getCurrentWorkspace, isSuspensionRecoveryPath, isWorkspaceStatusOperational } from "@/lib/workspace";
 import { getPortalIdentity } from "@/lib/portal";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveBranding } from "@/lib/branding";
@@ -140,18 +141,22 @@ export default async function AppLayout({ children, modal }: { children: React.R
     return <AcceptTermsGate version={LEGAL_VERSION} />;
   }
 
-  // Phase 3 suspension enforcement: a billing-suspended workspace loses
-  // normal operational access for every member (not just the owner), but
-  // must always be able to reach the billing-recovery surface -- Verexa's
-  // own Plan & Usage page (payment method, subscription status), the
-  // released-staff "Set Up My Billing" flow (briefly loads pages in this
-  // same suspended workspace before redirecting to Stripe Checkout), and
-  // Support. Platform admins bypass this entirely -- they need to be able
-  // to open any tenant's workspace to investigate/resolve the suspension
-  // itself, same as every other admin-bypass check in this layout.
+  // Suspension/archive lifecycle enforcement: a non-active workspace
+  // (suspended, archived, or permanently archived) loses normal operational
+  // access for every member (not just the owner), but must always be able
+  // to reach the billing-recovery surface -- Verexa's own Plan & Usage page
+  // (payment method, subscription status), the released-staff "Set Up My
+  // Billing" flow (briefly loads pages in this same workspace before
+  // redirecting to Stripe Checkout), and Support. Platform admins bypass
+  // this entirely -- they need to be able to open any tenant's workspace to
+  // investigate/resolve the suspension itself, same as every other
+  // admin-bypass check in this layout. This mirrors the DB-level
+  // is_workspace_operational() rule (only "active" is operational) --
+  // archived/permanently_archived are not given any weaker treatment than
+  // suspended.
   const pathname = headers().get("x-pathname") ?? "";
-  if (workspace.status === "suspended" && !isPlatformAdmin && !isSuspensionRecoveryPath(pathname)) {
-    return <SuspendedWorkspaceScreen suspensionReason={workspace.suspension_reason} />;
+  if (!isWorkspaceStatusOperational(workspace.status) && !isPlatformAdmin && !isSuspensionRecoveryPath(pathname)) {
+    return <SuspendedWorkspaceScreen status={workspace.status} suspensionReason={workspace.suspension_reason} />;
   }
 
   // Messages is relevant either for cross-firm network messaging (ERO/SB or
@@ -221,6 +226,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
   return (
     <div style={brandVars}>
       <ToastProvider>
+       <ConfirmProvider>
         <IdleLogout timeoutMinutes={securityPolicy?.session_timeout_minutes ?? 60} loginPath="/login" />
         <a
           href="#main-content"
@@ -266,6 +272,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
           </main>
         </div>
         <ModalSlotGate>{modal}</ModalSlotGate>
+       </ConfirmProvider>
       </ToastProvider>
     </div>
   );

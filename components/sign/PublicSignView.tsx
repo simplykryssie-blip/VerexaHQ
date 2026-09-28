@@ -48,6 +48,16 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
       .catch(() => setFileError("Could not load the document."));
   }, [token]);
 
+  useEffect(() => {
+    // Best-effort audit-trail capture -- IP is read server-side from the
+    // request itself; user agent can only come from the browser.
+    fetch(`/api/sign/${token}/track`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userAgent: navigator.userAgent }),
+    }).catch(() => {});
+  }, [token]);
+
   async function sign() {
     if (!typedName.trim() || !drawnDataUrl) return;
     setSubmitting(true);
@@ -77,6 +87,15 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
       setError(rpcError.message);
       return;
     }
+    // Best-effort -- the signature itself is already recorded and safe;
+    // filing the final flattened PDF is a no-op until every signer is done
+    // and can be retried later if this fails (same pattern
+    // PublicEngagementLetterSign.tsx already uses for its own filing call).
+    fetch("/api/sign/finalize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    }).catch(() => {});
     setData((d) => ({ ...d, signer_status: "signed", signed_at: new Date().toISOString() }));
   }
 

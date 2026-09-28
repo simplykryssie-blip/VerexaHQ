@@ -19,7 +19,9 @@ export default async function PackageDetailPage({ params }: { params: { id: stri
   const [{ data: pkg }, { data: canManage }] = await Promise.all([
     supabase
       .from("firm_packages")
-      .select("id, name, description, flat_price, billing_cadence, revenue_share_percent, revenue_share_scope")
+      .select(
+        "id, name, description, flat_price, billing_cadence, revenue_share_percent, revenue_share_scope, stripe_payment_link_id, stripe_payment_link_url, stripe_price_id, stripe_product_id, purchase_purpose"
+      )
       .eq("id", params.id)
       .eq("workspace_id", workspace.id)
       .maybeSingle(),

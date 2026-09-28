@@ -7,6 +7,7 @@ import { Avatar } from "@/components/Avatar";
 import { WorkspaceStatusActions, AssignSubscriptionForm } from "./WorkspaceAdminActions";
 import { Badge } from "@/components/ui/Badge";
 import { WORKSPACE_STATUS_TONE } from "@/lib/workspaceStatus";
+import { LegalArchiveList, type LegalArchiveRow } from "@/components/legal/LegalArchiveList";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,7 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
 
   if (!workspace) notFound();
 
-  const [{ data: subscription }, { data: invoices }, { data: billingAdmin }, { data: staff }, { data: asParent }, { data: asChild }, { data: plans }] =
+  const [{ data: subscription }, { data: invoices }, { data: billingAdmin }, { data: staff }, { data: asParent }, { data: asChild }, { data: plans }, { data: legalArchives }] =
     await Promise.all([
       supabase
         .from("workspace_subscriptions")
@@ -92,7 +93,27 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
         .eq("child_workspace_id", workspace.id)
         .in("relationship_type", ["ero_ptin", "service_bureau_ero", "service_bureau_ptin"]),
       supabase.from("platform_subscription_plans").select("id, name").eq("is_active", true).order("name"),
+      supabase.rpc("get_platform_terms_archives", { p_workspace_id: params.id }),
     ]);
+
+  const legalArchiveRows: LegalArchiveRow[] = await Promise.all(
+    (legalArchives ?? []).map(async (a) => {
+      let viewUrl: string | null = null;
+      if (a.status === "generated" && a.pdf_storage_path) {
+        const { data: signed } = await supabase.storage.from("legal-archives").createSignedUrl(a.pdf_storage_path, 300);
+        viewUrl = signed?.signedUrl ?? null;
+      }
+      return {
+        id: a.id,
+        version: a.version,
+        status: a.status as LegalArchiveRow["status"],
+        accepted_at: a.accepted_at,
+        accepted_by_name: a.accepted_by_name,
+        accepted_by_email: a.accepted_by_email,
+        viewUrl,
+      };
+    })
+  );
 
   const plan = subscription?.platform_subscription_plans as unknown as {
     name: string;
@@ -287,6 +308,13 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
             </div>
           </div>
         )}
+
+        <div>
+          <h3 className="font-display text-sm font-semibold text-ink">Legal &amp; Agreements</h3>
+          <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft">
+            <LegalArchiveList rows={legalArchiveRows} showRetry />
+          </div>
+        </div>
       </div>
     </>
   );

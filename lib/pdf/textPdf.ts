@@ -65,6 +65,19 @@ export class TextPdf {
     return new TextPdf(pdfDoc, font, fontBold, fontItalic);
   }
 
+  /** Loads an already-uploaded PDF instead of creating a blank one, for
+   * appending a signature certificate page to a document that already has
+   * real content (as opposed to create(), which renders one from scratch).
+   * The constructor's own addPage() call means the certificate always lands
+   * on a fresh page after everything the file already had. */
+  static async fromExisting(bytes: Uint8Array): Promise<TextPdf> {
+    const pdfDoc = await PDFDocument.load(bytes);
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const fontItalic = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
+    return new TextPdf(pdfDoc, font, fontBold, fontItalic);
+  }
+
   private ensureSpace(needed: number) {
     if (this.y - needed < MARGIN) {
       this.page = this.pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);

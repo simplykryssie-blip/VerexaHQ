@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 
 // Blocks the entire app shell -- rendered by (app)/layout.tsx in place of
 // {children} whenever a workspace owner hasn't accepted the current terms
@@ -13,7 +12,6 @@ import { createClient } from "@/lib/supabase/client";
 // rather than trusting client state to flip a boolean.
 export function AcceptTermsGate({ version }: { version: string }) {
   const router = useRouter();
-  const supabase = createClient();
   const [checked, setChecked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,10 +20,20 @@ export function AcceptTermsGate({ version }: { version: string }) {
     if (!checked || saving) return;
     setSaving(true);
     setError(null);
-    const { error } = await supabase.rpc("accept_platform_terms", { p_version: version });
-    if (error) {
+    // Routed through a server endpoint (rather than calling the
+    // accept_platform_terms RPC directly from here) so acceptance can also
+    // kick off server-side legal-archive/PDF generation -- see
+    // app/api/legal/accept-platform-terms/route.ts. The RPC itself, and what
+    // it means to be "accepted," is unchanged.
+    const response = await fetch("/api/legal/accept-platform-terms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ version }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
       setSaving(false);
-      setError(error.message);
+      setError(body.error ?? "Something went wrong. Please try again.");
       return;
     }
     router.refresh();

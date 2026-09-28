@@ -1,3 +1,15 @@
+-- ============================================================================
+-- MIGRATION RECONCILIATION PHASE 1.9 -- RECOVERED FROM PRODUCTION (PR #268)
+--
+-- Did not previously exist in Git main. Applied directly to production
+-- during the MKB Tax Prep + Client Review + F1/F2/NW-1 security work
+-- (PR #268, branch claude/verexa-schema-mismatch-i8c19u, never merged).
+-- This filename's version already exactly matches the real recorded
+-- production version in supabase_migrations.schema_migrations -- no rename
+-- needed. Content verified byte-for-byte (modulo a single trailing
+-- newline) against schema_migrations.statements. Confidence: A -- exact
+-- original recovered.
+-- ============================================================================
 -- Phase 4H-A: fixes F1 and F2 from the Phase 4H adversarial security audit.
 --
 -- F1 -- start_pipeline_run(p_entity_type, p_entity_id, p_process_id) had no

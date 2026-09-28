@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getPortalIdentity } from "@/lib/portal";
 import { createClient } from "@/lib/supabase/server";
 import { PortalSidebar } from "@/components/portal/PortalSidebar";
+import { PortalClosedScreen } from "@/components/portal/PortalClosedScreen";
 import { ScrollToTopOnNavigate } from "@/components/ScrollToTopOnNavigate";
 import { ToastProvider } from "@/components/Toast";
 import { IdleLogout } from "@/components/IdleLogout";
@@ -11,6 +12,17 @@ import { hexToRgbTriplet, lightenHexToRgbTriplet } from "@/lib/color";
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const identity = await getPortalIdentity();
   if (!identity) redirect("/portal/login");
+
+  // Day-30 lifecycle policy: "Client portal is closed" once the firm's
+  // workspace is archived/permanently_archived. Suspended is deliberately
+  // excluded -- existing clients may keep using the portal during that
+  // period per current policy; RLS already blocks new organizer/message
+  // writes at every non-active stage regardless (see
+  // 20260916150000_billing_lifecycle_suspension_enforcement.sql), this only
+  // adds the read/view-access close for the two later stages.
+  if (identity.workspaceStatus === "archived" || identity.workspaceStatus === "permanently_archived") {
+    return <PortalClosedScreen status={identity.workspaceStatus} />;
+  }
 
   const supabase = createClient();
   const [{ count }, branding] = await Promise.all([

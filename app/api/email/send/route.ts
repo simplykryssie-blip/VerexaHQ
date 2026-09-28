@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentWorkspace, workspaceOperationalError } from "@/lib/workspace";
+import { getCurrentWorkspace, workspaceOperationalError, isWorkspaceStatusOperational } from "@/lib/workspace";
 import { sendEmailViaResend, SYSTEM_SENDERS, type SystemSenderKey } from "@/lib/email/resend";
 import { recordProviderCheck } from "@/lib/providerHealth";
 import { checkRateLimit } from "@/lib/rateLimit";
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   }
 
   const workspace = await getCurrentWorkspace();
-  if (workspace && workspace.status === "suspended") {
+  if (workspace && !isWorkspaceStatusOperational(workspace.status)) {
     return NextResponse.json({ ok: false, sent: false, error: workspaceOperationalError(workspace) }, { status: 403 });
   }
   const { data: profile } = await supabase.from("user_profiles").select("display_name").eq("id", user.id).maybeSingle();

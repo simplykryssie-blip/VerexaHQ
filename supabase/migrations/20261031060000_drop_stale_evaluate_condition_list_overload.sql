@@ -1,0 +1,17 @@
+-- 20260927050000_decision_step.sql's local migration file redefines
+-- _evaluate_condition_list with the old 5-arg signature (no p_connection_id/
+-- p_onboarding_id) and no accompanying DROP FUNCTION for the canonical 7-arg
+-- version added by 20260920142055_partner_purchase_stripe_mapping_and_purpose.sql
+-- -- the same changed-argument-list-without-a-drop trap already hit and fixed
+-- for create_engagement, create_client, set_firm_tax_profile, and
+-- search_clients.
+--
+-- Confirmed live in production (via direct SQL inspection, 2026-09-24):
+-- exactly ONE _evaluate_condition_list overload exists today -- the correct
+-- 7-arg one -- and 20260927050000's version was never actually applied
+-- (absent from supabase_migrations.schema_migrations). This migration is
+-- therefore a safe no-op against current production; its purpose is to keep
+-- a full, fresh replay of this migrations directory (e.g. a new environment)
+-- converging on the same single-overload state production is already in,
+-- rather than accidentally introducing the stale overload there.
+drop function if exists public._evaluate_condition_list(jsonb, jsonb, uuid, uuid, uuid);

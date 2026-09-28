@@ -4,13 +4,14 @@ export type PortalIdentity = {
   portalUserId: string;
   clientId: string;
   workspaceId: string;
+  workspaceStatus: string;
   isPrimary: boolean;
   clientLabel: string;
 };
 
 function clientLabel(c: { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null } | null) {
   if (!c) return "Client";
-  if (c.client_type === "business" && c.business_name) return c.business_name;
+  if (c.client_type !== "individual" && c.business_name) return c.business_name;
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Client";
 }
 
@@ -27,7 +28,7 @@ export async function getPortalIdentity(): Promise<PortalIdentity | null> {
 
   const { data } = await supabase
     .from("client_portal_users")
-    .select("id, client_id, workspace_id, is_primary, clients(client_type, first_name, last_name, business_name)")
+    .select("id, client_id, workspace_id, is_primary, clients(client_type, first_name, last_name, business_name), workspaces(status)")
     .eq("user_id", user.id)
     .eq("status", "active")
     .limit(1)
@@ -39,6 +40,7 @@ export async function getPortalIdentity(): Promise<PortalIdentity | null> {
     portalUserId: data.id,
     clientId: data.client_id,
     workspaceId: data.workspace_id,
+    workspaceStatus: (data.workspaces as unknown as { status: string } | null)?.status ?? "active",
     isPrimary: data.is_primary,
     clientLabel: clientLabel(data.clients as never),
   };

@@ -34,7 +34,11 @@ const TITLES: Record<string, (p: Payload) => string> = {
   ORGANIZER_SUBMITTED: (p) => {
     const client = str(p, "client_name").trim();
     const organizer = str(p, "organizer_template_name", "a form");
-    return client ? `${client} submitted ${organizer}` : `${organizer} was submitted`;
+    return client ? `${client} completed ${organizer}` : `${organizer} was completed`;
+  },
+  PUBLIC_LEAD_CREATED: (p) => {
+    const client = str(p, "client_name").trim();
+    return client ? `${client} Lead - Form Incomplete` : "New lead -- form incomplete";
   },
   DOCUMENT_REQUEST_COMPLETED: (p) => {
     const client = str(p, "client_name").trim();

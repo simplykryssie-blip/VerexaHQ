@@ -8,6 +8,7 @@ import {
   markWebhookFailed,
   markWebhookProcessed,
 } from "@/lib/stripe/handleCheckoutCompleted";
+import { handleSignupCheckoutCompleted } from "@/lib/stripe/handleSignupCheckoutCompleted";
 import {
   handleSubscriptionCreated,
   handleSubscriptionUpdated,
@@ -68,17 +69,20 @@ export async function POST(request: Request) {
         id: string;
         mode?: string;
         customer?: string | { id: string };
+        subscription?: string | { id: string } | null;
         setup_intent?: string | { id: string } | null;
         payment_intent: string;
         amount_total: number;
-        metadata?: { invoice_id?: string; payment_plan_id?: string; workspace_id?: string; type?: string; resource_type?: string; units?: string };
+        metadata?: { invoice_id?: string; payment_plan_id?: string; workspace_id?: string; pending_signup_id?: string; type?: string; resource_type?: string; units?: string };
       };
       const result =
         session.mode === "setup"
           ? await handleSetupCheckoutCompleted(supabase, session as Parameters<typeof handleSetupCheckoutCompleted>[1])
           : session.metadata?.type === "usage_topup"
             ? await handleUsageTopupCheckoutCompleted(supabase, session)
-            : await handleCheckoutSessionCompleted(supabase, session);
+            : session.metadata?.type === "signup"
+              ? await handleSignupCheckoutCompleted(supabase, session as Parameters<typeof handleSignupCheckoutCompleted>[1])
+              : await handleCheckoutSessionCompleted(supabase, session);
       await markWebhookProcessed(supabase, logRow?.id, session.metadata?.workspace_id);
       if (result.skipped) {
         return NextResponse.json({ received: true, skipped: result.skipped });

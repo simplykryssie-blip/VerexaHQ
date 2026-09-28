@@ -13,8 +13,10 @@ import { ClientSearchField as SharedClientSearchField, clientSearchResultLabel, 
 
 const DRAFT_KEY = "new-engagement-inline";
 
+type EntityClientType = "business" | "trust" | "estate" | "organization";
+
 type InlineDraft = {
-  clientType: "individual" | "business";
+  clientType: "individual" | EntityClientType;
   firstName: string;
   lastName: string;
   businessName: string;
@@ -25,6 +27,18 @@ type InlineDraft = {
 type ClientOption = ClientSearchResult;
 
 const clientLabel = clientSearchResultLabel;
+
+// Every non-individual client_type shares one shape in the schema (a single
+// business_name column, no per-type name field) -- same established
+// entity-name pattern as NewClientButton.tsx, kept as its own small local
+// map here rather than importing from that file, since this fast-path
+// creation panel is intentionally a separate, minimal implementation.
+const ENTITY_NAME_LABELS: Record<EntityClientType, string> = {
+  business: "Business name",
+  trust: "Trust name",
+  estate: "Estate name",
+  organization: "Organization name",
+};
 
 // Wraps the shared search-and-select field with this flow's own "no match --
 // create a new client" panel (name/email/phone, dedup check, draft-resume
@@ -41,7 +55,8 @@ function ClientSearchField({
 }) {
   const supabase = createClient();
   const [showCreate, setShowCreate] = useState(false);
-  const [newClientType, setNewClientType] = useState<"individual" | "business">("individual");
+  const [newClientType, setNewClientType] = useState<"individual" | EntityClientType>("individual");
+  const isNewClientEntity = newClientType !== "individual";
   const [newFirstName, setNewFirstName] = useState("");
   const [newLastName, setNewLastName] = useState("");
   const [newBusinessName, setNewBusinessName] = useState("");
@@ -82,8 +97,8 @@ function ClientSearchField({
       setCreateError("First and last name are required.");
       return;
     }
-    if (newClientType === "business" && !newBusinessName.trim()) {
-      setCreateError("Business name is required.");
+    if (isNewClientEntity && !newBusinessName.trim()) {
+      setCreateError(`${ENTITY_NAME_LABELS[newClientType as EntityClientType]} is required.`);
       return;
     }
     setCreating(true);
@@ -92,7 +107,7 @@ function ClientSearchField({
       p_client_type: newClientType,
       p_first_name: newClientType === "individual" ? newFirstName.trim() : undefined,
       p_last_name: newClientType === "individual" ? newLastName.trim() : undefined,
-      p_business_name: newClientType === "business" ? newBusinessName.trim() : undefined,
+      p_business_name: isNewClientEntity ? newBusinessName.trim() : undefined,
       p_primary_email: newEmail || undefined,
       p_primary_phone: newPhone || undefined,
       p_force_create: forceCreate,
@@ -113,7 +128,7 @@ function ClientSearchField({
       id: result.client_id,
       first_name: newClientType === "individual" ? newFirstName.trim() : null,
       last_name: newClientType === "individual" ? newLastName.trim() : null,
-      business_name: newClientType === "business" ? newBusinessName.trim() : null,
+      business_name: isNewClientEntity ? newBusinessName.trim() : null,
       client_type: newClientType,
       primary_email: newEmail || null,
     });
@@ -141,8 +156,8 @@ function ClientSearchField({
       )}
       {!selected && showCreate && (
         <div className="mt-2 space-y-2 rounded-lg border border-border bg-surfaceMuted p-3">
-          <div className="flex gap-2">
-            {(["individual", "business"] as const).map((t) => (
+          <div className="flex flex-wrap gap-2">
+            {(["individual", "business", "trust", "estate", "organization"] as const).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -172,7 +187,7 @@ function ClientSearchField({
             </div>
           ) : (
             <input
-              placeholder="Business name"
+              placeholder={ENTITY_NAME_LABELS[newClientType as EntityClientType]}
               value={newBusinessName}
               onChange={(e) => setNewBusinessName(e.target.value)}
               className="w-full rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"

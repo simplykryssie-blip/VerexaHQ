@@ -1,3 +1,15 @@
+-- ============================================================================
+-- MIGRATION RECONCILIATION PHASE 1.9 -- RECOVERED FROM PRODUCTION (PR #268)
+--
+-- Did not previously exist in Git main. Applied directly to production
+-- during the MKB Tax Prep + Client Review + F1/F2/NW-1 security work
+-- (PR #268, branch claude/verexa-schema-mismatch-i8c19u, never merged).
+-- This filename's version already exactly matches the real recorded
+-- production version in supabase_migrations.schema_migrations -- no rename
+-- needed. Content verified byte-for-byte (modulo a single trailing
+-- newline) against schema_migrations.statements. Confidence: A -- exact
+-- original recovered.
+-- ============================================================================
 -- Phase 4H-C: fixes NW-1 from the Phase 4H-B targeted security audit.
 --
 -- NW-1 -- any authenticated admin of ANY workspace could directly INSERT (or,

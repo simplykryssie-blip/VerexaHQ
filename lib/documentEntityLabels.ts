@@ -4,7 +4,7 @@ type ClientLike = { client_type: string; first_name: string | null; last_name: s
 
 export function clientLabel(c: ClientLike | null) {
   if (!c) return "--";
-  if (c.client_type === "business" && c.business_name) return c.business_name;
+  if (c.client_type !== "individual" && c.business_name) return c.business_name;
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 

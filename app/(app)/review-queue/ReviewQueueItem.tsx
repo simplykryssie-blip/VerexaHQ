@@ -152,3 +152,75 @@ export function ReviewQueueItem({
     </li>
   );
 }
+
+
+export function AutomationDecisionQueueItem({
+  pendingStepId,
+  stepName,
+  clientName,
+  engagementNumber,
+  engagementId,
+  createdAt,
+  options,
+}: {
+  pendingStepId: string;
+  stepName: string;
+  clientName: string;
+  engagementNumber: string | null;
+  engagementId: string | null;
+  createdAt: string;
+  options: { key: string; label: string }[];
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  async function decide(optionKey: string) {
+    setBusy(true);
+    const { error } = await supabase.rpc("decide_automation_step", {
+      p_pending_step_id: pendingStepId,
+      p_decided_option: optionKey,
+    });
+    setBusy(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Review Queue decision recorded -- the workflow will continue.", "success");
+    router.refresh();
+  }
+
+  return (
+    <li className="rounded-2xl border border-border bg-surface shadow-soft p-4 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-medium text-ink">
+            {clientName} {engagementNumber ? `-- ${engagementNumber}` : ""}
+          </p>
+          <p className="text-xs text-muted">
+            {stepName} · waiting since {new Date(createdAt).toLocaleString()}
+          </p>
+          {engagementId && (
+            <Link href={`/engagements/${engagementId}`} className="mt-1 inline-block text-xs text-accent hover:underline">
+              View engagement
+            </Link>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {options.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              disabled={busy}
+              onClick={() => decide(option.key)}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate transition hover:border-accent hover:text-accent disabled:opacity-60"
+            >
+              {busy ? "Saving..." : option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </li>
+  );
+}

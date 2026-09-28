@@ -6,6 +6,7 @@ import { TagListInput } from "@/components/workflows/TagListInput";
 import { InlineStepPickerField } from "@/components/workflows/StepPicker";
 
 export type TemplateOption = { id: string; name: string };
+export type ServiceCategoryOption = { id: string; name: string; process_id?: string | null };
 export type PipelineOption = { id: string; name: string; stages: { id: string; name: string }[] };
 
 export const APPOINTMENT_STATUS_OPTIONS = ["scheduled", "confirmed", "completed", "cancelled", "no_show"];
@@ -90,6 +91,7 @@ export const TRIGGER_TYPES = [
   { value: "payment_plan.installment_paid", label: "A payment plan installment is paid", category: "billing", description: "Fires when a payment plan installment is paid.", keywords: "payment plan installment paid" },
   { value: "engagement_share.created", label: "A connected PTIN shares an engagement for review", category: "ero_ptin", description: "Fires in the ERO's workspace when a connected PTIN sends an engagement in for review. Runs in addition to the built-in reviewer notification -- use it for custom routing (e.g. Slack, round-robin).", keywords: "ero ptin share review connected office" },
   { value: "firm_package.purchased", label: "A connected firm purchases a package", category: "ero_ptin", description: "Fires in your workspace when a connected firm checks out and pays for the package you assigned them (e.g. a tax software or bank product package) -- use it to automate onboarding onto whatever they chose.", keywords: "package purchase checkout software bank connected firm ero ptin" },
+  { value: "partner_package.purchased", label: "A new partner purchases a package", category: "ero_ptin", description: "Fires in your workspace when someone with no Verexa workspace buys a package directly on your own website or checkout (e.g. a software/banking package) -- use it to start their onboarding without requiring them to have a Verexa account first.", keywords: "package purchase checkout new partner prospect no workspace website external" },
   { value: "firm_package.canceled", label: "A connected firm's package is canceled", category: "ero_ptin", description: "Fires in your workspace when a connected firm's package purchase is canceled (a recurring subscription ending, most commonly) -- use it to automate revoking access.", keywords: "package canceled subscription ended connected firm ero ptin" },
   { value: "partner_onboarding.created", label: "A partner enters onboarding", category: "ero_ptin", description: "Fires once, the moment a partner (a connected ERO/PTIN) enters the Verexa onboarding process -- e.g. right after a package purchase. Use it to kick off a welcome message or an internal task, not to react to individual onboarding steps.", keywords: "partner onboarding created new connected firm ero ptin" },
   { value: "partner_onboarding.status_changed", label: "A partner's onboarding status changes to", category: "ero_ptin", description: "Fires when a partner's onboarding record moves to a specific status (under review, approved, ready, rejected, etc).", keywords: "partner onboarding status approved rejected ready review connected firm ero ptin" },
@@ -117,6 +119,7 @@ export function triggerSummary(
   config: Record<string, unknown>,
   organizerTemplates: TemplateOption[],
   services: TemplateOption[] = [],
+  serviceCategories: ServiceCategoryOption[] = [],
   pipelines: PipelineOption[] = []
 ) {
   if (triggerType === "engagement.status_changed") {
@@ -135,6 +138,11 @@ export function triggerSummary(
   }
   if (triggerType === "client.service_interest_selected") {
     const serviceId = config.service_id as string | undefined;
+    const categoryId = config.service_category_id as string | undefined;
+    if (categoryId) {
+      const category = serviceCategories.find((c) => c.id === categoryId);
+      return `When a client selects a service in "${category?.name ?? "a category"}"`;
+    }
     if (!serviceId) return "When a client selects any service";
     const service = services.find((s) => s.id === serviceId);
     return `When a client selects "${service?.name ?? "a service"}"`;
@@ -281,6 +289,9 @@ export function triggerSummary(
   if (triggerType === "firm_package.purchased") {
     return "When a connected firm purchases a package";
   }
+  if (triggerType === "partner_package.purchased") {
+    return "When a new partner (no Verexa workspace) purchases a package";
+  }
   if (triggerType === "firm_package.canceled") {
     return "When a connected firm's package is canceled";
   }
@@ -300,11 +311,13 @@ export function TriggerFields({
   onConfigChange,
   organizerTemplates,
   services = [],
+  serviceCategories = [],
   pipelines = [],
   tagOptions = [],
   webhookUrl,
   disabled,
   onTagDraftChange,
+  tagDraft,
 }: {
   triggerType: string;
   onTriggerTypeChange: (t: string) => void;
@@ -312,6 +325,7 @@ export function TriggerFields({
   onConfigChange: (c: Record<string, unknown>) => void;
   organizerTemplates: TemplateOption[];
   services?: TemplateOption[];
+  serviceCategories?: ServiceCategoryOption[];
   pipelines?: PipelineOption[];
   tagOptions?: string[];
   webhookUrl?: string;
@@ -320,6 +334,7 @@ export function TriggerFields({
    * in a typed-but-uncommitted tag at save time instead of losing it to the
    * same-event-batch race. */
   onTagDraftChange?: (draft: string) => void;
+  tagDraft?: string;
 }) {
   const selectedPipeline = pipelines.find((p) => p.id === (config.process_id as string | undefined));
   return (
@@ -400,11 +415,70 @@ export function TriggerFields({
           <TagListInput
             disabled={disabled}
             value={(config.tags as string[] | undefined) ?? (config.tag ? [config.tag as string] : [])}
+            draft={tagDraft ?? ""}
             onChange={(v) => onConfigChange({ tags: v })}
-            onDraftChange={onTagDraftChange}
+            onDraftChange={onTagDraftChange ?? (() => {})}
             tagOptions={tagOptions}
           />
         </label>
+      )}
+
+      {triggerType === "client.service_interest_selected" && (
+        <div className="col-span-2 grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            Match by
+            <select
+              disabled={disabled}
+              value={(config.service_interest_match_type as string) ?? (config.service_category_id as string ? "category" : "service")}
+              onChange={(e) =>
+                onConfigChange(
+                  e.target.value === "category"
+                    ? {
+                        service_interest_match_type: "category",
+                        service_category_id: config.service_category_id ?? "",
+                        service_id: undefined,
+                      }
+                    : {
+                        service_interest_match_type: "service",
+                        service_id: config.service_id ?? "",
+                        service_category_id: undefined,
+                      }
+                )
+              }
+              className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            >
+              <option value="service">Service</option>
+              <option value="category">Category</option>
+            </select>
+          </label>
+          {((config.service_interest_match_type as string) ?? (config.service_category_id as string ? "category" : "service")) === "category" ? (
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Category
+              <select
+                disabled={disabled}
+                value={(config.service_category_id as string) ?? ""}
+                onChange={(e) => onConfigChange({ service_category_id: e.target.value })}
+                className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="" disabled>Choose a category</option>
+                {serviceCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+          ) : (
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Service
+              <select
+                disabled={disabled}
+                value={(config.service_id as string) ?? ""}
+                onChange={(e) => onConfigChange({ service_id: e.target.value })}
+                className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="" disabled>Choose a service</option>
+                {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </label>
+          )}
+        </div>
       )}
 
       {triggerType === "engagement.created" && (
@@ -639,30 +713,6 @@ export function TriggerFields({
               </option>
             ))}
           </select>
-        </label>
-      )}
-
-      {triggerType === "client.service_interest_selected" && (
-        <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-          Service
-          <select
-            disabled={disabled}
-            value={(config.service_id as string) ?? ""}
-            onChange={(e) => onConfigChange({ service_id: e.target.value })}
-            className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-          >
-            <option value="">Any service</option>
-            {services.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <span className="text-[11px] text-muted">
-            Leave as &quot;Any service&quot; to match every service at once -- pair with the &quot;Push a form&quot;
-            action left on &quot;Auto-detect&quot; to route each one to its own linked form without needing a
-            separate workflow per service.
-          </span>
         </label>
       )}
 

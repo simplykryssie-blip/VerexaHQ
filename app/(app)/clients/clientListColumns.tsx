@@ -3,6 +3,8 @@ import type { DataTableColumn } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/Avatar";
 import { clientStatusTone } from "@/lib/clientStatus";
+import { normalizeName } from "@/lib/name";
+import { formatPhone } from "@/lib/phone";
 
 // Split out of page.tsx: a Next.js App Router page.tsx file may only export
 // `default` and a small fixed set of route config fields (dynamic,
@@ -16,8 +18,23 @@ export function clientDisplayName(c: {
   last_name: string | null;
   business_name: string | null;
 }) {
-  if (c.client_type === "business" && c.business_name) return c.business_name;
-  return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
+  // Every non-individual client_type (business/trust/estate/organization)
+  // shares the same business_name column as its entity name -- there's no
+  // per-type name field in the schema.
+  if (c.client_type !== "individual" && c.business_name) return c.business_name;
+  return [c.first_name, c.last_name].filter(Boolean).map((name) => normalizeName(name!)).join(" ") || "Unnamed client";
+}
+
+/** Pure so the "assigned but profile row missing" fallback is directly
+ * testable. A missing user_profiles row (rather than a null
+ * relationship_manager_id) still renders as assigned, just with a generic
+ * label, instead of silently collapsing to "Unassigned". */
+export function resolveAssignedStaff(
+  managerId: string | null,
+  managerById: Map<string, { id: string; display_name: string | null }>
+): { id: string; display_name: string | null } | null {
+  if (!managerId) return null;
+  return managerById.get(managerId) ?? { id: managerId, display_name: null };
 }
 
 export type ClientRow = {
@@ -32,6 +49,12 @@ export type ClientRow = {
   tags: string[] | null;
   requestedService?: string | null;
   needsReview?: boolean;
+  /** clients.relationship_manager_id -- the canonical "assigned staff"
+   * relationship (same field search_clients' existing p_assigned_staff_id
+   * filter already matches against; this column only adds display, no new
+   * assignment mechanism). Undefined/null staff renders as "Unassigned",
+   * matching ClientAssignmentForm's own existing empty state. */
+  assignedStaff?: { id: string; display_name: string | null } | null;
 };
 
 export const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
@@ -59,7 +82,7 @@ export const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
   },
   { key: "type", header: "Type", render: (c) => <span className="capitalize text-slate">{c.client_type}</span> },
   { key: "email", header: "Email", render: (c) => <span className="text-slate">{c.primary_email ?? "--"}</span> },
-  { key: "phone", header: "Phone", render: (c) => <span className="text-slate">{c.primary_phone ?? "--"}</span> },
+  { key: "phone", header: "Phone", render: (c) => <span className="text-slate">{c.primary_phone ? formatPhone(c.primary_phone) : "--"}</span> },
   {
     key: "status",
     header: "Status",
@@ -68,6 +91,19 @@ export const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
         {c.lifecycle_status.replace(/_/g, " ")}
       </Badge>
     ),
+  },
+  {
+    key: "assignedStaff",
+    header: "Assigned Staff",
+    render: (c) =>
+      c.assignedStaff ? (
+        <div className="flex items-center gap-2">
+          <Avatar name={c.assignedStaff.display_name} size="xs" />
+          <span className="text-slate">{c.assignedStaff.display_name ?? "Staff"}</span>
+        </div>
+      ) : (
+        <span className="text-muted">Unassigned</span>
+      ),
   },
   {
     key: "tags",

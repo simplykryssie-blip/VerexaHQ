@@ -14,11 +14,13 @@ import { US_STATES } from "@/lib/usStates";
 
 const DRAFT_KEY = "new-client-button";
 
-type ServiceCategory = { id: string; name: string; services: { id: string; name: string }[] };
+export type ServiceCategory = { id: string; name: string; services: { id: string; name: string }[] };
 type ServiceOption = { id: string; name: string };
 
+type EntityClientType = "business" | "trust" | "estate" | "organization";
+
 type Draft = {
-  clientType: "individual" | "business";
+  clientType: "individual" | EntityClientType;
   firstName: string;
   lastName: string;
   businessName: string;
@@ -51,7 +53,21 @@ const CONTACT_TITLE_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
-type StaffOption = { id: string; display_name: string | null };
+// Every non-individual client_type shares one shape in the schema (a single
+// business_name column, no per-type name field -- clients_client_type_check
+// already allows all five: individual/business/trust/estate/organization,
+// and create_client's own validation already accepts all five). Only the
+// entity-name field's placeholder needs to vary by type; everything else
+// downstream (EIN field, contact person section, RPC args) already reuses
+// the exact same "business" shape for any of these.
+const ENTITY_NAME_LABELS: Record<EntityClientType, string> = {
+  business: "Business name",
+  trust: "Trust name",
+  estate: "Estate name",
+  organization: "Organization name",
+};
+
+export type StaffOption = { id: string; display_name: string | null };
 
 export function NewClientButton({
   workspaceId,
@@ -60,6 +76,8 @@ export function NewClientButton({
   isOwner = false,
   staffOptions = [],
   accountHolderName = "Me",
+  triggerLabel = "New Client",
+  triggerSize = "md",
 }: {
   workspaceId: string;
   workspaceName: string;
@@ -73,13 +91,21 @@ export function NewClientButton({
    *  viewer IS the account holder, so the default option is labeled with
    *  their real name instead of a generic "Me". */
   accountHolderName?: string;
+  /** Visible text on the trigger button -- defaults to "New Client" so
+   *  every existing call site (Contacts page header/empty state) is
+   *  unaffected. Only the Dashboard's CTA overrides this; the flow itself
+   *  (modal, validation, create_client RPC) is identical regardless. */
+  triggerLabel?: string;
+  /** Matches Button's own size prop -- defaults to "md", the size every
+   *  existing call site already renders at. */
+  triggerSize?: "sm" | "md";
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
-  const [clientType, setClientType] = useState<"individual" | "business">("individual");
+  const [clientType, setClientType] = useState<"individual" | EntityClientType>("individual");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [businessName, setBusinessName] = useState("");
@@ -107,7 +133,11 @@ export function NewClientButton({
   const [loading, setLoading] = useState(false);
   const [duplicateMatch, setDuplicateMatch] = useState<{ matchedOn: string[]; existingClientId: string } | null>(null);
 
-  const isBusiness = clientType === "business";
+  // Business/Trust/Estate/Organization all share the same entity shape --
+  // an entity-name field instead of first/last name, an EIN instead of
+  // SSN/ITIN, and an entity contact person (trustee/executor/officer/etc.)
+  // instead of the client themselves being the primary contact.
+  const isEntity = clientType !== "individual";
 
   useEffect(() => {
     // Landed here from the global draft banner (which can surface this
@@ -197,19 +227,19 @@ export function NewClientButton({
       setError("Mailing address is required.");
       return;
     }
-    if (isBusiness && (!contactFirstName || !contactLastName)) {
+    if (isEntity && (!contactFirstName || !contactLastName)) {
       setError("Contact person's first and last name are required.");
       return;
     }
-    if (isBusiness && contactTitle === "other" && !contactCustomTitle.trim()) {
+    if (isEntity && contactTitle === "other" && !contactCustomTitle.trim()) {
       setError("Enter a title for this contact.");
       return;
     }
-    if (isBusiness && linkContactAsClient && !contactEmail) {
+    if (isEntity && linkContactAsClient && !contactEmail) {
       setError("An email for the contact is required to give them their own client profile.");
       return;
     }
-    if (isBusiness && contactInviteToPortal && !contactEmail) {
+    if (isEntity && contactInviteToPortal && !contactEmail) {
       setError("An email for the contact is required to invite them to the portal.");
       return;
     }
@@ -225,7 +255,7 @@ export function NewClientButton({
       setError("ITIN must be exactly 9 digits.");
       return;
     }
-    if (clientType === "business" && ein && digitsOnly(ein).length !== 9) {
+    if (isEntity && ein && digitsOnly(ein).length !== 9) {
       setError("EIN must be exactly 9 digits.");
       return;
     }
@@ -237,12 +267,12 @@ export function NewClientButton({
       p_client_type: clientType,
       p_first_name: clientType === "individual" ? firstName : undefined,
       p_last_name: clientType === "individual" ? lastName : undefined,
-      p_business_name: clientType === "business" ? businessName : undefined,
+      p_business_name: isEntity ? businessName : undefined,
       p_date_of_birth: undefined,
       p_primary_email: email || undefined,
       p_primary_phone: phone || undefined,
       p_ssn: clientType === "individual" ? ssn || undefined : undefined,
-      p_ein: clientType === "business" ? ein || undefined : undefined,
+      p_ein: isEntity ? ein || undefined : undefined,
       p_itin: clientType === "individual" ? itin || undefined : undefined,
       p_force_create: forceCreate,
     });
@@ -298,7 +328,7 @@ export function NewClientButton({
 
     const contactTitleLabel = contactTitle === "other" ? contactCustomTitle.trim() || "Other" : CONTACT_TITLE_OPTIONS.find((o) => o.value === contactTitle)?.label ?? contactTitle;
 
-    if (isBusiness) {
+    if (isEntity) {
       const { error: contactError } = await supabase.from("client_contacts").insert({
         client_id: result.client_id,
         workspace_id: workspaceId,
@@ -449,8 +479,8 @@ export function NewClientButton({
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>
-        <Plus size={16} /> New Client
+      <Button size={triggerSize} onClick={() => setOpen(true)}>
+        <Plus size={16} /> {triggerLabel}
       </Button>
 
       {open && (
@@ -459,8 +489,8 @@ export function NewClientButton({
             <h2 className="font-display text-base font-semibold text-ink">New client</h2>
 
             <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-              <div className="flex gap-2">
-                {(["individual", "business"] as const).map((t) => (
+              <div className="flex flex-wrap gap-2">
+                {(["individual", "business", "trust", "estate", "organization"] as const).map((t) => (
                   <button
                     key={t}
                     type="button"
@@ -514,7 +544,7 @@ export function NewClientButton({
               ) : (
                 <input
                   required
-                  placeholder="Business name"
+                  placeholder={isEntity ? ENTITY_NAME_LABELS[clientType as EntityClientType] : "Business name"}
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
                   className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
@@ -614,7 +644,7 @@ export function NewClientButton({
                 </div>
               </div>
 
-              {isBusiness && (
+              {isEntity && (
                 <div className="border-t border-border pt-4">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted">Contact person</p>
                   <div className="mt-2 grid grid-cols-2 gap-3">
@@ -665,7 +695,7 @@ export function NewClientButton({
                   {linkContactAsClient && (
                     <div className="mt-2 space-y-2">
                       <p className="text-xs text-muted">
-                        They&apos;ll get a separate client record with their own client ID, kept apart from {businessName || "this business"}&apos;s.
+                        They&apos;ll get a separate client record with their own client ID, kept apart from {businessName || "this entity"}&apos;s.
                       </p>
                       <div className="grid grid-cols-2 gap-3">
                         <input

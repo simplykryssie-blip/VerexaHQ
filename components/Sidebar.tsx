@@ -282,9 +282,18 @@ export function Sidebar({
               Tax Office module
             </span>
           </div>
-          {!railExpanded && (
-            <Image src="/brand/vmark.png" alt={workspaceName} width={22} height={18} priority className="hidden lg:block" />
-          )}
+          {!railExpanded &&
+            (trimmedLogoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={trimmedLogoUrl}
+                alt={workspaceName}
+                className="hidden lg:block"
+                style={{ display: "block", maxHeight: "22px", maxWidth: "32px", objectFit: "contain" }}
+              />
+            ) : (
+              <Image src="/brand/vmark.png" alt={workspaceName} width={22} height={18} priority className="hidden lg:block" />
+            ))}
           <button type="button" onClick={() => setOpen(false)} aria-label="Close navigation menu" className={`${styles.workspaceName} lg:hidden`}>
             <X size={18} />
           </button>

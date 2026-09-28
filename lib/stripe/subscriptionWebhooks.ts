@@ -6,31 +6,52 @@ import {
   setCustomerDefaultPaymentMethod,
   getSoleSubscriptionItem,
 } from "@/lib/stripe/client";
-import type { Database } from "@/lib/database.types";
+import type { Database, Json } from "@/lib/database.types";
 
 type WorkspaceSubscriptionUpdate = Database["public"]["Tables"]["workspace_subscriptions"]["Update"];
+
+type StripeSubscriptionItem = {
+  id: string;
+  price: { id: string };
+  // Billing-period dates live here, not on the subscription itself -- see
+  // subscriptionPeriod() below.
+  current_period_start: number;
+  current_period_end: number;
+};
 
 type StripeSubscription = {
   id: string;
   customer: string | { id: string };
   status: string;
-  current_period_start: number;
-  current_period_end: number;
+  default_payment_method?: string | { id: string } | null;
   trial_end: number | null;
   cancel_at_period_end?: boolean;
   metadata?: { workspace_id?: string; plan_slug?: string };
-  items: { data: Array<{ id: string; price: { id: string } }> };
+  items: { data: StripeSubscriptionItem[] };
 };
 
 type StripeInvoice = {
   id: string;
   subscription: string | { id: string } | null;
+  // Newer Stripe API versions moved the subscription reference here instead
+  // of the flat `subscription` field above -- see subscriptionId() below.
+  parent?: {
+    subscription_details?: { subscription?: string | { id: string } | null } | null;
+  } | null;
   amount_due: number;
   amount_paid: number;
   status: string;
   period_start: number | null;
   period_end: number | null;
   hosted_invoice_url: string | null;
+  // Present once Stripe Tax is actually calculating something (automatic_tax
+  // is enabled on the Checkout Session that created the subscription -- see
+  // lib/stripe/client.ts -- and at least one tax registration exists for the
+  // customer's jurisdiction). Both null/absent on every invoice today, since
+  // the account currently has zero registrations -- see the Stripe Tax audit.
+  total?: number;
+  total_excluding_tax?: number | null;
+  total_taxes?: unknown[];
 };
 
 type PlanSnapshot = {
@@ -70,9 +91,75 @@ function customerId(customer: StripeSubscription["customer"]): string {
   return typeof customer === "string" ? customer : customer.id;
 }
 
-function subscriptionId(subscription: StripeInvoice["subscription"]): string | null {
-  if (!subscription) return null;
-  return typeof subscription === "string" ? subscription : subscription.id;
+function refId(ref: string | { id: string } | null | undefined): string | null {
+  if (!ref) return null;
+  return typeof ref === "string" ? ref : ref.id;
+}
+
+// Billing-period dates moved off the top-level Subscription object onto its
+// sole item in current Stripe API versions -- same root cause as
+// subscriptionId() above, just for a different pair of fields. Never guesses
+// items.data[0]: an unresolvable item (none, or more than one) fails closed
+// to {start: null, end: null} rather than reading the wrong item's dates.
+function subscriptionPeriod(items: StripeSubscriptionItem[]): { start: number | null; end: number | null } {
+  const itemResult = getSoleSubscriptionItem(items);
+  if (!itemResult.ok) return { start: null, end: null };
+  return { start: itemResult.data.current_period_start, end: itemResult.data.current_period_end };
+}
+
+// Captures the subscription's default payment method for the billing UI --
+// mirrors handleSetupCheckoutCompleted's own capture below, just triggered
+// from the subscription lifecycle instead of the separate "Add a card" flow.
+// Returns {} (a no-op merge) whenever there's nothing to safely report,
+// rather than writing partial/null card fields over whatever is already
+// stored -- no payment method, or a failed Stripe read, both fail closed.
+async function subscriptionCardFields(
+  defaultPaymentMethod: StripeSubscription["default_payment_method"]
+): Promise<Partial<WorkspaceSubscriptionUpdate>> {
+  const paymentMethodId = refId(defaultPaymentMethod);
+  if (!paymentMethodId) return {};
+
+  const cardResult = await retrieveCardDetails(paymentMethodId);
+  if (!cardResult.ok) return {};
+
+  return {
+    default_payment_method_id: paymentMethodId,
+    card_brand: cardResult.data.brand,
+    card_last4: cardResult.data.last4,
+    card_exp_month: cardResult.data.expMonth,
+    card_exp_year: cardResult.data.expYear,
+  };
+}
+
+// invoice.subscription (the flat field) is null on every LIVE invoice.payment_succeeded
+// event this app has ever received (confirmed via webhook_events.payload) -- current
+// Stripe API versions carry it at invoice.parent.subscription_details.subscription
+// instead. Check the flat field first (older API versions / any invoice that still
+// carries it) and fall back to the nested location; an invoice with neither is
+// genuinely not tied to a subscription.
+function subscriptionId(invoice: StripeInvoice): string | null {
+  return refId(invoice.subscription) ?? refId(invoice.parent?.subscription_details?.subscription);
+}
+
+/**
+ * Exported for testing. Normalizes the tax-specific slice of an invoice
+ * rather than storing the whole Stripe object: tax_amount is derived (total
+ * minus total_excluding_tax) instead of trusting Stripe to sum total_taxes
+ * consistently, and tax_details is only the tax breakdown array, not the
+ * invoice itself. All three are null when total_excluding_tax is absent --
+ * either automatic_tax isn't enabled on this subscription, or (today, for
+ * every real invoice) it is but no tax registration exists yet to compute
+ * anything against.
+ */
+export function taxFieldsFromInvoice(invoice: StripeInvoice): { tax_amount: number | null; total_excluding_tax: number | null; tax_details: Json | null } {
+  if (invoice.total_excluding_tax == null || invoice.total == null) {
+    return { tax_amount: null, total_excluding_tax: null, tax_details: null };
+  }
+  return {
+    tax_amount: invoice.total - invoice.total_excluding_tax,
+    total_excluding_tax: invoice.total_excluding_tax,
+    tax_details: invoice.total_taxes && invoice.total_taxes.length > 0 ? (invoice.total_taxes as unknown as Json) : null,
+  };
 }
 
 /**
@@ -93,12 +180,14 @@ async function pauseWorkspaceForBilling(supabase: ReturnType<typeof createServic
 /**
  * Only reactivates a workspace suspended for one of the given billing
  * reasons -- never overrides a manual suspension unrelated to payment.
- * Exported: also called from app/api/cron/check-billing-cycles/route.ts to
- * resume a workspace suspended by that cron's own pre-emptive charge path,
- * which (unlike Stripe's subscription-status-driven suspensions) has no
- * webhook of its own to react to a later successful retry.
+ * Also requires the workspace to currently be "suspended": a stale or
+ * duplicate webhook reporting a paid subscription must never reactivate a
+ * workspace that has already progressed to archived/permanently_archived
+ * (those states carry their own recovery path, not a plain status flip),
+ * even though suspension_reason is left unset by the archive-lifecycle
+ * cron and would otherwise still match.
  */
-export async function resumeWorkspaceFromBilling(
+async function resumeWorkspaceFromBilling(
   supabase: ReturnType<typeof createServiceClient>,
   workspaceId: string,
   allowedReasons: string[] = ["billing_past_due"]
@@ -107,7 +196,30 @@ export async function resumeWorkspaceFromBilling(
     .from("workspaces")
     .update({ status: "active", suspension_reason: null })
     .eq("id", workspaceId)
+    .eq("status", "suspended")
     .in("suspension_reason", allowedReasons);
+}
+
+// The complete set of billing suspension_reason values (matches
+// workspaces_suspension_reason_check) that a genuinely paid subscription
+// proves are resolved -- billing_incomplete is create_paid_workspace's
+// initial lock on every brand-new signup; billing_past_due/
+// subscription_canceled are the two pre-existing recovery cases. Shared by
+// handleSubscriptionCreated and handleSubscriptionUpdated so a signup's
+// lock clears identically regardless of which event happens to carry the
+// transition to "active" first (see isSubscriptionStatusPaid below).
+const REASONS_CLEARED_BY_PAID_SUBSCRIPTION = ["billing_past_due", "subscription_canceled", "billing_incomplete"];
+
+/**
+ * Exported for testing. A subscription's own status is the only thing that
+ * actually proves billing succeeded -- Stripe can create or update a
+ * subscription to a non-active status (still confirming, past_due, unpaid,
+ * canceled), and neither handleSubscriptionCreated nor handleSubscriptionUpdated
+ * may treat the workspace as paid unless this is true for that event's
+ * subscription object.
+ */
+export function isSubscriptionStatusPaid(status: string): boolean {
+  return status === "active" || status === "trialing";
 }
 
 /**
@@ -121,11 +233,16 @@ export async function resumeWorkspaceFromBilling(
  * top-ups, any unused top-up balance must be forfeited (not refunded) here.
  */
 async function lockWorkspaceForCancellation(supabase: ReturnType<typeof createServiceClient>, workspaceId: string) {
+  // Only ever moves active/suspended -> suspended. A late
+  // customer.subscription.deleted event must never regress an already
+  // archived or permanently archived workspace back to suspended --
+  // excluding just "archived" (the original guard) missed
+  // permanently_archived entirely.
   await supabase
     .from("workspaces")
     .update({ status: "suspended", suspension_reason: "subscription_canceled" })
     .eq("id", workspaceId)
-    .neq("status", "archived");
+    .in("status", ["active", "suspended"]);
 }
 
 export async function handleSubscriptionCreated(
@@ -153,6 +270,9 @@ export async function handleSubscriptionCreated(
   }
   if (!plan) return { skipped: "no plan matches this subscription's price" };
 
+  const period = subscriptionPeriod(subscription.items.data);
+  const cardFields = await subscriptionCardFields(subscription.default_payment_method);
+
   await supabase.from("workspace_subscriptions").upsert(
     {
       workspace_id: workspaceId,
@@ -160,20 +280,23 @@ export async function handleSubscriptionCreated(
       stripe_customer_id: customerId(subscription.customer),
       stripe_subscription_id: subscription.id,
       stripe_status: subscription.status,
-      current_period_start: toIso(subscription.current_period_start),
-      current_period_end: toIso(subscription.current_period_end),
+      current_period_start: toIso(period.start),
+      current_period_end: toIso(period.end),
       trial_end: toIso(subscription.trial_end),
       cancel_at_period_end: subscription.cancel_at_period_end ?? false,
       locked_plan_snapshot: snapshotFromPlan(plan),
+      ...cardFields,
     },
     { onConflict: "workspace_id" }
   );
 
-  // A brand-new subscription always clears whatever billing lock the
-  // workspace was under -- a past-due pause, a prior cancellation, or (Phase
-  // 4A) create_paid_workspace's own initial "not yet paid" suspension, which
-  // this event is exactly the confirmation for.
-  await resumeWorkspaceFromBilling(supabase, workspaceId, ["billing_past_due", "subscription_canceled", "billing_incomplete"]);
+  // subscription.created can fire with a non-active status (e.g. still
+  // confirming) -- see the comment below on the free-allowance grant for
+  // why that's treated as real here too. workspaceId is this event's own
+  // metadata, so this can never touch a different workspace's suspension.
+  if (isSubscriptionStatusPaid(subscription.status)) {
+    await resumeWorkspaceFromBilling(supabase, workspaceId, REASONS_CLEARED_BY_PAID_SUBSCRIPTION);
+  }
 
   // Deliberately does NOT grant the free usage allowance here.
   // subscription.created fires the moment Stripe creates the subscription
@@ -202,26 +325,32 @@ export async function handleSubscriptionUpdated(
     return handleSubscriptionCreated(supabase, subscription);
   }
 
-  const newPeriodEnd = toIso(subscription.current_period_end);
+  const period = subscriptionPeriod(subscription.items.data);
+  const newPeriodEnd = toIso(period.end);
   const isNewCycle = existing.current_period_end !== newPeriodEnd;
+  const cardFields = await subscriptionCardFields(subscription.default_payment_method);
 
   const updates: WorkspaceSubscriptionUpdate = {
     stripe_status: subscription.status,
-    current_period_start: toIso(subscription.current_period_start),
+    current_period_start: toIso(period.start),
     current_period_end: newPeriodEnd,
     trial_end: toIso(subscription.trial_end),
     cancel_at_period_end: subscription.cancel_at_period_end ?? false,
+    ...cardFields,
   };
 
   // Apply a pending grandfathered price migration exactly at the renewal
   // where its effective date has been reached -- never mid-cycle. Early
   // renewals before that date are already billing at the old price with no
   // action needed here, since we haven't touched the Stripe subscription's
-  // Price object yet.
+  // Price object yet. period.start being unresolvable (see
+  // subscriptionPeriod above) fails this closed for the cycle rather than
+  // risking a migration timed off a wrong/missing date.
   if (
     isNewCycle &&
     existing.price_change_effective_date &&
-    new Date(existing.price_change_effective_date) <= new Date(subscription.current_period_start * 1000)
+    period.start !== null &&
+    new Date(existing.price_change_effective_date) <= new Date(period.start * 1000)
   ) {
     const { data: plan } = await supabase.from("platform_subscription_plans").select("*").eq("id", existing.plan_id).single();
     // Doesn't assume items.data[0] is the item to migrate -- if this
@@ -245,8 +374,13 @@ export async function handleSubscriptionUpdated(
 
   if (subscription.status === "unpaid") {
     await pauseWorkspaceForBilling(supabase, existing.workspace_id);
-  } else if (subscription.status === "active" || subscription.status === "trialing") {
-    await resumeWorkspaceFromBilling(supabase, existing.workspace_id);
+  } else if (isSubscriptionStatusPaid(subscription.status)) {
+    // Same billing_incomplete case as handleSubscriptionCreated above: a
+    // signup's subscription can still be created non-active and only reach
+    // "active" via a later update (e.g. a delayed payment-method
+    // confirmation) -- this is the only other point that transition can be
+    // observed, so it needs the same allowed-reasons list.
+    await resumeWorkspaceFromBilling(supabase, existing.workspace_id, REASONS_CLEARED_BY_PAID_SUBSCRIPTION);
   }
 
   return {};
@@ -348,7 +482,7 @@ export async function handleInvoicePaymentSucceeded(
   supabase: ReturnType<typeof createServiceClient>,
   invoice: StripeInvoice
 ): Promise<{ skipped?: string }> {
-  const stripeSubId = subscriptionId(invoice.subscription);
+  const stripeSubId = subscriptionId(invoice);
   if (!stripeSubId) return { skipped: "not a subscription invoice" };
 
   const { data: sub } = await supabase
@@ -369,6 +503,7 @@ export async function handleInvoicePaymentSucceeded(
       period_end: toIso(invoice.period_end),
       paid_at: new Date().toISOString(),
       hosted_invoice_url: invoice.hosted_invoice_url,
+      ...taxFieldsFromInvoice(invoice),
     },
     { onConflict: "stripe_invoice_id" }
   );
@@ -396,7 +531,7 @@ export async function handleInvoicePaymentFailed(
   supabase: ReturnType<typeof createServiceClient>,
   invoice: StripeInvoice
 ): Promise<{ skipped?: string }> {
-  const stripeSubId = subscriptionId(invoice.subscription);
+  const stripeSubId = subscriptionId(invoice);
   if (!stripeSubId) return { skipped: "not a subscription invoice" };
 
   const { data: sub } = await supabase
@@ -416,6 +551,7 @@ export async function handleInvoicePaymentFailed(
       period_start: toIso(invoice.period_start),
       period_end: toIso(invoice.period_end),
       hosted_invoice_url: invoice.hosted_invoice_url,
+      ...taxFieldsFromInvoice(invoice),
     },
     { onConflict: "stripe_invoice_id" }
   );

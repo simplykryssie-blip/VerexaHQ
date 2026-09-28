@@ -13,6 +13,14 @@ export const maxDuration = 60;
 const BATCH_SIZE = 50;
 const RETRY_BACKOFF_MINUTES = 5;
 
+// A suspended/archived/permanently_archived workspace must not continue
+// normal business communications -- but the customer must still be able to
+// find out about and resolve billing, so these specific keys are exempt
+// from the suspension check below. Every other template_key (client
+// emails/texts, staff alerts, everything execute_automation_step queues)
+// is blocked for a non-operational workspace.
+const BILLING_RECOVERY_TEMPLATE_KEYS = new Set(["billing-card-reminder", "billing-payment-failed", "billing-workspace-suspended"]);
+
 function isAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
@@ -113,6 +121,7 @@ type DispatchContext = {
   portalInviteByClientId: Map<string, PortalInvite | null>;
   emailTemplatesBySlug: Map<string, EmailTemplateCandidate[]>;
   smsTemplatesBySlug: Map<string, SmsTemplateCandidate[]>;
+  workspaceStatusById: Map<string, string>;
 };
 
 // Every job independently re-resolves the same handful of lookups
@@ -185,7 +194,13 @@ async function resolveDispatchContext(supabase: ReturnType<typeof createServiceC
     smsTemplatesBySlug.set(row.slug, list);
   }
 
-  return { engagementClientId, portalInviteByClientId, emailTemplatesBySlug, smsTemplatesBySlug };
+  const { data: workspaceRows } =
+    workspaceIds.length > 0
+      ? await supabase.from("workspaces").select("id, status").in("id", workspaceIds)
+      : { data: [] as { id: string; status: string }[] };
+  const workspaceStatusById = new Map((workspaceRows ?? []).map((w) => [w.id, w.status]));
+
+  return { engagementClientId, portalInviteByClientId, emailTemplatesBySlug, smsTemplatesBySlug, workspaceStatusById };
 }
 
 function resolveClientIdFromContext(context: DispatchContext, entityType: string | null, entityId: string | null) {
@@ -267,6 +282,17 @@ async function recordClientMessage(
 async function dispatchOne(supabase: ReturnType<typeof createServiceClient>, job: NotificationJob, context: DispatchContext): Promise<"sent" | "retry" | "dead"> {
   const basePayload = (job.payload ?? {}) as Record<string, unknown>;
   const workspaceId = job.workspace_id;
+
+  // A suspended/archived/permanently_archived workspace's normal business
+  // communications stop -- billing recovery notices are exempt (see
+  // BILLING_RECOVERY_TEMPLATE_KEYS) so the customer can still find out
+  // about and resolve billing. Dead-lettered immediately rather than
+  // retried: nothing about a non-operational workspace resolves itself by
+  // waiting, and this isn't a delivery failure to retry.
+  if (workspaceId && !BILLING_RECOVERY_TEMPLATE_KEYS.has(job.template_key) && context.workspaceStatusById.get(workspaceId) !== "active") {
+    await supabase.from("notification_queue").update({ status: "failed", error: "workspace is not active -- normal notifications are suspended" }).eq("id", job.id);
+    return "dead";
+  }
 
   try {
     const clientId = resolveClientIdFromContext(context, job.entity_type, job.entity_id);

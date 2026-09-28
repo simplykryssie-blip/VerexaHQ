@@ -85,7 +85,7 @@ export function LinkExistingClientForm({ clientId, workspaceId }: { clientId: st
     setResults(
       (data ?? []).map((c) => ({
         id: c.id,
-        label: c.client_type === "business" && c.business_name ? c.business_name : [c.first_name, c.last_name].filter(Boolean).join(" "),
+        label: c.client_type !== "individual" && c.business_name ? c.business_name : [c.first_name, c.last_name].filter(Boolean).join(" "),
       }))
     );
   }
@@ -245,7 +245,7 @@ export function AddRelationshipForm({ clientId, workspaceId }: { clientId: strin
     setResults(
       (data ?? []).map((c) => ({
         id: c.id,
-        label: c.client_type === "business" && c.business_name ? c.business_name : [c.first_name, c.last_name].filter(Boolean).join(" "),
+        label: c.client_type !== "individual" && c.business_name ? c.business_name : [c.first_name, c.last_name].filter(Boolean).join(" "),
       }))
     );
   }
@@ -399,7 +399,7 @@ export function AddRelationshipForm({ clientId, workspaceId }: { clientId: strin
 function EditRelationshipForm({ relationship, clientType }: { relationship: RelationshipRow; clientType: string }) {
   const router = useRouter();
   const supabase = createClient();
-  const types = clientType === "business" ? BUSINESS_RELATIONSHIP_TYPES : INDIVIDUAL_RELATIONSHIP_TYPES;
+  const types = clientType !== "individual" ? BUSINESS_RELATIONSHIP_TYPES : INDIVIDUAL_RELATIONSHIP_TYPES;
   const knownType = types.includes(relationship.relationship_type);
   return (
     <InlineAddForm

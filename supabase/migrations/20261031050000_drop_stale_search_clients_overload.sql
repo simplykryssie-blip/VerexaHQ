@@ -1,0 +1,15 @@
+-- 20261031000000 added p_client_type/p_has_email/p_has_phone via `create or
+-- replace function`, but Postgres only replaces a function in place when the
+-- argument list is identical -- adding parameters (even with defaults)
+-- registers a second overload instead, leaving the old 11-arg version live
+-- and callable alongside the new 14-arg one (the same trap this codebase
+-- already hit and fixed for create_engagement, create_client, and
+-- set_firm_tax_profile). Both call sites (app/(app)/clients/page.tsx,
+-- ContactsBulkTable.tsx) spread a filters object whose p_client_type/
+-- p_has_email/p_has_phone keys are dropped by JSON.stringify whenever their
+-- value is undefined (i.e. whenever none of those three filters is active),
+-- so an ordinary unfiltered Contacts search can resolve against either
+-- overload -- exactly the ambiguity PostgREST's function-overload
+-- resolution is prone to. Drop the stale overload so there's exactly one
+-- search_clients again.
+drop function if exists public.search_clients(uuid, text, text[], text, uuid, uuid, text, boolean, boolean, integer, integer);

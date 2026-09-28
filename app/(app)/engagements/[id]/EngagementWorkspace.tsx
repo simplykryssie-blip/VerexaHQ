@@ -62,7 +62,7 @@ const TABS = [
 type Tab = (typeof TABS)[number];
 
 function clientLabel(c: { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }) {
-  if (c.client_type === "business" && c.business_name) return c.business_name;
+  if (c.client_type !== "individual" && c.business_name) return c.business_name;
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 
@@ -102,6 +102,7 @@ export function EngagementWorkspace({
   irsNotices,
   taxYears,
   additionalSigners,
+  hasSignedLetter,
 }: {
   workspace: Workspace;
   permissions: ActionPermissions;
@@ -138,6 +139,7 @@ export function EngagementWorkspace({
   irsNotices: IrsNoticeRow[];
   taxYears: number[];
   additionalSigners: AdditionalSignerOption[];
+  hasSignedLetter: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("Details");
   const showStaffRoles = !isIndependentTier(workspace);
@@ -214,6 +216,7 @@ export function EngagementWorkspace({
                 taxDetail={taxDetail}
                 taxYears={taxYears}
                 workspaceId={workspace.id}
+                hasSignedLetter={hasSignedLetter}
               />
             )}
             {tab === "IRS Notices" && (

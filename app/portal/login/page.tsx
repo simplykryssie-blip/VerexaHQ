@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
-import { friendlyAuthError } from "@/lib/authErrors";
 import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
 import { PasswordInput } from "@/components/PasswordInput";
 
@@ -26,7 +24,6 @@ const RAIL_FOOT = (
 
 export default function PortalLoginPage() {
   const router = useRouter();
-  const supabase = createClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
@@ -38,18 +35,15 @@ export default function PortalLoginPage() {
     setError(null);
     setLoading(true);
 
-    const { data: lockout } = await supabase.rpc("check_login_lockout", { p_email: email });
-    if ((lockout as { locked?: boolean } | null)?.locked) {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const result = (await response.json().catch(() => ({}))) as { error?: string };
+    if (!response.ok) {
       setLoading(false);
-      setError("This account is temporarily locked due to too many failed sign-in attempts. Try again later.");
-      return;
-    }
-
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    await supabase.rpc("record_login_result", { p_email: email, p_success: !error });
-    if (error) {
-      setLoading(false);
-      setError(friendlyAuthError(error.message));
+      setError(result.error ?? "Something went wrong. Please try again.");
       return;
     }
 

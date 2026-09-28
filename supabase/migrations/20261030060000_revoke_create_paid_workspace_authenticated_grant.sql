@@ -1,0 +1,22 @@
+-- Suspension/Archive lifecycle hardening, item 8 (create_paid_workspace
+-- regression). 20260916141428_payment_first_signup.sql deliberately
+-- revoked authenticated execute on create_paid_workspace to close a
+-- payment-first-signup bypass (a user could otherwise create a workspace
+-- directly, skipping Stripe Checkout entirely). 20260925010000 later did
+-- `create or replace function ... create_paid_workspace` and re-granted
+-- execute to authenticated without re-checking that earlier decision --
+-- an unintentional regression re-opening the same bypass.
+--
+-- Live database reconciliation (checked via has_function_privilege before
+-- writing this migration): the live project's authenticated/anon grants on
+-- this function are already revoked -- current production is NOT
+-- exploitable. This migration exists to reconcile that live state into
+-- git, so a fresh bootstrap from these migration files in order doesn't
+-- silently regress back to the vulnerable grant from 20260925010000. No
+-- live behavior changes as a result of this migration; it is a no-op on
+-- the current database.
+--
+-- The intended payment-first flow (start_paid_signup) is unaffected -- it
+-- is a separate function with its own grants, untouched here.
+revoke all on function public.create_paid_workspace(text, text, text, text) from public, anon, authenticated;
+grant execute on function public.create_paid_workspace(text, text, text, text) to service_role;

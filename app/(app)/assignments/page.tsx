@@ -26,7 +26,7 @@ const ENGAGEMENT_ROLES = [
 type EngagementRoleKey = (typeof ENGAGEMENT_ROLES)[number]["key"];
 
 function clientLabelFor(c: { first_name: string | null; last_name: string | null; business_name: string | null; client_type: string }) {
-  if (c.client_type === "business" && c.business_name) return c.business_name;
+  if (c.client_type !== "individual" && c.business_name) return c.business_name;
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 

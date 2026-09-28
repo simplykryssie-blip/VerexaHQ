@@ -1,0 +1,27 @@
+-- Release blocker P0 #2: record_login_result(p_email, p_success, p_workspace_id)
+-- was SECURITY DEFINER and executable by anon/authenticated, with p_success
+-- taken as-is from the caller and no check that the caller had actually
+-- attempted to authenticate as p_email. An unauthenticated attacker who knew
+-- a user's email could call it repeatedly with p_success=false to trip
+-- record_login_attempt's existing 5-failure lockout (workspace_security_policies
+-- .max_failed_login_attempts) and lock that user out indefinitely, without
+-- ever attempting the real password.
+--
+-- record_login_attempt (the function that actually mutates
+-- user_profiles.failed_login_count/locked_until) was already correctly
+-- restricted to service_role only -- record_login_result was the sole public
+-- path to it. The legitimate need for a client-role path is real: a failed
+-- login is by definition unauthenticated, and app/login/page.tsx and
+-- app/portal/login/page.tsx both need to report one. The fix is not to
+-- remove that need but to stop trusting a client-supplied success/failure
+-- boolean for it: app/api/auth/login/route.ts (new) now makes the actual
+-- supabase.auth.signInWithPassword call server-side and reports the result
+-- it just observed -- never a value the caller chose -- via the service
+-- role, exactly like record_login_attempt's own existing precondition.
+--
+-- check_login_lockout(p_email) is untouched: it's read-only (no mutation),
+-- and reveals nothing beyond the "this account is temporarily locked"
+-- message already shown in the ordinary login UX -- not part of this
+-- vulnerability.
+revoke execute on function public.record_login_result(text, boolean, uuid) from anon, authenticated, public;
+grant execute on function public.record_login_result(text, boolean, uuid) to service_role;

@@ -36,7 +36,7 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
         (data ?? []).map((c) => ({
           id: c.id,
           label: c.business_name || [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client",
-          sub: c.client_type === "business" ? "Business" : "Individual",
+          sub: c.client_type === "individual" ? "Individual" : c.client_type[0].toUpperCase() + c.client_type.slice(1),
         }))
       );
       setLoading(false);

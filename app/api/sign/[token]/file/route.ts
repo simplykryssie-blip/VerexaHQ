@@ -15,11 +15,26 @@ export async function GET(request: Request, { params }: { params: { token: strin
 
   const supabase = createServiceClient();
 
-  const { data: signer } = await supabase
+  // signature_requests has two FKs into attachments (attachment_id and
+  // final_pdf_attachment_id, added later by signature_request_final_pdf) --
+  // PostgREST can't pick one for an unqualified `attachments(...)` embed and
+  // errors out, which the old code silently swallowed (only `data` was
+  // destructured, never `error`), so every real signer hit this route's
+  // fallback 404 "invalid or expired" regardless of whether their link was
+  // actually fine. Qualifying the FK by name fixes the embed; checking
+  // `error` explicitly stops a future schema issue from being masked the
+  // same way.
+  const { data: signer, error: signerError } = await supabase
     .from("signature_request_signers")
-    .select("id, signature_request:signature_requests(attachment:attachments(storage_path, file_name, mime_type))")
+    .select(
+      "id, signature_request:signature_requests(attachment:attachments!signature_requests_attachment_id_fkey(storage_path, file_name, mime_type))"
+    )
     .eq("access_token", params.token)
     .maybeSingle();
+
+  if (signerError) {
+    return NextResponse.json({ error: "Could not load document." }, { status: 500 });
+  }
 
   const attachment = (signer as any)?.signature_request?.attachment;
   if (!attachment) {

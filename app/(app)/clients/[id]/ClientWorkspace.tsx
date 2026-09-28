@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { QuickActions } from "./QuickActions";
 import { ConvertLeadButton } from "./ConvertLeadButton";
 import { MarkLeadLostButton } from "./MarkLeadLostButton";
+import { ArchiveClientButton } from "./ArchiveClientButton";
 import Link from "next/link";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
@@ -16,7 +18,7 @@ import { FileUp, MessageSquare, Receipt as ReceiptIcon, NotebookPen } from "luci
 import { Badge } from "@/components/ui/Badge";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { clientStatusTone } from "@/lib/clientStatus";
-import { ClientTabsBody, displayName, type ClientTab } from "./ClientTabsBody";
+import { ClientTabsBody, displayName, TABS, type ClientTab } from "./ClientTabsBody";
 import {
   type ContactRow,
   type AddressRow,
@@ -28,6 +30,7 @@ import {
   type NoteRow,
   type ActivityRow,
   type TaskRow,
+  type ClientBankProductTransactionRow,
   type QuoteRow,
   type InvoiceRow,
   type PaymentRow,
@@ -101,6 +104,8 @@ export type ClientWorkspaceProps = {
   messages: MessageRow[];
   timeline: ActivityRow[];
   tasks: TaskRow[];
+  completedTasks: TaskRow[];
+  bankProductTransactions: ClientBankProductTransactionRow[];
   missingDocumentCount: number;
   documentRequestTemplates: { id: string; name: string }[];
   organizerTemplates: { id: string; name: string }[];
@@ -169,7 +174,14 @@ export function ClientWorkspace(props: ClientWorkspaceProps) {
   automationStatus,
   additionalSigners,
   } = props;
-  const [tab, setTab] = useState<ClientTab>("Details");
+  // Lets Quick View's stat tiles (ClientQuickViewDrawer) link straight to a
+  // specific tab on the full record instead of always landing on Details --
+  // the initial value only, so switching tabs afterward still just updates
+  // local state the way it always has.
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const initialTab = (TABS as readonly string[]).includes(requestedTab ?? "") ? (requestedTab as ClientTab) : "Details";
+  const [tab, setTab] = useState<ClientTab>(initialTab);
   const showStaffRoles = !isIndependentTier(workspace);
 
   const openEngagement = engagements.find((e) => e.status !== "Completed" && e.status !== "Archived");
@@ -242,6 +254,7 @@ export function ClientWorkspace(props: ClientWorkspaceProps) {
       <div className="flex items-center gap-2 border-b border-border bg-surface px-8 py-3">
         <ConvertLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
         <MarkLeadLostButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
+        <ArchiveClientButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
         <QuickActions
           clientId={client.id}
           workspaceId={workspace.id}

@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
 import { Pencil, Trash2 } from "lucide-react";
-import type { ContactRow, AddressRow } from "./ClientWorkspaceTabs";
+import type { ContactRow, AddressRow, TaskRow, StaffOption } from "./ClientWorkspaceTabs";
+import { useToast } from "@/components/Toast";
 import { US_STATES } from "@/lib/usStates";
 
 const STATE_OPTIONS = US_STATES.map((s) => ({ value: s.code, label: s.name }));
@@ -30,8 +31,8 @@ export function AddContactForm({ clientId, workspaceId }: Ids) {
     <InlineAddForm
       label="Add a contact"
       fields={[
-        { name: "first_name", label: "First name", required: true },
-        { name: "last_name", label: "Last name", required: true },
+        { name: "first_name", label: "First name", type: "name", required: true },
+        { name: "last_name", label: "Last name", type: "name", required: true },
         { name: "title", label: "Title", type: "select", options: CONTACT_TITLE_OPTIONS },
         { name: "custom_title", label: "Custom title", showIf: (v) => v.title === "other" },
         { name: "email", label: "Email" },
@@ -120,7 +121,7 @@ export function DeleteContactButton({ contactId }: { contactId: string }) {
   );
 }
 
-export function AddAddressForm({ clientId, workspaceId }: Ids) {
+export function AddAddressForm({ clientId, workspaceId, open, onOpenChange }: Ids & { open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const router = useRouter();
   const supabase = createClient();
   return (
@@ -238,7 +239,7 @@ export function AddPortalUserForm({ clientId, workspaceId }: Ids) {
     <InlineAddForm
       label="Invite Additional"
       fields={[
-        { name: "invited_name", label: "Name" },
+        { name: "invited_name", label: "Name", type: "name" },
         { name: "invited_email", label: "Email", type: "email", required: true },
       ]}
       onSubmit={async (v) => {
@@ -295,7 +296,7 @@ export function AddNoteForm({
       label="New Note"
       fields={[
         { name: "subject", label: "Subject" },
-        { name: "body", label: "Note", type: "textarea", required: true },
+        { name: "body", label: "Note", type: "richtext", required: true },
       ]}
       onSubmit={async (v) => {
         const {
@@ -326,7 +327,7 @@ export function EditNoteForm({ note }: { note: { id: string; subject: string | n
       initialValues={{ subject: note.subject ?? "", body: note.body }}
       fields={[
         { name: "subject", label: "Subject" },
-        { name: "body", label: "Note", type: "textarea", required: true },
+        { name: "body", label: "Note", type: "richtext", required: true },
       ]}
       trigger={(openForm) => (
         <button type="button" onClick={openForm} className="text-muted hover:text-ink" aria-label="Edit note">
@@ -342,5 +343,155 @@ export function EditNoteForm({ note }: { note: { id: string; subject: string | n
         router.refresh();
       }}
     />
+  );
+}
+
+// -------------------------------------------------------------------------
+// Contacts Reconciliation Audit -- Phase 4a: Client Tasks CRUD. The Tasks
+// tab previously only supported checkbox-complete (no create/edit/delete),
+// even though the engagement detail page already has full task creation
+// (app/(app)/engagements/[id]/AddTaskForm.tsx). This reuses the same
+// `tasks` table and the same InlineAddForm pattern every other client
+// sub-record above already uses -- no new task architecture, no new table.
+const TASK_PRIORITY_OPTIONS = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+  { value: "critical", label: "Critical" },
+];
+
+const TASK_VISIBILITY_OPTIONS = [
+  { value: "internal", label: "Staff only" },
+  { value: "client", label: "Staff and client (shows in portal)" },
+];
+
+export function AddClientTaskForm({ clientId, workspaceId, staffOptions }: Ids & { staffOptions: StaffOption[] }) {
+  const router = useRouter();
+  const supabase = createClient();
+  return (
+    <InlineAddForm
+      label="Add Task"
+      fields={[
+        { name: "title", label: "Title", required: true },
+        { name: "description", label: "Description", type: "richtext" },
+        { name: "priority", label: "Priority", type: "select", options: TASK_PRIORITY_OPTIONS },
+        {
+          name: "assigned_staff_id",
+          label: "Assigned to",
+          type: "select",
+          options: staffOptions.map((s) => ({ value: s.id, label: s.display_name ?? "Staff" })),
+        },
+        { name: "due_date", label: "Task due date" },
+        { name: "visibility", label: "Visible to", type: "select", options: TASK_VISIBILITY_OPTIONS },
+      ]}
+      onSubmit={async (v) => {
+        const description = v.description && v.description.replace(/<[^>]+>/g, "").trim() ? v.description : null;
+        const { error } = await supabase.from("tasks").insert({
+          workspace_id: workspaceId,
+          client_id: clientId,
+          title: v.title,
+          description,
+          priority: v.priority || null,
+          assigned_staff_id: v.assigned_staff_id || null,
+          due_date: v.due_date || null,
+          visibility: v.visibility || "internal",
+          status: "pending",
+        });
+        if (error) return error.message;
+        router.refresh();
+      }}
+    />
+  );
+}
+
+export function EditTaskForm({ task, staffOptions }: { task: TaskRow; staffOptions: StaffOption[] }) {
+  const router = useRouter();
+  const supabase = createClient();
+  return (
+    <InlineAddForm
+      label="Edit"
+      submitLabel="Save changes"
+      initialValues={{
+        title: task.title,
+        description: task.description ?? "",
+        priority: task.priority ?? "",
+        assigned_staff_id: task.assigned_staff_id ?? "",
+        due_date: task.due_date ?? "",
+        visibility: task.visibility,
+      }}
+      fields={[
+        { name: "title", label: "Title", required: true },
+        { name: "description", label: "Description", type: "richtext" },
+        { name: "priority", label: "Priority", type: "select", options: TASK_PRIORITY_OPTIONS },
+        {
+          name: "assigned_staff_id",
+          label: "Assigned to",
+          type: "select",
+          options: staffOptions.map((s) => ({ value: s.id, label: s.display_name ?? "Staff" })),
+        },
+        { name: "due_date", label: "Task due date" },
+        { name: "visibility", label: "Visible to", type: "select", options: TASK_VISIBILITY_OPTIONS },
+      ]}
+      trigger={(openForm) => (
+        <button type="button" onClick={openForm} className="text-muted hover:text-ink" aria-label="Edit task">
+          <Pencil size={13} />
+        </button>
+      )}
+      onSubmit={async (v) => {
+        const description = v.description && v.description.replace(/<[^>]+>/g, "").trim() ? v.description : null;
+        const { error } = await supabase
+          .from("tasks")
+          .update({
+            title: v.title,
+            description,
+            priority: v.priority || null,
+            assigned_staff_id: v.assigned_staff_id || null,
+            due_date: v.due_date || null,
+            visibility: v.visibility || "internal",
+          })
+          .eq("id", task.id);
+        if (error) return error.message;
+        router.refresh();
+      }}
+    />
+  );
+}
+
+export function DeleteTaskButton({ taskId }: { taskId: string }) {
+  const router = useRouter();
+  const supabase = createClient();
+  async function handleDelete() {
+    if (!window.confirm("Delete this task? This can't be undone.")) return;
+    const { error } = await supabase.from("tasks").delete().eq("id", taskId);
+    if (error) {
+      window.alert(error.message);
+      return;
+    }
+    router.refresh();
+  }
+  return (
+    <button type="button" onClick={handleDelete} className="text-muted hover:text-danger" aria-label="Delete task">
+      <Trash2 size={13} />
+    </button>
+  );
+}
+
+export function ReopenTaskButton({ taskId }: { taskId: string }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  async function reopen() {
+    const { error } = await supabase.from("tasks").update({ status: "pending", completed_at: null }).eq("id", taskId);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Task reopened", "success");
+    router.refresh();
+  }
+  return (
+    <button type="button" onClick={reopen} className="text-xs font-medium text-accent hover:underline">
+      Reopen
+    </button>
   );
 }

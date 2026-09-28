@@ -1,6 +1,7 @@
 // Shared arc math + legend for every donut chart on the dashboard --
-// TopServicesWidget and StageBreakdownWidget both draw one of these instead
-// of each re-deriving the SVG stroke-dasharray math. Segments use the app's
+// TopServicesWidget and the Engagement Pipeline card (DashboardShell) both
+// draw one of these instead of each re-deriving the SVG stroke-dasharray
+// math. Segments use the app's
 // fixed categorical order (see SEGMENT_CLASSES) so hue always maps to the
 // same rank across every donut, never re-cycled per chart.
 export type DonutSegment = { id: string; label: string; count: number };

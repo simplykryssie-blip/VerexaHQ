@@ -149,6 +149,137 @@ export async function createSubscriptionCheckoutSession({
   return { ok: true, data };
 }
 
+/**
+ * Same shape as createSubscriptionCheckoutSession, but for one of Verexa's
+ * own fixed-catalog platform plans (see platform_subscription_plans.
+ * stripe_price_id) -- references that pre-created Stripe Price directly
+ * instead of building an ad-hoc price_data line item on every checkout.
+ * createSubscriptionCheckoutSession itself stays as-is for per-tenant custom
+ * pricing (e.g. firm packages), where no fixed catalog Price exists to
+ * reference.
+ *
+ * No `customer` is passed -- Stripe creates one on session completion, same
+ * as before, so a brand-new workspace (stripe_customer_id still null) never
+ * needs a pre-existing Stripe Customer to check out.
+ *
+ * managed_payments is explicitly disabled: Stripe's Managed Payments default
+ * now requires a Product tax code on every Checkout line item, and Verexa
+ * hasn't made a deliberate tax/compliance decision to adopt Managed Payments
+ * (that would make Stripe the merchant of record). This restores the
+ * pre-existing checkout behavior rather than opting into something new.
+ *
+ * automatic_tax is always on: Verexa's Stripe account already has Stripe Tax
+ * active with its business origin configured (Louisiana) and tax-exclusive
+ * pricing as the account default -- see the Stripe Tax audit. billing_
+ * address_collection is required because Stripe Tax has nothing to compute
+ * tax from otherwise; Checkout shows the customer the tax and total before
+ * they pay, same as any other automatic_tax Checkout Session. Enabling this
+ * does NOT by itself collect any tax anywhere -- Stripe Tax only calculates
+ * tax in jurisdictions with an active registration, and the account
+ * currently has zero (a Dashboard action, not a code change; see the audit).
+ * Until at least one registration exists, every Checkout Session created
+ * here correctly shows $0.00 tax rather than erroring.
+ */
+export async function createSubscriptionCheckoutSessionFromPrice({
+  priceId,
+  successUrl,
+  cancelUrl,
+  metadata,
+}: {
+  priceId: string;
+  successUrl: string;
+  cancelUrl: string;
+  metadata: Record<string, string>;
+}): Promise<StripeResult<{ id: string; url: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const body = toFormBody({
+    mode: "subscription",
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    "line_items[0][price]": priceId,
+    "line_items[0][quantity]": 1,
+    "managed_payments[enabled]": "false",
+    "automatic_tax[enabled]": "true",
+    billing_address_collection: "required",
+  });
+  for (const [key, value] of Object.entries(metadata)) {
+    body.set(`metadata[${key}]`, value);
+    body.set(`subscription_data[metadata][${key}]`, value);
+  }
+
+  const res = await fetch(`${STRIPE_API}/checkout/sessions`, { method: "POST", headers: authHeaders(), body });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { id: string; url: string };
+  return { ok: true, data };
+}
+
+/**
+ * Same shape as createCheckoutSession (mode "payment", ad-hoc price_data --
+ * usage top-ups have no fixed denomination, so there is no catalog Price to
+ * reference: a workspace can top up any dollar amount >= $25, computed
+ * against its plan's own overage rate at checkout time) but with
+ * managed_payments explicitly disabled, for the same reason the subscription
+ * checkout needed it: Stripe's Managed Payments default requires a Product
+ * tax code on every Checkout line item, and this ad-hoc, per-session
+ * product never has one. Kept as its own function rather than changing
+ * createCheckoutSession itself, since that function is also used by
+ * /api/firm-packages/checkout and /api/stripe/checkout-session (client
+ * invoice/installment payments) -- both out of scope here and left
+ * untouched, even though they share the same latent Managed Payments gap
+ * (see the audit report for this task).
+ *
+ * No connectedAccountId: usage top-ups are always a platform-level charge
+ * (Verexa charging the workspace itself), never a Connect direct charge.
+ */
+export async function createUsageTopupCheckoutSession({
+  amount,
+  currency = "usd",
+  description,
+  successUrl,
+  cancelUrl,
+  metadata,
+}: {
+  amount: number;
+  currency?: string;
+  description: string;
+  successUrl: string;
+  cancelUrl: string;
+  metadata: Record<string, string>;
+}): Promise<StripeResult<{ id: string; url: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const body = toFormBody({
+    mode: "payment",
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    "line_items[0][price_data][currency]": currency,
+    "line_items[0][price_data][product_data][name]": description,
+    "line_items[0][price_data][unit_amount]": Math.round(amount * 100),
+    "line_items[0][quantity]": 1,
+    "managed_payments[enabled]": "false",
+  });
+  for (const [key, value] of Object.entries(metadata)) {
+    body.set(`metadata[${key}]`, value);
+    body.set(`payment_intent_data[metadata][${key}]`, value);
+  }
+
+  const res = await fetch(`${STRIPE_API}/checkout/sessions`, { method: "POST", headers: authHeaders(), body });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { id: string; url: string };
+  return { ok: true, data };
+}
+
 export async function createRefund({
   paymentIntentId,
   amount,
@@ -296,6 +427,38 @@ export async function getSubscriptionPrimaryItemId(stripeSubscriptionId: string)
   return { ok: true, data: { id: itemResult.data.id } };
 }
 
+export type StripeSubscriptionForProvisioning = {
+  id: string;
+  customer: string;
+  status: string;
+  default_payment_method: string | null;
+  trial_end: number | null;
+  cancel_at_period_end: boolean;
+  items: { data: { current_period_start: number; current_period_end: number }[] };
+};
+
+/**
+ * checkout.session.completed firing is not by itself proof of a paid
+ * subscription (e.g. a card can still be unconfirmed) -- signup provisioning
+ * always re-reads the actual Subscription object fresh rather than trusting
+ * the Checkout Session payload, and gates on its real status. Deliberately
+ * unexpanded (customer/default_payment_method come back as plain ids), same
+ * as every other subscription read in this file.
+ */
+export async function retrieveSubscriptionForProvisioning(subscriptionId: string): Promise<StripeResult<StripeSubscriptionForProvisioning>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const res = await fetch(`${STRIPE_API}/subscriptions/${subscriptionId}`, { headers: authHeaders() });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as StripeSubscriptionForProvisioning;
+  return { ok: true, data };
+}
+
 export type CustomerDefaultPaymentMethod = { brand: string; last4: string; expMonth: number; expYear: number } | null;
 
 // Platform billing has no local copy of card details -- checked live against
@@ -376,6 +539,15 @@ export async function createInvoiceItem({
  * mode "setup" saves a payment method against the customer without
  * charging anything, same Checkout-redirect pattern as createCheckoutSession
  * above (mode "payment") rather than embedding Stripe Elements client-side.
+ *
+ * managed_payments is explicitly disabled: Managed Payments only supports
+ * Checkout Sessions in mode "subscription" or "payment" -- a mode "setup"
+ * session is unconditionally rejected while it's on, per Stripe's own error.
+ * No charge ever occurs in a setup session, so there's no tax/compliance
+ * behavior being forfeited by opting out here -- same reasoning already
+ * applied to createSubscriptionCheckoutSessionFromPrice and
+ * createUsageTopupCheckoutSession above, for their own (different) Managed
+ * Payments incompatibility.
  */
 export async function createSetupCheckoutSession({
   customerId,
@@ -398,6 +570,7 @@ export async function createSetupCheckoutSession({
     success_url: successUrl,
     cancel_url: cancelUrl,
     "payment_method_types[0]": "card",
+    "managed_payments[enabled]": "false",
   });
   for (const [key, value] of Object.entries(metadata)) {
     body.set(`metadata[${key}]`, value);
@@ -673,6 +846,123 @@ export async function createCustomerBalanceCredit({
 }
 
 /**
+ * Immediately cancels a subscription (no grace period, no proration) --
+ * used at the Day 90 permanently_archived transition, where the point is
+ * specifically that the subscription must no longer be capable of
+ * generating any recurring charge. Idempotent from the caller's side: a
+ * subscription that's already canceled returns ok:false (Stripe rejects
+ * canceling an already-canceled subscription), which the caller treats the
+ * same as "nothing left to cancel" rather than a retryable failure.
+ */
+export async function cancelSubscription(subscriptionId: string): Promise<StripeResult<{ id: string; status: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const res = await fetch(`${STRIPE_API}/subscriptions/${subscriptionId}`, { method: "DELETE", headers: authHeaders() });
+  const data = (await res.json().catch(() => ({}))) as { id?: string; status?: string; error?: { message?: string; code?: string } };
+  if (!res.ok || !data.id) {
+    return { ok: false, reason: data.error?.message ?? `Stripe responded with ${res.status}` };
+  }
+  return { ok: true, data: { id: data.id, status: data.status ?? "canceled" } };
+}
+
+/**
+ * Creates a bare Stripe Customer with no payment method and no
+ * subscription -- used by the legacy first-charge migration tool to give a
+ * pre-existing workspace (one that predates payment-first signup and has
+ * never had a real Stripe Customer) somewhere to attach a card via the
+ * existing setup Checkout flow. Never call this for a workspace that
+ * already has a stripe_customer_id -- the caller is responsible for that
+ * idempotency check, since Stripe has no natural dedup key here.
+ */
+export async function createCustomer({
+  email,
+  name,
+  metadata,
+}: {
+  email: string;
+  name?: string;
+  metadata: Record<string, string>;
+}): Promise<StripeResult<{ id: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const body = toFormBody({ email, name });
+  for (const [key, value] of Object.entries(metadata)) {
+    body.set(`metadata[${key}]`, value);
+  }
+
+  const res = await fetch(`${STRIPE_API}/customers`, { method: "POST", headers: authHeaders(), body });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { id: string };
+  return { ok: true, data };
+}
+
+/**
+ * Creates a subscription directly against the Subscriptions API (not via
+ * Checkout) with a future billing_cycle_anchor and proration_behavior
+ * "none" -- the only combination that lets Stripe hold a real,
+ * already-priced subscription with a card on file while guaranteeing zero
+ * charge occurs before the anchor date, per Stripe's own documented
+ * behavior ("this action doesn't generate an invoice at all until the
+ * first billing period... customers receive an invoice with the full
+ * subscription amount on the billing cycle anchor date"). Used exclusively
+ * by the legacy first-charge migration tool -- every other subscription in
+ * this app is created through a Checkout Session instead, where the
+ * customer confirms payment interactively.
+ *
+ * automatic_tax stays on for the same reason every other subscription
+ * creation path in this file turns it on: Stripe Tax is active on the
+ * account even though no registration exists yet (see the Stripe Tax
+ * audit), so this is a no-op today and correct the moment a registration
+ * is added. collection_method is explicit "charge_automatically" so
+ * Stripe -- not a human sending an invoice -- performs the actual charge
+ * attempt on the anchor date.
+ */
+export async function createDelayedStartSubscription({
+  customerId,
+  priceId,
+  billingCycleAnchorUnix,
+  defaultPaymentMethodId,
+  metadata,
+}: {
+  customerId: string;
+  priceId: string;
+  billingCycleAnchorUnix: number;
+  defaultPaymentMethodId: string;
+  metadata: Record<string, string>;
+}): Promise<StripeResult<StripeSubscriptionForProvisioning>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const body = toFormBody({
+    customer: customerId,
+    "items[0][price]": priceId,
+    billing_cycle_anchor: billingCycleAnchorUnix,
+    proration_behavior: "none",
+    collection_method: "charge_automatically",
+    default_payment_method: defaultPaymentMethodId,
+    "automatic_tax[enabled]": "true",
+  });
+  for (const [key, value] of Object.entries(metadata)) {
+    body.set(`metadata[${key}]`, value);
+  }
+
+  const res = await fetch(`${STRIPE_API}/subscriptions`, { method: "POST", headers: authHeaders(), body });
+  const data = (await res.json().catch(() => ({}))) as StripeSubscriptionForProvisioning & { error?: { message?: string } };
+  if (!res.ok || !data.id) {
+    return { ok: false, reason: (data as { error?: { message?: string } }).error?.message ?? `Stripe responded with ${res.status}` };
+  }
+  return { ok: true, data };
+}
+
+/**
  * Verifies a Stripe webhook signature per Stripe's documented scheme
  * (t=<timestamp>,v1=<hmac>) without needing the stripe SDK.
  */
@@ -686,6 +976,10 @@ export async function verifyStripeSignature(payload: string, signatureHeader: st
   const timestamp = parts.t;
   const signature = parts.v1;
   if (!timestamp || !signature) return false;
+
+  const timestampSeconds = Number(timestamp);
+  if (!Number.isFinite(timestampSeconds)) return false;
+  if (Math.abs(Date.now() / 1000 - timestampSeconds) > 300) return false;
 
   const crypto = await import("crypto");
   const expected = crypto.createHmac("sha256", secret).update(`${timestamp}.${payload}`).digest("hex");

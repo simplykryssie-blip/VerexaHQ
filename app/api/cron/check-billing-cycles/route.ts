@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { previewUpcomingInvoiceAmount, chargeOffSession, createCustomerBalanceCredit } from "@/lib/stripe/client";
-import { resumeWorkspaceFromBilling } from "@/lib/stripe/subscriptionWebhooks";
 import { withJobLogging } from "@/lib/cron/withJobLogging";
+import { isFirstPeriod } from "@/lib/billing/firstPeriod";
+import { dunningIdempotencyKey } from "@/lib/billing/dunningIdempotency";
 
 export const dynamic = "force-dynamic";
 
@@ -22,34 +23,52 @@ function daysBetween(fromDateStr: string, toDateStr: string): number {
   return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86400000);
 }
 
+// The three payment-attempt days, each further out than the last so a
+// decline has multiple chances to be resolved (adding a card, a bank
+// covering funds) before the due date actually arrives.
+const ATTEMPT_DAYS = [7, 3, 1];
+
 /**
  * Platform-wide billing dunning, run hourly. Uses America/Chicago calendar
- * dates (not a fixed UTC cron offset) so the day boundaries this logic
- * keys off of -- 5 days out, 3 days out, past the cycle end -- land on true
+ * dates (not a fixed UTC cron offset) so the day boundaries this logic keys
+ * off of -- 7/3/1 days out, and the due date itself -- land on true
  * CST/CDT midnight year-round, including across the DST changeover.
  *
- * Three things happen, keyed off days-until-current_period_end in Chicago
- * calendar days:
- *  - day 5: no card on file yet -> reminder notification.
- *  - day 3 and day 0: attempt to charge the card on file for the previewed
- *    upcoming-invoice amount. A successful charge is credited to the Stripe
- *    customer's balance (not charged again) -- see createCustomerBalanceCredit
- *    for why that avoids double-charging on the real renewal date. Day 0 is
- *    a last-chance retry for anyone who added a card after a day-3 decline.
- *  - once the cycle end has passed with no successful charge recorded for
- *    it: suspend the workspace. This is independent of (and can fire before)
- *    Stripe's own Smart Retries exhausting into an "unpaid" subscription
- *    status, since that can take longer than a single billing cycle.
- *  - Phase 4A: a workspace this cron itself suspended (suspension_reason
- *    'billing_past_due') has no Stripe-side status change to react to --
- *    this charge is off-session and outside Stripe's own subscription
- *    invoicing, so stripe_status can sit at "active" the entire time and no
- *    webhook ever fires. Once suspended, every subsequent day is folded
- *    into the same retry path as day 3/day 0 (same once-per-day guard, same
- *    charge logic) so that adding a payment method and this cron's next
- *    hourly tick is what actually restores access -- reusing
- *    resumeWorkspaceFromBilling, the same function Stripe's own webhooks
- *    call for every other billing-suspension reason.
+ * Schedule:
+ *  - day 7, 3, and 1 before current_period_end: attempt to charge the card
+ *    on file for the previewed upcoming-invoice amount (or send a
+ *    no-card-on-file reminder on day 7 specifically, then a payment-failed
+ *    notice on every attempt day that actually declines). A successful
+ *    charge is credited to the Stripe customer's balance (not charged
+ *    again) -- see createCustomerBalanceCredit for why that avoids
+ *    double-charging on the real renewal date.
+ *  - due date (day 0): if no successful charge attempt is on record for
+ *    this cycle, suspend the workspace immediately (at the first hourly
+ *    tick on or after midnight Chicago time on the due date) rather than
+ *    waiting for the cycle to have already passed.
+ *
+ * Idempotent by construction: workspace_billing_charge_attempts is checked
+ * for an existing attempt (by workspace_id + period_end) before charging
+ * again on the same Chicago calendar day, and the suspend itself is guarded
+ * by .eq("status", "active") so a repeated cron tick after suspension is a
+ * no-op rather than a duplicate transition or a second charge.
+ *
+ * First-period exception: a subscription created with a future
+ * billing_cycle_anchor (see createDelayedStartSubscription in
+ * lib/stripe/client.ts -- used for legacy customer migrations where the
+ * first charge date is contractually fixed) has first_period_end set equal
+ * to its own current_period_end for exactly one cycle: its stub period
+ * ending at the anchor. This cron must never pre-collect against that
+ * period -- the whole point of the anchor is that Stripe, not this cron,
+ * performs the one and only charge attempt, exactly on that date. So on
+ * the 7/3/1 attempt days, a first-period row gets a reminder-only
+ * notification instead of the normal charge-attempt block, and on the due
+ * date, "no successful charge on record" is replaced with "Stripe's own
+ * subscription status went past_due" as the suspend signal, since there is
+ * deliberately no workspace_billing_charge_attempts row to check for that
+ * cycle. Once Stripe's anchor-date invoice is created and current_period_end
+ * advances, first_period_end no longer matches it and every branch below
+ * falls back to the exact same logic as any other customer's renewal.
  */
 async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
@@ -62,7 +81,7 @@ async function handleGET(request: Request) {
   const { data: subs, error } = await supabase
     .from("workspace_subscriptions")
     .select(
-      "id, workspace_id, stripe_customer_id, stripe_subscription_id, stripe_status, current_period_end, default_payment_method_id, workspaces(status, suspension_reason)"
+      "id, workspace_id, stripe_customer_id, stripe_subscription_id, stripe_status, current_period_end, first_period_end, default_payment_method_id, workspaces(status)"
     )
     .in("stripe_status", ["active", "trialing", "past_due"])
     .not("current_period_end", "is", null)
@@ -73,16 +92,15 @@ async function handleGET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const results = { reminded: 0, charged: 0, chargeFailed: 0, suspended: 0, resumed: 0, skipped: 0 };
+  const results = { reminded: 0, charged: 0, chargeFailed: 0, suspended: 0, skipped: 0 };
 
   for (const sub of subs ?? []) {
     const periodEnd = chicagoDateStr(new Date(sub.current_period_end as string));
     const daysUntil = daysBetween(today, periodEnd);
-    const workspace = sub.workspaces as unknown as { status: string; suspension_reason: string | null } | null;
-    const workspaceStatus = workspace?.status;
-    const isPostSuspensionRecovery = daysUntil < 0 && workspaceStatus === "suspended" && workspace?.suspension_reason === "billing_past_due";
+    const workspaceStatus = (sub.workspaces as unknown as { status: string } | null)?.status;
+    const isFirstPeriodRow = isFirstPeriod(sub);
 
-    if (daysUntil === 5 && !sub.default_payment_method_id) {
+    if (daysUntil === 7 && !sub.default_payment_method_id && !isFirstPeriodRow) {
       const { data: existing } = await supabase
         .from("notification_queue")
         .select("id")
@@ -106,7 +124,30 @@ async function handleGET(request: Request) {
       }
     }
 
-    if (daysUntil === 3 || daysUntil === 0 || isPostSuspensionRecovery) {
+    if (ATTEMPT_DAYS.includes(daysUntil) && isFirstPeriodRow) {
+      // Reminder-only: the real first charge belongs to Stripe's own
+      // automatic invoicing on the billing_cycle_anchor date, never to this
+      // cron's off-session chargeOffSession path -- see the file-level
+      // comment above.
+      const dedupeKey = `billing-first-charge-reminder:${sub.workspace_id}:${periodEnd}:${daysUntil}`;
+      const { data: existing } = await supabase.from("notification_queue").select("id").eq("dedupe_key", dedupeKey).maybeSingle();
+      if (!existing) {
+        const { data: admin } = await supabase.rpc("get_workspace_billing_admin", { p_workspace_id: sub.workspace_id }).maybeSingle();
+        if (admin?.user_id) {
+          await supabase.from("notification_queue").insert({
+            workspace_id: sub.workspace_id,
+            channel: "Email",
+            template_key: "billing-first-charge-reminder",
+            event_type: "billing_first_charge_reminder",
+            payload: { period_end: periodEnd, days_until: daysUntil },
+            recipient_user_id: admin.user_id,
+            recipient_email: admin.email,
+            dedupe_key: dedupeKey,
+          });
+          results.reminded += 1;
+        }
+      }
+    } else if (ATTEMPT_DAYS.includes(daysUntil)) {
       const { data: succeeded } = await supabase
         .from("workspace_billing_charge_attempts")
         .select("id")
@@ -135,9 +176,7 @@ async function handleGET(request: Request) {
             failure_reason: "No payment method on file.",
           });
           results.chargeFailed += 1;
-          if (daysUntil === 3) {
-            await notifyPaymentFailed(supabase, sub.workspace_id, "No payment method on file.", periodEnd);
-          }
+          await notifyPaymentFailed(supabase, sub.workspace_id, "No payment method on file.", periodEnd);
         } else {
           const preview = await previewUpcomingInvoiceAmount(sub.stripe_subscription_id as string);
           const amountDueCents = preview.ok ? preview.data.amountDueCents : 0;
@@ -150,10 +189,6 @@ async function handleGET(request: Request) {
               status: "succeeded",
             });
             results.charged += 1;
-            if (isPostSuspensionRecovery) {
-              await resumeWorkspaceFromBilling(supabase, sub.workspace_id, ["billing_past_due"]);
-              results.resumed += 1;
-            }
           } else {
             const charge = await chargeOffSession({
               customerId: sub.stripe_customer_id as string,
@@ -161,6 +196,7 @@ async function handleGET(request: Request) {
               amountCents: amountDueCents,
               description: `Verexa subscription -- cycle ending ${periodEnd}`,
               metadata: { workspace_id: sub.workspace_id, period_end: periodEnd },
+              idempotencyKey: dunningIdempotencyKey(sub.workspace_id, sub.current_period_end as string),
             });
 
             if (charge.ok && charge.data.status === "succeeded") {
@@ -177,10 +213,6 @@ async function handleGET(request: Request) {
                 status: "succeeded",
               });
               results.charged += 1;
-              if (isPostSuspensionRecovery) {
-                await resumeWorkspaceFromBilling(supabase, sub.workspace_id, ["billing_past_due"]);
-                results.resumed += 1;
-              }
             } else {
               const reason = charge.ok ? `Payment intent status: ${charge.data.status}` : charge.reason;
               await supabase.from("workspace_billing_charge_attempts").insert({
@@ -192,9 +224,7 @@ async function handleGET(request: Request) {
                 failure_reason: reason,
               });
               results.chargeFailed += 1;
-              if (daysUntil === 3) {
-                await notifyPaymentFailed(supabase, sub.workspace_id, reason, periodEnd);
-              }
+              await notifyPaymentFailed(supabase, sub.workspace_id, reason, periodEnd);
             }
           }
         }
@@ -203,18 +233,41 @@ async function handleGET(request: Request) {
       }
     }
 
-    if (daysUntil < 0 && workspaceStatus === "active") {
-      const { data: succeeded } = await supabase
-        .from("workspace_billing_charge_attempts")
-        .select("id")
-        .eq("workspace_id", sub.workspace_id)
-        .eq("period_end", sub.current_period_end)
-        .eq("status", "succeeded")
-        .maybeSingle();
+    if (daysUntil <= 0 && workspaceStatus === "active") {
+      // First-period rows never have a workspace_billing_charge_attempts
+      // row for this cycle (that whole mechanism is skipped above), so
+      // "no successful attempt on record" would incorrectly read as
+      // nonpayment the instant the anchor date arrives, even when Stripe's
+      // own charge is still in flight or already succeeded. Use the
+      // subscription's own Stripe-reported status instead: past_due is the
+      // only state that proves the anchor-date invoice actually failed.
+      // While it's still "active", either the payment succeeded (and
+      // current_period_end will advance via webhook, aging this row out of
+      // the due set) or Stripe hasn't attempted it yet -- neither is
+      // nonpayment.
+      const failed = isFirstPeriodRow
+        ? sub.stripe_status === "past_due"
+        : !(
+            await supabase
+              .from("workspace_billing_charge_attempts")
+              .select("id")
+              .eq("workspace_id", sub.workspace_id)
+              .eq("period_end", sub.current_period_end)
+              .eq("status", "succeeded")
+              .maybeSingle()
+          ).data;
 
-      if (!succeeded) {
-        await supabase.from("workspaces").update({ status: "suspended", suspension_reason: "billing_past_due" }).eq("id", sub.workspace_id).eq("status", "active");
-        results.suspended += 1;
+      if (failed) {
+        const suspendedAt = new Date().toISOString();
+        const { error: suspendError } = await supabase
+          .from("workspaces")
+          .update({ status: "suspended", suspension_reason: "billing_past_due", suspended_at: suspendedAt })
+          .eq("id", sub.workspace_id)
+          .eq("status", "active");
+        if (!suspendError) {
+          results.suspended += 1;
+          await notifyWorkspaceSuspended(supabase, sub.workspace_id, periodEnd);
+        }
       }
     }
   }
@@ -233,7 +286,22 @@ async function notifyPaymentFailed(supabase: ReturnType<typeof createServiceClie
     payload: { failure_reason: failureReason, period_end: periodEnd },
     recipient_user_id: admin.user_id,
     recipient_email: admin.email,
-    dedupe_key: `billing-payment-failed:${workspaceId}:${periodEnd}`,
+    dedupe_key: `billing-payment-failed:${workspaceId}:${periodEnd}:${new Date().toISOString().slice(0, 10)}`,
+  });
+}
+
+async function notifyWorkspaceSuspended(supabase: ReturnType<typeof createServiceClient>, workspaceId: string, periodEnd: string) {
+  const { data: admin } = await supabase.rpc("get_workspace_billing_admin", { p_workspace_id: workspaceId }).maybeSingle();
+  if (!admin?.user_id) return;
+  await supabase.from("notification_queue").insert({
+    workspace_id: workspaceId,
+    channel: "Email",
+    template_key: "billing-workspace-suspended",
+    event_type: "billing_workspace_suspended",
+    payload: { period_end: periodEnd },
+    recipient_user_id: admin.user_id,
+    recipient_email: admin.email,
+    dedupe_key: `billing-workspace-suspended:${workspaceId}:${periodEnd}`,
   });
 }
 

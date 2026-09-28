@@ -11,13 +11,14 @@ export default async function ServicesPage() {
 
   const supabase = createClient();
 
-  const [{ data: services }, { data: categories }, { data: canManage }] = await Promise.all([
+  const [{ data: services }, { data: categories }, { data: pipelines }, { data: canManage }] = await Promise.all([
     supabase
       .from("services")
       .select("id, name, status, service_categories(name), processes(name)")
       .eq("workspace_id", workspace.id)
       .order("name"),
-    supabase.from("service_categories").select("id, name").eq("workspace_id", workspace.id).order("display_order"),
+    supabase.from("service_categories").select("id, name, process_id").eq("workspace_id", workspace.id).order("display_order"),
+    supabase.from("processes").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
   ]);
 
@@ -37,6 +38,7 @@ export default async function ServicesPage() {
       workspaceSlug={workspace.slug}
       services={cards}
       categories={categoryOptions}
+      pipelines={pipelines ?? []}
       canManage={Boolean(canManage)}
     />
   );

@@ -3,6 +3,7 @@
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import { Tabs } from "@/components/ui/Tabs";
 import { isIndependentTier } from "@/lib/workspaceCapabilities";
+import { normalizeName } from "@/lib/name";
 import { OverviewTab, MessagesTab, BillingTab, NotesTab, TasksTab } from "./ClientWorkspaceTabs";
 import type { ClientWorkspaceProps } from "./ClientWorkspace";
 
@@ -10,8 +11,8 @@ export const TABS = ["Details", "Tasks", "Documents", "Messages", "Billing", "No
 export type ClientTab = (typeof TABS)[number];
 
 function displayName(c: { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }) {
-  if (c.client_type === "business" && c.business_name) return c.business_name;
-  return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
+  if (c.client_type !== "individual" && c.business_name) return c.business_name;
+  return [c.first_name, c.last_name].filter(Boolean).map((name) => normalizeName(name!)).join(" ") || "Unnamed client";
 }
 
 /** The client's tab bar + tab content -- the one part of the client detail
@@ -44,6 +45,8 @@ export function ClientTabsBody({
     complianceDefault,
     engagements,
     tasks,
+    completedTasks,
+    bankProductTransactions,
     appointments,
     invoices,
     notes,
@@ -108,7 +111,15 @@ export function ClientTabsBody({
             onShowTasks={() => onTabChange("Tasks")}
           />
         )}
-        {tab === "Tasks" && <TasksTab clientId={client.id} tasks={tasks} />}
+        {tab === "Tasks" && (
+          <TasksTab
+            clientId={client.id}
+            workspaceId={workspace.id}
+            tasks={tasks}
+            completedTasks={completedTasks}
+            staffOptions={staffOptions}
+          />
+        )}
         {tab === "Documents" && (
           <DocumentWorkspace
             workspaceId={workspace.id}
@@ -154,6 +165,7 @@ export function ClientTabsBody({
             paymentPlansByInvoice={paymentPlansByInvoice}
             canManageBilling={permissions.billingManage}
             workspaceServices={workspaceServices}
+            bankProductTransactions={bankProductTransactions}
           />
         )}
         {tab === "Notes" && <NotesTab clientId={client.id} workspaceId={workspace.id} notes={notes} />}

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Briefcase, CheckSquare, Receipt, ArrowUpRight, FileText, ClipboardCheck, PenLine, RefreshCw, StickyNote, DollarSign, Mail, HelpCircle } from "lucide-react";
 import { taskHref } from "@/lib/taskLink";
+import { formatPhone } from "@/lib/phone";
+import { normalizeName } from "@/lib/name";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 import { createClient } from "@/lib/supabase/client";
@@ -29,22 +31,24 @@ import {
   AddContactForm,
   EditContactForm,
   DeleteContactButton,
-  AddAddressForm,
   EditAddressForm,
   DeleteAddressButton,
   AddPortalUserForm,
   AddNoteForm,
   EditNoteForm,
+  AddClientTaskForm,
+  EditTaskForm,
+  DeleteTaskButton,
+  ReopenTaskButton,
 } from "./AddForms";
 import {
-  AddEmailForm,
   SetEmailPrimaryButton,
   DeleteEmailButton,
-  AddPhoneForm,
   SetPhonePrimaryButton,
   DeletePhoneButton,
   SetAddressPrimaryButton,
 } from "./ContactChannelForms";
+import { AddContactInformationControl } from "./AddContactInformationControl";
 import { EditClientProfileForm } from "./EditClientProfileForm";
 import { TagsEditor } from "./TagsEditor";
 import { ServiceInterestControl } from "./ServiceInterestControl";
@@ -53,7 +57,7 @@ import { SectionCard as Section, Field } from "@/components/ui/SectionCard";
 import { Badge } from "@/components/ui/Badge";
 import { StatTile } from "@/components/ui/StatTile";
 import { ProgressBar } from "@/components/ui/ProgressBar";
-import { ENGAGEMENT_STATUS_TONE, ENGAGEMENT_PRIORITY_TONE, ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
+import { ENGAGEMENT_STATUS_TONE, ENGAGEMENT_PRIORITY_TONE, ENGAGEMENT_STATUS_OPTIONS, isOpenEngagementStatus } from "@/lib/engagementStatus";
 import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
 
 // Mirrors lib/dashboard/data.ts's ENGAGEMENT_PIPELINE_STATUSES (which can't be
@@ -66,11 +70,20 @@ function money(n: number | null | undefined) {
   return `$${(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** Notes now store rich-text HTML (Contacts Reconciliation Audit, item #8),
+ * but a short plain-text preview is still needed for the Overview widget's
+ * single-line list -- rendering the raw HTML there would show literal tags. */
+function stripHtml(html: string) {
+  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
 // ---------------------------------------------------------------- Overview
 
 function clientDisplayName(c: { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }) {
-  if (c.client_type === "business" && c.business_name) return c.business_name;
-  return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
+  // Every non-individual client_type (business/trust/estate/organization)
+  // shares the same business_name column as its entity name.
+  if (c.client_type !== "individual" && c.business_name) return c.business_name;
+  return [c.first_name, c.last_name].filter(Boolean).map((name) => normalizeName(name!)).join(" ") || "Unnamed client";
 }
 
 export function OverviewTab({
@@ -161,7 +174,7 @@ export function OverviewTab({
   );
   const unmatchedPortalUsers = portalUsers.filter((p) => !matchedPortalIds.has(p.id));
 
-  const openEngagements = engagements.filter((e) => e.status !== "Completed" && e.status !== "Archived");
+  const openEngagements = engagements.filter((e) => isOpenEngagementStatus(e.status));
   const openTasks = tasks.filter((t) => t.status !== "completed");
   const upcomingItems = [
     ...appointments.map((a) => ({ label: a.title, date: a.start_at, kind: "Appointment" })),
@@ -191,7 +204,13 @@ export function OverviewTab({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatTile icon={Briefcase} tone="emerald" label="Current engagements" value={openEngagements.length} />
+        {primaryEngagement ? (
+          <Link href={`/engagements/${primaryEngagement.id}`}>
+            <StatTile icon={Briefcase} tone="emerald" label="Current engagements" value={openEngagements.length} />
+          </Link>
+        ) : (
+          <StatTile icon={Briefcase} tone="emerald" label="Current engagements" value={openEngagements.length} />
+        )}
         <StatTile icon={CheckSquare} tone="amber" label="Open tasks" value={openTasks.length} onClick={onShowTasks} />
         <StatTile icon={Receipt} tone="rose" label="Outstanding balance" value={money(outstandingBalance)} onClick={onCreateInvoice} />
       </div>
@@ -235,7 +254,7 @@ export function OverviewTab({
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
           <Field label="Name" value={clientDisplayName(client)} />
           <Field label="Primary email" value={client.primary_email} />
-          <Field label="Primary phone" value={client.primary_phone} />
+          <Field label="Primary phone" value={client.primary_phone ? formatPhone(client.primary_phone) : null} />
           {client.client_type === "individual" ? (
             <>
               <TaxIdReveal clientId={client.id} kind="ssn" last4={client.ssn_last4} />
@@ -254,65 +273,59 @@ export function OverviewTab({
           )}
         </dl>
 
-        <div className="mt-4 grid grid-cols-1 gap-4 border-t border-border pt-4 sm:grid-cols-2">
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Emails</h3>
-              <AddEmailForm clientId={client.id} workspaceId={workspaceId} />
+        <div className="mt-4 border-t border-border pt-4">
+          <AddContactInformationControl clientId={client.id} workspaceId={workspaceId} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Emails</h3>
+              {emails.length === 0 ? (
+                <EmptyState message="No emails on file." />
+              ) : (
+                <ul className="divide-y divide-border">
+                  {emails.map((e) => (
+                    <li key={e.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
+                      <span>
+                        {e.email}
+                        <span className="ml-2 text-xs capitalize text-muted">{e.email_type}</span>
+                        {e.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {!e.is_primary && <SetEmailPrimaryButton emailId={e.id} />}
+                        <DeleteEmailButton emailId={e.id} />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-            {emails.length === 0 ? (
-              <EmptyState message="No emails on file." />
-            ) : (
-              <ul className="divide-y divide-border">
-                {emails.map((e) => (
-                  <li key={e.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
-                    <span>
-                      {e.email}
-                      <span className="ml-2 text-xs capitalize text-muted">{e.email_type}</span>
-                      {e.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
-                    </span>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {!e.is_primary && <SetEmailPrimaryButton emailId={e.id} />}
-                      <DeleteEmailButton emailId={e.id} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
 
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Phones</h3>
-              <AddPhoneForm clientId={client.id} workspaceId={workspaceId} />
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Phones</h3>
+              {phones.length === 0 ? (
+                <EmptyState message="No phones on file." />
+              ) : (
+                <ul className="divide-y divide-border">
+                  {phones.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
+                      <span>
+                        {formatPhone(p.phone_number)}
+                        <span className="ml-2 text-xs capitalize text-muted">{p.phone_type}</span>
+                        {p.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {!p.is_primary && <SetPhonePrimaryButton phoneId={p.id} />}
+                        <DeletePhoneButton phoneId={p.id} />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-            {phones.length === 0 ? (
-              <EmptyState message="No phones on file." />
-            ) : (
-              <ul className="divide-y divide-border">
-                {phones.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
-                    <span>
-                      {p.phone_number}
-                      <span className="ml-2 text-xs capitalize text-muted">{p.phone_type}</span>
-                      {p.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
-                    </span>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {!p.is_primary && <SetPhonePrimaryButton phoneId={p.id} />}
-                      <DeletePhoneButton phoneId={p.id} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
         </div>
 
         <div className="mt-4 border-t border-border pt-4">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Addresses</h3>
-            <AddAddressForm clientId={client.id} workspaceId={workspaceId} />
-          </div>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Addresses</h3>
           {addresses.length === 0 ? (
             <EmptyState message="No additional addresses." />
           ) : (
@@ -380,7 +393,7 @@ export function OverviewTab({
           </div>
         )}
 
-        {client.client_type === "business" && (
+        {client.client_type !== "individual" && (
         <div className="mt-4 border-t border-border pt-4">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Contacts</h3>
@@ -611,7 +624,7 @@ export function OverviewTab({
             {recentNotes.map((n) => (
               <li key={n.id} className="text-sm text-slate">
                 {n.subject && <span className="font-semibold text-ink">{n.subject}: </span>}
-                {n.body}
+                {stripHtml(n.body)}
                 <span className="ml-2 text-xs text-muted">{new Date(n.created_at).toLocaleDateString()}</span>
               </li>
             ))}
@@ -893,6 +906,7 @@ export function BillingTab({
   paymentPlansByInvoice,
   canManageBilling,
   workspaceServices = [],
+  bankProductTransactions = [],
 }: {
   clientId: string;
   clientName: string;
@@ -905,6 +919,7 @@ export function BillingTab({
   paymentPlansByInvoice: Record<string, PaymentPlanRow[]>;
   canManageBilling: boolean;
   workspaceServices?: { id: string; name: string }[];
+  bankProductTransactions?: ClientBankProductTransactionRow[];
 }) {
   const [modal, setModal] = useState<"invoice" | "quote" | null>(null);
   const [editingQuote, setEditingQuote] = useState<QuoteRow | null>(null);
@@ -1142,9 +1157,48 @@ export function BillingTab({
           </ul>
         )}
       </Section>
+
+      {bankProductTransactions.length > 0 && (
+        <Section title="Bank Products">
+          <ul className="divide-y divide-border">
+            {bankProductTransactions.map((b) => (
+              <li key={b.id} className="flex items-center justify-between py-2 text-sm">
+                <div>
+                  <span className="text-slate">{BANK_PRODUCT_TYPE_LABEL[b.product_type] ?? b.product_type}</span>
+                  <span className="ml-2 text-xs text-muted">{b.bank_partner}</span>
+                  {b.engagement_number && (
+                    <Link href={`/engagements/${b.engagement_id}`} className="ml-2 text-xs font-medium text-accent hover:underline">
+                      {b.engagement_number}
+                    </Link>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-muted">
+                  <Badge tone={BANK_PRODUCT_STATUS_TONE[b.status] ?? "neutral"} className="capitalize">
+                    {b.status}
+                  </Badge>
+                  <span className="text-xs">{new Date(b.disbursed_at ?? b.created_at).toLocaleDateString()}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
     </div>
   );
 }
+
+const BANK_PRODUCT_TYPE_LABEL: Record<string, string> = {
+  refund_transfer: "Refund Transfer",
+  refund_advance: "Refund Advance",
+  other: "Other",
+};
+
+const BANK_PRODUCT_STATUS_TONE: Record<string, "neutral" | "warning" | "success" | "danger"> = {
+  pending: "warning",
+  funded: "neutral",
+  disbursed: "success",
+  rejected: "danger",
+};
 
 // ----------------------------------------------------------------- Timeline
 
@@ -1216,7 +1270,7 @@ export function NotesTab({ clientId, workspaceId, notes }: { clientId: string; w
                 </div>
                 <EditNoteForm note={n} />
               </div>
-              <p className="whitespace-pre-wrap">{n.body}</p>
+              <div className="prose prose-sm max-w-none whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: n.body }} />
               <p className="mt-1 text-xs text-muted">{new Date(n.created_at).toLocaleString()}</p>
             </li>
           ))}
@@ -1226,11 +1280,24 @@ export function NotesTab({ clientId, workspaceId, notes }: { clientId: string; w
   );
 }
 
-export function TasksTab({ clientId, tasks }: { clientId: string; tasks: TaskRow[] }) {
+export function TasksTab({
+  clientId,
+  workspaceId,
+  tasks,
+  completedTasks,
+  staffOptions,
+}: {
+  clientId: string;
+  workspaceId: string;
+  tasks: TaskRow[];
+  completedTasks: TaskRow[];
+  staffOptions: StaffOption[];
+}) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   async function complete(task: TaskRow) {
     setPendingId(task.id);
@@ -1255,7 +1322,7 @@ export function TasksTab({ clientId, tasks }: { clientId: string; tasks: TaskRow
   });
 
   return (
-    <Section title="Tasks">
+    <Section title="Tasks" action={<AddClientTaskForm clientId={clientId} workspaceId={workspaceId} staffOptions={staffOptions} />}>
       {sorted.length === 0 ? (
         <EmptyState message="No open tasks for this client." />
       ) : (
@@ -1290,10 +1357,40 @@ export function TasksTab({ clientId, tasks }: { clientId: string; tasks: TaskRow
                     )}
                   </div>
                 </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <EditTaskForm task={t} staffOptions={staffOptions} />
+                  <DeleteTaskButton taskId={t.id} />
+                </div>
               </li>
             );
           })}
         </ul>
+      )}
+      {completedTasks.length > 0 && (
+        <div className="mt-4 border-t border-border pt-3">
+          <button
+            type="button"
+            onClick={() => setShowCompleted((s) => !s)}
+            className="text-xs font-medium text-muted hover:text-ink"
+          >
+            {showCompleted ? "Hide" : "Show"} {completedTasks.length} completed task{completedTasks.length === 1 ? "" : "s"}
+          </button>
+          {showCompleted && (
+            <ul className="mt-2 divide-y divide-border">
+              {completedTasks.map((t) => (
+                <li key={t.id} className="flex items-start justify-between gap-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-muted line-through">{t.title}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <ReopenTaskButton taskId={t.id} />
+                    <DeleteTaskButton taskId={t.id} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </Section>
   );
@@ -1335,6 +1432,18 @@ export type TaskRow = {
   engagement_id: string | null;
   client_id: string | null;
   related_organizer_response_id: string | null;
+  assigned_staff_id: string | null;
+  visibility: string;
+};
+export type ClientBankProductTransactionRow = {
+  id: string;
+  engagement_id: string;
+  engagement_number: string | null;
+  bank_partner: string;
+  product_type: string;
+  status: string;
+  disbursed_at: string | null;
+  created_at: string;
 };
 export type QuoteRow = {
   id: string;

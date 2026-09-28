@@ -193,15 +193,15 @@ export function SignaturesPanel({
     setSigningError(null);
 
     let signatureImagePath: string | undefined;
+    const parentRequest = signatureRequests.find((r) => r.signers.some((s) => s.id === signingId));
 
     if (usingDrawnMode) {
-      const request = signatureRequests.find((r) => r.signers.some((s) => s.id === signingId));
-      if (!request) {
+      if (!parentRequest) {
         setSigningError("Could not find this signing request.");
         return;
       }
       setSubmittingSignature(true);
-      const uploadResult = await uploadSignatureImageClient(supabase, workspaceId, request.id, drawnDataUrl as string);
+      const uploadResult = await uploadSignatureImageClient(supabase, workspaceId, parentRequest.id, drawnDataUrl as string);
       if ("error" in uploadResult) {
         setSubmittingSignature(false);
         setSigningError(uploadResult.error);
@@ -223,6 +223,18 @@ export function SignaturesPanel({
       setSigningError(error.message);
       return;
     }
+    // Best-effort, same pattern PublicSignView.tsx's own token-based path
+    // uses -- a no-op until every signer is done, safe to retry.
+    if (parentRequest) {
+      fetch("/api/sign/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ signatureRequestId: parentRequest.id }),
+      }).catch(() => {});
+    }
+    // Completes the audit trail for this path the same way PublicSignView's
+    // token flow does -- navigator.userAgent is the only source for this.
+    void supabase.rpc("set_signature_user_agent", { p_signer_id: signingId, p_user_agent: navigator.userAgent });
     closeSigningModal();
     toast.show("Signature recorded", "success");
     router.refresh();

@@ -4,10 +4,10 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { Pager } from "@/components/Pager";
 import { NewClientButton } from "./NewClientButton";
-import { TagFilterControl } from "./TagFilterControl";
 import { ContactsSearchBar } from "./ContactsSearchBar";
 import { ContactsBulkTable } from "./ContactsBulkTable";
-import type { ClientRow } from "./clientListColumns";
+import { resolveAssignedStaff, type ClientRow } from "./clientListColumns";
+import type { SearchClientsFilters } from "./bulkContactActions";
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +28,18 @@ const STATUS_FILTERS = [
   { value: "archived", label: "Archived" },
 ];
 
+// Mirrors clients_client_type_check exactly -- the Type column already
+// shows this, this just makes it filterable too (Contacts Reconciliation
+// Audit, Product Decision #12: "Account Type" was found to be a duplicate
+// of this field, not a separate concept, so it gets no filter of its own).
+const CLIENT_TYPE_FILTERS = [
+  { value: "individual", label: "Individual" },
+  { value: "business", label: "Business" },
+  { value: "trust", label: "Trust" },
+  { value: "estate", label: "Estate" },
+  { value: "organization", label: "Organization" },
+];
+
 export default async function ClientsPage({
   searchParams,
 }: {
@@ -41,6 +53,9 @@ export default async function ClientsPage({
     stage?: string;
     missingDocs?: string;
     balance?: string;
+    clientType?: string;
+    hasEmail?: string;
+    hasPhone?: string;
   };
 }) {
   const workspace = await getCurrentWorkspace();
@@ -60,6 +75,30 @@ export default async function ClientsPage({
   const stageFilter = searchParams.stage?.trim() || "";
   const missingDocuments = searchParams.missingDocs === "1";
   const outstandingBalance = searchParams.balance === "1";
+  const clientType = CLIENT_TYPE_FILTERS.some((f) => f.value === searchParams.clientType) ? (searchParams.clientType as string) : "";
+  // "1" = has one on file, "0" = missing -- anything else (unset) means the
+  // filter isn't applied, matching search_clients' own null-means-ignore
+  // pattern for p_has_email/p_has_phone.
+  const hasEmail = searchParams.hasEmail === "1" ? true : searchParams.hasEmail === "0" ? false : undefined;
+  const hasPhone = searchParams.hasPhone === "1" ? true : searchParams.hasPhone === "0" ? false : undefined;
+
+  // Shared verbatim with ContactsBulkTable's "select all matching" (Phase
+  // 3) so it can reissue this exact query, unpaginated, without the two
+  // ever drifting out of sync with each other or with search_clients' own
+  // parameter names.
+  const searchFilters: SearchClientsFilters = {
+    p_query: q || undefined,
+    p_lifecycle_statuses: status ? [status] : ALL_LIFECYCLE_STATUSES,
+    p_tag: tag || undefined,
+    p_service_id: serviceFilter || undefined,
+    p_assigned_staff_id: staffFilter || undefined,
+    p_pipeline_stage_name: stageFilter || undefined,
+    p_missing_documents: missingDocuments ? true : undefined,
+    p_outstanding_balance: outstandingBalance ? true : undefined,
+    p_client_type: clientType || undefined,
+    p_has_email: hasEmail,
+    p_has_phone: hasPhone,
+  };
 
   const {
     data: { user },
@@ -70,6 +109,8 @@ export default async function ClientsPage({
     { data: services },
     { data: serviceCategoriesRaw },
     { data: canCreate },
+    { data: canEdit },
+    { data: canDelete },
     { data: workspaceTags },
     { data: activeMembers },
     { data: membership },
@@ -81,14 +122,7 @@ export default async function ClientsPage({
     // pagination stays correct against the filtered set.
     supabase.rpc("search_clients", {
       p_workspace_id: workspace.id,
-      p_query: q || undefined,
-      p_lifecycle_statuses: status ? [status] : ALL_LIFECYCLE_STATUSES,
-      p_tag: tag || undefined,
-      p_service_id: serviceFilter || undefined,
-      p_assigned_staff_id: staffFilter || undefined,
-      p_pipeline_stage_name: stageFilter || undefined,
-      p_missing_documents: missingDocuments ? true : undefined,
-      p_outstanding_balance: outstandingBalance ? true : undefined,
+      ...searchFilters,
       p_limit: PAGE_SIZE,
       p_offset: from,
     }),
@@ -104,6 +138,17 @@ export default async function ClientsPage({
       .eq("workspace_id", workspace.id)
       .order("display_order"),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
+    // Bulk status/assignment mutate existing contacts, not create new ones --
+    // clients.edit is the same permission mark_client_lost and the
+    // assignments page already require for exactly this kind of write.
+    // Bulk tag/export stay on the existing clients.create-gated canManage
+    // below, unchanged, since that's how they already shipped.
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.edit" }),
+    // Bulk hard delete -- a distinct, more consequential permission than
+    // clients.edit; already exists and is already granted to Owner/Admin/
+    // ERO (it already gates the RLS DELETE policy on `clients` directly),
+    // just never wired to any UI or RPC until this reconciliation pass.
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.delete" }),
     supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id }),
     supabase.from("workspace_users").select("user_id").eq("workspace_id", workspace.id).eq("status", "active"),
     user
@@ -186,10 +231,26 @@ export default async function ClientsPage({
     : { data: [] as { client_id: string }[] };
   const clientsNeedingReview = new Set((submittedOrganizers ?? []).map((o) => o.client_id));
 
+  // search_clients' RETURNS TABLE never selects relationship_manager_id --
+  // it's only used in the RPC's own WHERE clause for the existing "Assigned
+  // to" filter -- so the Assigned Staff column needs its own scoped fetch
+  // rather than a migration to the RPC's signature. Same enrichment pattern
+  // as requestedServicesByClient/clientsNeedingReview above.
+  const { data: relationshipManagerRows } = clientIds.length > 0
+    ? await supabase.from("clients").select("id, relationship_manager_id").in("id", clientIds)
+    : { data: [] as { id: string; relationship_manager_id: string | null }[] };
+  const managerIdByClient = new Map((relationshipManagerRows ?? []).map((r) => [r.id, r.relationship_manager_id]));
+  const managerIds = Array.from(new Set((relationshipManagerRows ?? []).map((r) => r.relationship_manager_id).filter((id): id is string => Boolean(id))));
+  const { data: managerProfiles } = managerIds.length > 0
+    ? await supabase.from("user_profiles").select("id, display_name").in("id", managerIds)
+    : { data: [] as { id: string; display_name: string | null }[] };
+  const managerById = new Map((managerProfiles ?? []).map((p) => [p.id, p]));
+
   const clientRows: ClientRow[] = (clients ?? []).map((c) => ({
     ...c,
     needsReview: clientsNeedingReview.has(c.id),
     requestedService: requestedServiceLabelByClient.get(c.id) ?? null,
+    assignedStaff: resolveAssignedStaff(managerIdByClient.get(c.id) ?? null, managerById),
   }));
 
   // Every active filter, so switching status/tag or paging never silently
@@ -204,6 +265,9 @@ export default async function ClientsPage({
       ["stage", stageFilter],
       ["missingDocs", missingDocuments ? "1" : ""],
       ["balance", outstandingBalance ? "1" : ""],
+      ["clientType", clientType],
+      ["hasEmail", hasEmail === undefined ? "" : hasEmail ? "1" : "0"],
+      ["hasPhone", hasPhone === undefined ? "" : hasPhone ? "1" : "0"],
     ] as [string, string][]
   ).filter(([, v]) => v);
   const extraQuery = activeParams.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
@@ -216,33 +280,39 @@ export default async function ClientsPage({
     <>
       <PageHeader
         title="Contacts"
-        description="Every client and lead in your workspace."
         actions={
-          canCreate ? (
-            <NewClientButton
-              workspaceId={workspace.id}
-              workspaceName={workspace.name}
-              serviceCategories={serviceCategories}
-              isOwner={isOwner}
-              staffOptions={staffOptions}
-              accountHolderName={accountHolderName}
+          <div className="flex flex-wrap items-center gap-2">
+            <ContactsSearchBar
+              initialQuery={q}
+              basePath="/clients"
+              services={serviceFilterOptions}
+              staffOptions={staffFilterOptions}
+              pipelineStages={pipelineStageOptions}
+              activeServiceId={serviceFilter}
+              activeStaffId={staffFilter}
+              activeStage={stageFilter}
+              clientTypes={CLIENT_TYPE_FILTERS}
+              activeClientType={clientType}
+              hasEmail={hasEmail}
+              hasPhone={hasPhone}
+              tags={workspaceTags ?? []}
+              activeTag={tag}
+              tagQueryBase={tagQueryBase}
             />
-          ) : null
+            {canCreate ? (
+              <NewClientButton
+                workspaceId={workspace.id}
+                workspaceName={workspace.name}
+                serviceCategories={serviceCategories}
+                isOwner={isOwner}
+                staffOptions={staffOptions}
+                accountHolderName={accountHolderName}
+              />
+            ) : null}
+          </div>
         }
       />
       <div className="flex-1 px-8 py-6">
-        <ContactsSearchBar
-          initialQuery={q}
-          basePath="/clients"
-          services={serviceFilterOptions}
-          staffOptions={staffFilterOptions}
-          pipelineStages={pipelineStageOptions}
-          activeServiceId={serviceFilter}
-          activeStaffId={staffFilter}
-          activeStage={stageFilter}
-          missingDocuments={missingDocuments}
-          outstandingBalance={outstandingBalance}
-        />
         <div className="mb-2 flex flex-wrap gap-2">
           {STATUS_FILTERS.map((f) => (
             <Link
@@ -257,25 +327,35 @@ export default async function ClientsPage({
           ))}
         </div>
 
-        {(workspaceTags ?? []).length > 0 && (
-          <div className="mb-4">
-            <TagFilterControl tags={workspaceTags ?? []} activeTag={tag} baseHref={tagQueryBase} />
-          </div>
-        )}
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft transition hover:shadow-softHover">
           <ContactsBulkTable
             rows={clientRows}
             workspaceId={workspace.id}
             canManage={Boolean(canCreate)}
+            canEdit={Boolean(canEdit)}
+            canDelete={Boolean(canDelete)}
+            staffOptions={staffFilterOptions}
+            activeFilters={searchFilters}
+            totalCount={count ?? clients.length}
             emptyMessage={
-              q || serviceFilter || staffFilter || stageFilter || missingDocuments || outstandingBalance
+              q || serviceFilter || staffFilter || stageFilter || missingDocuments || outstandingBalance || clientType || hasEmail !== undefined || hasPhone !== undefined
                 ? "No contacts match this search."
                 : status
                 ? `No clients with status "${STATUS_FILTERS.find((f) => f.value === status)?.label}".`
                 : "No clients yet. Add your first client to get started."
             }
             emptyAction={
-              !status && !q && !serviceFilter && !staffFilter && !stageFilter && !missingDocuments && !outstandingBalance && canCreate ? (
+              !status &&
+              !q &&
+              !serviceFilter &&
+              !staffFilter &&
+              !stageFilter &&
+              !missingDocuments &&
+              !outstandingBalance &&
+              !clientType &&
+              hasEmail === undefined &&
+              hasPhone === undefined &&
+              canCreate ? (
                 <NewClientButton
               workspaceId={workspace.id}
               workspaceName={workspace.name}

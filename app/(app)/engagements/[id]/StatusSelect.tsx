@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { SIGNATURE_GATED_STATUSES } from "@/lib/engagementStatus";
 
 export function StatusSelect({
   engagementId,
@@ -20,8 +21,6 @@ export function StatusSelect({
   const [status, setStatus] = useState(currentStatus);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const SIGNATURE_GATED_STATUSES = ["Waiting On Payment", "Ready To Release", "Completed"];
 
   async function handleChange(next: string) {
     if (SIGNATURE_GATED_STATUSES.includes(next)) {
