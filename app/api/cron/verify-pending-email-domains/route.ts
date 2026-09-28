@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { syncResendDomainStatus } from "@/lib/email/domains";
+import { readResendDomainStatus } from "@/lib/email/domains";
 import { withJobLogging } from "@/lib/cron/withJobLogging";
 import { withSupabaseRetry } from "@/lib/supabase/withRetry";
 
@@ -15,9 +15,17 @@ function isAuthorized(request: Request) {
 // Recurring counterpart to the "Check verification" button on the Sending
 // domain card in Settings > Integrations -- so a workspace doesn't have to
 // keep coming back to click it while DNS propagates. Sweeps every domain
-// not yet verified, re-checks against Resend, and self-heals the stored
-// domain name to whatever Resend actually has on file if it ever drifts
-// (the root cause of an earlier stuck-pending case).
+// not yet verified, reads its current state from Resend, and self-heals the
+// stored domain name to whatever Resend actually has on file if it ever
+// drifts (the root cause of an earlier stuck-pending case).
+//
+// Uses a plain read (readResendDomainStatus), not the verify-triggering
+// syncResendDomainStatus the manual button uses: Resend already re-checks
+// pending domains against DNS on its own, so this sweep has no need to force
+// a fresh /verify every run. Forcing one here previously reset an already-
+// verified domain's status back to "pending" on every 15-minute tick, which
+// could make a genuinely verified domain (confirmed in Resend) show as
+// permanently stuck "pending" in the app.
 async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -36,7 +44,7 @@ async function handleGET(request: Request) {
   let verified = 0;
   for (const row of pending ?? []) {
     checked += 1;
-    const sync = await syncResendDomainStatus(row.resend_domain_id);
+    const sync = await readResendDomainStatus(row.resend_domain_id);
     if (!sync.ok) continue;
     if (sync.data.status === "verified") verified += 1;
 
