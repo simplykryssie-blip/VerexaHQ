@@ -228,7 +228,7 @@ export default async function DashboardPage() {
         key: "pipeline",
         label: "Create a pipeline",
         description: "Build the stages a piece of work moves through, from intake to delivered.",
-        href: "/pipelines",
+        href: "/pipelines/manage",
         complete: (processCount ?? 0) > 0,
       },
       {

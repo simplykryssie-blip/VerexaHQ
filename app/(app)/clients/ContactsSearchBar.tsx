@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Check, ChevronDown, X, Filter } from "lucide-react";
 import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
 import { TagFilterControl } from "./TagFilterControl";
@@ -64,6 +64,7 @@ export function ContactsSearchBar({
   tagQueryBase: string;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState(initialQuery);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useDropdownDismiss<HTMLDivElement>(filtersOpen, () => setFiltersOpen(false));
@@ -86,7 +87,7 @@ export function ContactsSearchBar({
   }, [query]);
 
   function toggleLink(param: string, value: string) {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(searchParams.toString());
     if (params.get(param) === value) params.delete(param);
     else params.set(param, value);
     params.delete("page");
@@ -151,7 +152,14 @@ export function ContactsSearchBar({
                   <FilterDropdown label="Service" options={services} activeValue={activeServiceId} param="service" basePath={basePath} />
                 )}
                 {staffOptions.length > 0 && (
-                  <FilterDropdown label="Assigned to" options={staffOptions} activeValue={activeStaffId} param="staff" basePath={basePath} />
+                  <FilterDropdown
+                    label="Assigned to"
+                    options={staffOptions}
+                    activeValue={activeStaffId}
+                    param="staff"
+                    basePath={basePath}
+                    extraOption={{ value: "unassigned", label: "Unassigned" }}
+                  />
                 )}
                 {pipelineStages.length > 0 && (
                   <FilterDropdown label="Pipeline stage" options={pipelineStages} activeValue={activeStage} param="stage" basePath={basePath} />
@@ -199,19 +207,26 @@ function FilterDropdown({
   activeValue,
   param,
   basePath,
+  extraOption,
 }: {
   label: string;
   options: FilterOption[];
   activeValue: string;
   param: string;
   basePath: string;
+  /** A static choice rendered between "All" and the regular options list --
+   * used for "Unassigned" on the Assigned-to filter, a sentinel value
+   * (`?staff=unassigned`) search_clients treats as p_unassigned_only rather
+   * than a real staff id (see app/(app)/clients/page.tsx). */
+  extraOption?: FilterOption;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useDropdownDismiss<HTMLDivElement>(open, () => setOpen(false));
-  const activeLabel = options.find((o) => o.value === activeValue)?.label;
+  const activeLabel = (extraOption && extraOption.value === activeValue ? extraOption : options.find((o) => o.value === activeValue))?.label;
+  const searchParams = useSearchParams();
 
   function hrefFor(value: string) {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(searchParams.toString());
     if (value) params.set(param, value);
     else params.delete(param);
     params.delete("page");
@@ -243,6 +258,18 @@ function FilterDropdown({
               <span>All</span>
               {!activeValue && <Check size={13} aria-hidden="true" />}
             </Link>
+            {extraOption && (
+              <Link
+                href={hrefFor(extraOption.value)}
+                onClick={() => setOpen(false)}
+                className={`flex items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs transition hover:bg-surfaceMuted ${
+                  activeValue === extraOption.value ? "text-accent" : "text-slate"
+                }`}
+              >
+                <span>{extraOption.label}</span>
+                {activeValue === extraOption.value && <Check size={13} aria-hidden="true" />}
+              </Link>
+            )}
             {options.map((o) => (
               <Link
                 key={o.value}

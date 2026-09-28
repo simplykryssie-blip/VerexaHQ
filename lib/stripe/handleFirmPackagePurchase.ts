@@ -49,7 +49,9 @@ export async function handleFirmPackagePurchaseCheckoutCompleted(
   // Keeps the seller's own view of the connection consistent -- the intended
   // flow only ever checks out the package already assigned to the
   // connection, but this stays correct even if that changed in between.
-  await supabase.from("firm_connections").update({ package_id: purchase.package_id }).eq("id", purchase.connection_id);
+  if (purchase.connection_id) {
+    await supabase.from("firm_connections").update({ package_id: purchase.package_id }).eq("id", purchase.connection_id);
+  }
 
   return { skipped: undefined };
 }

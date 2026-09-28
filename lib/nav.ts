@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
-  UserCheck,
   Users,
   Briefcase,
   Calendar,
@@ -56,11 +55,9 @@ export type NavItem = NavLeaf | NavGroup;
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Contacts", href: "/clients", icon: Users },
-  { label: "Engagements", href: "/engagements", icon: Briefcase },
   { label: "Billing", href: "/billing", icon: Receipt },
   { label: "Partner Dashboard", href: "/partner-dashboard", icon: Wallet },
   { label: "Review Queue", href: "/review-queue", icon: ClipboardCheck },
-  { label: "Assignments", href: "/assignments", icon: UserCheck },
   { label: "Pipelines", href: "/pipelines", icon: Kanban },
   { label: "Workflows", href: "/workflows", icon: Zap },
   {
@@ -101,7 +98,7 @@ export type NavSection = { label: string; items: NavItem[] };
 const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   {
     label: "Daily",
-    itemLabels: ["Dashboard", "Contacts", "Engagements", "Billing", "Partner Dashboard", "Review Queue", "Assignments", "Calendar", "Messages"],
+    itemLabels: ["Dashboard", "Contacts", "Billing", "Partner Dashboard", "Review Queue", "Calendar", "Messages"],
   },
   { label: "Build", itemLabels: ["Pipelines", "Workflows", "Websites", "Templates"] },
   { label: "Reference", itemLabels: ["Documents", "Tax Office", "IRS Authorizations", "Reports", "Learning Hub"] },
@@ -137,7 +134,7 @@ export const PLATFORM_HOME_NAV_ITEMS: NavItem[] = [
     label: "Pipelines & Workflows",
     icon: Kanban,
     children: [
-      { label: "Pipelines", href: "/pipelines" },
+      { label: "Pipelines", href: "/pipelines/manage" },
       { label: "Workflows", href: "/workflows" },
     ],
   },

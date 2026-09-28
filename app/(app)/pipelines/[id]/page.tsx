@@ -90,7 +90,7 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
 
   return (
     <div className="px-8 py-6">
-      <Link href="/pipelines" className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
+      <Link href="/pipelines/manage" className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
         <ArrowLeft size={13} /> Back to Pipelines
       </Link>
       <div className="flex items-center gap-2">

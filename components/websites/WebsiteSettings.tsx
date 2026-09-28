@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, X, Globe, CheckCircle2, Copy, RefreshCw } from "lucide-react";
+import { Trash2, X, Globe, CheckCircle2, RefreshCw } from "lucide-react";
+import { CopyIconButton, CopyRecordButton } from "@/components/CopyIconButton";
+import { formatDnsRecordForCopy } from "@/lib/dns/formatDnsRecordForCopy";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { SectionImageUpload } from "@/components/pages/section-editors/SectionImageUpload";
@@ -141,11 +143,6 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
     setDomainVerified(result.verified);
     setDomainVerifiedAt(result.verified ? new Date().toISOString() : null);
     toast.show(result.verified ? "DNS is pointing correctly" : "DNS record not detected yet", result.verified ? "success" : "error");
-  }
-
-  function copyToClipboard(value: string) {
-    navigator.clipboard.writeText(value);
-    toast.show("Copied", "success");
   }
 
   async function save() {
@@ -299,20 +296,26 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
                 <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1 font-mono text-xs">
                   <span className="text-muted">Type</span>
                   <span className="text-ink">{verifyResult.recordType}</span>
-                  <span />
+                  <CopyIconButton value={verifyResult.recordType} label="Copy DNS record type" className="justify-self-end" />
                   <span className="text-muted">Host</span>
                   <span className="text-ink">{verifyResult.isApex ? "@ (root)" : savedDomain}</span>
-                  <span />
+                  <CopyIconButton
+                    value={verifyResult.isApex ? "@" : (savedDomain ?? "")}
+                    label="Copy DNS host"
+                    className="justify-self-end"
+                  />
                   <span className="text-muted">Value</span>
                   <span className="truncate text-ink">{verifyResult.expected}</span>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(verifyResult.expected)}
-                    className="justify-self-end text-muted hover:text-accent"
-                    aria-label="Copy value"
-                  >
-                    <Copy size={12} />
-                  </button>
+                  <CopyIconButton value={verifyResult.expected} label="Copy DNS value" className="justify-self-end" />
+                </div>
+                <div className="mt-2 flex justify-end">
+                  <CopyRecordButton
+                    text={formatDnsRecordForCopy({
+                      type: verifyResult.recordType,
+                      name: verifyResult.isApex ? "@" : savedDomain ?? "",
+                      value: verifyResult.expected,
+                    })}
+                  />
                 </div>
                 {!verifyResult.verified && (
                   <p className="mt-2 text-[11px] text-muted">
@@ -338,20 +341,21 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
                   This domain is already registered elsewhere on Vercel. Add this TXT record too, to prove you own it:
                 </p>
                 {ownershipChallenge.map((c) => (
-                  <div key={c.value} className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1 font-mono text-xs">
-                    <span className="text-muted">TXT</span>
-                    <span className="truncate text-ink">{c.domain}</span>
-                    <span />
-                    <span className="text-muted">Value</span>
-                    <span className="truncate text-ink">{c.value}</span>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(c.value)}
-                      className="justify-self-end text-muted hover:text-accent"
-                      aria-label="Copy value"
-                    >
-                      <Copy size={12} />
-                    </button>
+                  <div key={c.value}>
+                    <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1 font-mono text-xs">
+                      <span className="text-muted">{c.type}</span>
+                      <span className="truncate text-ink">{c.domain}</span>
+                      <CopyIconButton value={c.type} label="Copy DNS record type" className="justify-self-end" />
+                      <span className="text-muted">Host</span>
+                      <span className="truncate text-ink">{c.domain}</span>
+                      <CopyIconButton value={c.domain} label="Copy DNS host" className="justify-self-end" />
+                      <span className="text-muted">Value</span>
+                      <span className="truncate text-ink">{c.value}</span>
+                      <CopyIconButton value={c.value} label="Copy DNS value" className="justify-self-end" />
+                    </div>
+                    <div className="mt-1 flex justify-end">
+                      <CopyRecordButton text={formatDnsRecordForCopy({ type: c.type, name: c.domain, value: c.value })} />
+                    </div>
                   </div>
                 ))}
               </div>

@@ -262,6 +262,7 @@ export function NewEngagementForm({
   defaultClient,
   services,
   pipelines,
+  defaultProcessId,
   autoAssignToSelf,
 }: {
   workspaceId: string;
@@ -275,6 +276,10 @@ export function NewEngagementForm({
     service_categories: { slug: string } | null;
   }[];
   pipelines: { id: string; name: string }[];
+  /** Pre-selects the Pipeline field -- used when arriving from the Pipelines
+   *  Kanban's "+ New Engagement" action, so the engagement is created
+   *  straight into the pipeline the staff member was already looking at. */
+  defaultProcessId?: string | null;
   /** Independent PTIN workspaces are one person -- there's no one else to
    *  assign, so skip the manual assignment step and just assign the
    *  account holder creating the engagement. */
@@ -285,7 +290,9 @@ export function NewEngagementForm({
   const [selectedClient, setSelectedClient] = useState<ClientOption | null>(defaultClient);
   const [serviceId, setServiceId] = useState("");
   const [serviceTouched, setServiceTouched] = useState(false);
-  const [processId, setProcessId] = useState("");
+  const [processId, setProcessId] = useState(
+    defaultProcessId && pipelines.some((p) => p.id === defaultProcessId) ? defaultProcessId : ""
+  );
   const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

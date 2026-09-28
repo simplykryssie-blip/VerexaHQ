@@ -9,6 +9,7 @@ import { JotFormConnectionCard } from "@/components/settings/JotFormConnectionCa
 import { GhlConnectionCard } from "@/components/settings/GhlConnectionCard";
 import { EmailDomainCard, type DnsRecord } from "@/components/settings/EmailDomainCard";
 import { WebhookIntegrationsCard } from "@/components/settings/WebhookIntegrationsCard";
+import { canUseMultipleSendingDomains } from "@/lib/workspaceCapabilities";
 
 export const dynamic = "force-dynamic";
 
@@ -105,11 +106,12 @@ export default async function IntegrationsPage({
   const { data: workspaceRow } = await supabase.from("workspaces").select("stripe_connect_status").eq("id", workspace!.id).single();
   const { data: isJotformConnected } = await supabase.rpc("is_workspace_jotform_connected", { p_workspace_id: workspace!.id });
   const { data: isGhlConnected } = await supabase.rpc("is_workspace_ghl_connected", { p_workspace_id: workspace!.id });
-  const { data: emailDomain } = await supabase
+  const { data: emailDomains } = await supabase
     .from("workspace_email_domains")
-    .select("domain, status, dns_records, from_local_part")
+    .select("id, domain, status, dns_records, from_local_part, is_primary")
     .eq("workspace_id", workspace!.id)
-    .maybeSingle();
+    .order("is_primary", { ascending: false })
+    .order("created_at", { ascending: true });
   const { data: canManageWebhooks } = await supabase.rpc("has_permission", { p_workspace_id: workspace!.id, p_permission_key: "automations.manage" });
   const { data: webhookIntegrations } = canManageWebhooks
     ? await supabase
@@ -146,16 +148,15 @@ export default async function IntegrationsPage({
       </p>
       <div className="mt-6">
         <EmailDomainCard
-          emailDomain={
-            emailDomain
-              ? {
-                  domain: emailDomain.domain,
-                  status: emailDomain.status as "pending" | "verified" | "failed",
-                  dns_records: (emailDomain.dns_records as unknown as DnsRecord[]) ?? [],
-                  from_local_part: emailDomain.from_local_part,
-                }
-              : null
-          }
+          emailDomains={(emailDomains ?? []).map((d) => ({
+            id: d.id,
+            domain: d.domain,
+            status: d.status as "pending" | "verified" | "failed",
+            dns_records: (d.dns_records as unknown as DnsRecord[]) ?? [],
+            from_local_part: d.from_local_part,
+            is_primary: d.is_primary,
+          }))}
+          canAddAnother={canUseMultipleSendingDomains(workspace!)}
         />
       </div>
 

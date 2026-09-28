@@ -57,12 +57,20 @@ export async function sendEmailViaResend({
   // verexahq.com -- e.g. a client sees mail from "notifications@theirfirm.com"
   // rather than "noreply@verexahq.com". Falls back silently to the system
   // default if nothing's configured or verification hasn't completed yet.
+  //
+  // A workspace can have more than one verified domain (ERO Office /
+  // Service Bureau multi-domain support) -- prefers whichever is marked
+  // primary, but still sends from any verified domain rather than falling
+  // all the way back to verexahq.com if the primary itself isn't verified
+  // yet (e.g. mid-switch between two domains).
   if (workspaceId) {
     const { data: customDomain } = await supabase
       .from("workspace_email_domains")
       .select("domain, from_local_part, status")
       .eq("workspace_id", workspaceId)
       .eq("status", "verified")
+      .order("is_primary", { ascending: false })
+      .limit(1)
       .maybeSingle();
     if (customDomain) {
       fromAddress = `${customDomain.from_local_part}@${customDomain.domain}`;

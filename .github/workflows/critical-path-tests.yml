@@ -15,8 +15,9 @@ name: Critical path tests
 # credentials guard below by design.
 #
 # Required repo secrets (Settings -> Secrets and variables -> Actions):
-#   NEXT_PUBLIC_SUPABASE_URL  -- staging project URL
-#   SUPABASE_SERVICE_ROLE_KEY -- staging project service_role key
+#   NEXT_PUBLIC_SUPABASE_URL      -- staging project URL
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY -- staging project anon key
+#   SUPABASE_SERVICE_ROLE_KEY     -- staging project service_role key
 # These must point at the isolated staging project, never production.
 
 on:
@@ -47,19 +48,21 @@ jobs:
 
       - name: Verify staging credentials are configured
         run: |
-          if [ -z "${NEXT_PUBLIC_SUPABASE_URL}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY}" ]; then
-            echo "::error::NEXT_PUBLIC_SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY repo secrets are not set." \
-                 "The critical-path suite requires both so it actually runs against the isolated" \
+          if [ -z "${NEXT_PUBLIC_SUPABASE_URL}" ] || [ -z "${NEXT_PUBLIC_SUPABASE_ANON_KEY}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY}" ]; then
+            echo "::error::NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, and/or SUPABASE_SERVICE_ROLE_KEY repo secrets are not set." \
+                 "The critical-path suite requires all three so it actually runs against the isolated" \
                  "Supabase staging project instead of silently skipping. See .github/workflows/critical-path-tests.yml" \
                  "for setup instructions."
             exit 1
           fi
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
       - name: Run critical path smoke tests
         run: npm test
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

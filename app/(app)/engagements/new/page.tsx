@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export default async function NewEngagementPage({
   searchParams,
 }: {
-  searchParams: { clientId?: string };
+  searchParams: { clientId?: string; processId?: string };
 }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
@@ -65,6 +65,7 @@ export default async function NewEngagementPage({
             defaultClient={defaultClient ?? null}
             services={services ?? []}
             pipelines={pipelines ?? []}
+            defaultProcessId={searchParams.processId ?? null}
             autoAssignToSelf={isIndependentTier(workspace)}
           />
         </div>
