@@ -134,7 +134,7 @@ export const PLATFORM_HOME_NAV_ITEMS: NavItem[] = [
     label: "Pipelines & Workflows",
     icon: Kanban,
     children: [
-      { label: "Pipelines", href: "/pipelines" },
+      { label: "Pipelines", href: "/pipelines/manage" },
       { label: "Workflows", href: "/workflows" },
     ],
   },
