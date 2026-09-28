@@ -275,52 +275,53 @@ export function OverviewTab({
 
         <div className="mt-4 border-t border-border pt-4">
           <AddContactInformationControl clientId={client.id} workspaceId={workspaceId} />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Emails</h3>
-              {emails.length === 0 ? (
-                <EmptyState message="No emails on file." />
-              ) : (
-                <ul className="divide-y divide-border">
-                  {emails.map((e) => (
-                    <li key={e.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
-                      <span>
-                        {e.email}
-                        <span className="ml-2 text-xs capitalize text-muted">{e.email_type}</span>
-                        {e.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
-                      </span>
-                      <div className="flex shrink-0 items-center gap-2">
-                        {!e.is_primary && <SetEmailPrimaryButton emailId={e.id} />}
-                        <DeleteEmailButton emailId={e.id} />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+        </div>
 
-            <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Phones</h3>
-              {phones.length === 0 ? (
-                <EmptyState message="No phones on file." />
-              ) : (
-                <ul className="divide-y divide-border">
-                  {phones.map((p) => (
-                    <li key={p.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
-                      <span>
-                        {formatPhone(p.phone_number)}
-                        <span className="ml-2 text-xs capitalize text-muted">{p.phone_type}</span>
-                        {p.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
-                      </span>
-                      <div className="flex shrink-0 items-center gap-2">
-                        {!p.is_primary && <SetPhonePrimaryButton phoneId={p.id} />}
-                        <DeletePhoneButton phoneId={p.id} />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Emails</h3>
+            {emails.length === 0 ? (
+              <EmptyState message="No emails on file." />
+            ) : (
+              <ul className="divide-y divide-border">
+                {emails.map((e) => (
+                  <li key={e.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
+                    <span>
+                      {e.email}
+                      <span className="ml-2 text-xs capitalize text-muted">{e.email_type}</span>
+                      {e.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {!e.is_primary && <SetEmailPrimaryButton emailId={e.id} />}
+                      <DeleteEmailButton emailId={e.id} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Phones</h3>
+            {phones.length === 0 ? (
+              <EmptyState message="No phones on file." />
+            ) : (
+              <ul className="divide-y divide-border">
+                {phones.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
+                    <span>
+                      {formatPhone(p.phone_number)}
+                      <span className="ml-2 text-xs capitalize text-muted">{p.phone_type}</span>
+                      {p.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {!p.is_primary && <SetPhonePrimaryButton phoneId={p.id} />}
+                      <DeletePhoneButton phoneId={p.id} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
 
@@ -334,7 +335,7 @@ export function OverviewTab({
                 <li key={a.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
                   <span>
                     <span className="mr-2 capitalize text-muted">{a.address_type}:</span>
-                    {[a.street, a.city, a.state, a.zip].filter(Boolean).join(", ")}
+                    {[a.street, a.street2, a.city, [a.state, a.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ")}
                     {a.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
                   </span>
                   <div className="flex shrink-0 items-center gap-2">
@@ -446,7 +447,7 @@ export function OverviewTab({
                     </div>
                     <div className="mt-0.5 flex flex-wrap gap-x-4 text-xs text-muted">
                       {c.email && <span>{c.email}</span>}
-                      {c.phone && <span>{c.phone}</span>}
+                      {c.phone && <span>{formatPhone(c.phone)}</span>}
                     </div>
                   </li>
                 );
@@ -1399,7 +1400,16 @@ export function TasksTab({
 // ------------------------------------------------------------------- Types
 
 export type ContactRow = { id: string; first_name: string | null; last_name: string | null; title: string | null; email: string | null; phone: string | null; is_primary: boolean };
-export type AddressRow = { id: string; address_type: string; street: string | null; city: string | null; state: string | null; zip: string | null; is_primary: boolean };
+export type AddressRow = {
+  id: string;
+  address_type: string;
+  street: string | null;
+  street2: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  is_primary: boolean;
+};
 export type EmailRow = { id: string; email: string; email_type: string; is_primary: boolean };
 export type PhoneRow = { id: string; phone_number: string; phone_type: string; is_primary: boolean };
 export type PortalUserRow = {

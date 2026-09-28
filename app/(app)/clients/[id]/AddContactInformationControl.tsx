@@ -14,6 +14,13 @@ const METHOD_OPTIONS: { value: ContactMethodType; label: string; icon: typeof Ma
   { value: "address", label: "Address", icon: MapPin },
 ];
 
+/** Contacts Pass 2: replaces the three separate "Add Email" / "Add Phone" /
+ *  "Add Address" triggers with one unified control. Reuses AddEmailForm /
+ *  AddPhoneForm / AddAddressForm exactly as they already are -- same
+ *  tables, same RPCs/direct-table calls, same permission checks, same
+ *  primary-designation behavior -- this component only decides which one
+ *  of the three is visible at a time via InlineAddForm's controlled-open
+ *  mode, no new Contact-method storage or mutation path. */
 export function AddContactInformationControl({ clientId, workspaceId }: { clientId: string; workspaceId: string }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<ContactMethodType | null>(null);

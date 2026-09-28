@@ -92,7 +92,7 @@ export type SignatureRequestRow = {
   signers: SignerRow[];
 };
 
-export type ActivityRow = { id: string; description: string; created_at: string };
+export type ActivityRow = { id: string; description: string; activity_type: string; created_at: string };
 
 export type DocumentRequestTemplateOption = { id: string; name: string };
 

@@ -1,13 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Maximize2, X, Briefcase, FolderOpen, FileWarning, ListChecks, Wallet, CalendarClock, MessageCircle, Contact, ArrowUpRight } from "lucide-react";
+import { Maximize2, X, Briefcase, FolderOpen, FileWarning, ListChecks, Wallet, CalendarClock, MessageCircle, Contact, ArrowUpRight, MapPin } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatTile } from "@/components/ui/StatTile";
 import { QuickActions } from "./QuickActions";
 import { ConvertLeadButton } from "./ConvertLeadButton";
+import { RevertToLeadButton } from "./RevertToLeadButton";
 import { MarkLeadLostButton } from "./MarkLeadLostButton";
 import { ArchiveClientButton } from "./ArchiveClientButton";
 import { clientStatusTone } from "@/lib/clientStatus";
@@ -36,6 +37,19 @@ export function openEngagementsCount(engagements: { status: string }[]): number 
  * Calendar to add one. */
 export function nextAppointmentCalendarHref(appointments: unknown[]): string | undefined {
   return appointments.length > 0 ? "/calendar" : undefined;
+}
+
+/** Pure so the "which address counts as the quick-overview primary" rule
+ * is directly testable. Mirrors client_addresses' own is_primary flag
+ * (Pass 2: exactly one per Contact) -- falls back to the first address on
+ * file so a Contact that predates that invariant still shows something. */
+export function primaryAddressLine(addresses: { street: string | null; street2: string | null; city: string | null; state: string | null; zip: string | null; is_primary: boolean }[]): string | null {
+  const primary = addresses.find((a) => a.is_primary) ?? addresses[0];
+  if (!primary) return null;
+  const line = [primary.street, primary.street2, primary.city, [primary.state, primary.zip].filter(Boolean).join(" ")]
+    .filter(Boolean)
+    .join(", ");
+  return line || null;
 }
 
 function relativeTime(iso: string): string {
@@ -76,7 +90,7 @@ export function fullRecordHref(clientId: string, tab?: ClientTab): string {
  * not "the full record" the way an entire editable tab is. */
 export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
   const router = useRouter();
-  const { client, engagements, tasks, missingDocumentCount, appointments, messages, outstandingBalance, portalUsers, permissions, organizerTemplates, pendingOrganizerTemplateIds, workspace } = props;
+  const { client, engagements, tasks, missingDocumentCount, appointments, messages, outstandingBalance, portalUsers, permissions, organizerTemplates, pendingOrganizerTemplateIds, workspace, addresses } = props;
 
   const openEngagement = engagements.find((e) => isOpenEngagementStatus(e.status));
   const currentServiceName = openEngagement
@@ -89,6 +103,7 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
   const nextAppointment = appointments[0];
   const nextAppointmentDestination = nextAppointmentCalendarHref(appointments);
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+  const primaryAddress = primaryAddressLine(addresses);
   const portalStatus = portalUsers.some((p) => p.status === "active")
     ? "Portal Active"
     : portalUsers.length > 0
@@ -122,6 +137,11 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
                   {[client.primary_email, client.primary_phone ? formatPhone(client.primary_phone) : null].filter(Boolean).join(" · ") ||
                     "No contact info on file"}
                 </p>
+                {primaryAddress && (
+                  <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
+                    <MapPin size={11} aria-hidden="true" /> {primaryAddress}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1">
@@ -156,6 +176,7 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
 
           <div className="mt-3 flex items-center gap-2">
             <ConvertLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
+            <RevertToLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
             <MarkLeadLostButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
             <ArchiveClientButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
             <QuickActions
