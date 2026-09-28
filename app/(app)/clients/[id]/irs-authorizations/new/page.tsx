@@ -8,7 +8,7 @@ import { NewIrsAuthorizationForm } from "./NewIrsAuthorizationForm";
 export const dynamic = "force-dynamic";
 
 function clientDisplayName(c: { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }) {
-  if (c.client_type === "business" && c.business_name) return c.business_name;
+  if (c.client_type !== "individual" && c.business_name) return c.business_name;
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 
@@ -36,7 +36,9 @@ export default async function NewIrsAuthorizationPage({ params }: { params: { id
     await Promise.all([
       supabase
         .from("clients")
-        .select("id, client_type, first_name, last_name, business_name, primary_email, address_line1, address_line2, city, state, postal_code")
+        .select(
+          "id, client_type, first_name, last_name, business_name, primary_email, primary_phone, address_line1, address_line2, city, state, postal_code, ssn_last4, itin_last4, ein_last4"
+        )
         .eq("id", params.id)
         .single(),
       supabase
@@ -48,11 +50,13 @@ export default async function NewIrsAuthorizationPage({ params }: { params: { id
       supabase.from("workspace_users").select("user_id").eq("workspace_id", workspace.id).eq("status", "active"),
       supabase
         .from("engagement_letter_templates")
-        .select("id, name")
+        .select("id, name, pdf_field_mappings")
         .eq("workspace_id", workspace.id)
         .eq("source_type", "pdf")
+        .eq("form_kind", "irs_8821")
         .not("pdf_field_mode", "is", null)
-        .order("name"),
+        .order("form_version", { ascending: false })
+        .order("created_at", { ascending: false }),
       supabase.from("workspaces").select("name, phone, mailing_address").eq("id", workspace.id).single(),
       supabase.from("branding").select("support_phone").eq("workspace_id", workspace.id).maybeSingle(),
       getIrs8821OrganizerPrefill(supabase, params.id),
@@ -82,6 +86,14 @@ export default async function NewIrsAuthorizationPage({ params }: { params: { id
 
   const clientAddress = [client.address_line1, client.address_line2, client.city, client.state, client.postal_code].filter(Boolean).join(", ");
 
+  // A template with no field mappings at all would generate a completely
+  // blank 8821 -- excluded here rather than deleted, since it may already be
+  // referenced by a past signature_requests row.
+  const usableTemplates = (templates ?? []).filter((t) => {
+    const mappings = t.pdf_field_mappings as unknown[] | null;
+    return Array.isArray(mappings) && mappings.length > 0;
+  });
+
   return (
     <>
       <PageHeader backHref={`/clients/${client.id}`} backLabel={`Back to ${clientDisplayName(client)}`} title="New IRS Authorization" />
@@ -93,10 +105,12 @@ export default async function NewIrsAuthorizationPage({ params }: { params: { id
             clientName={clientDisplayName(client)}
             clientEmail={client.primary_email}
             clientAddress={clientAddress}
-            defaultTaxpayerType={client.client_type === "business" ? "business" : "individual"}
+            clientPhone={client.primary_phone ?? ""}
+            clientHasTin={Boolean(client.ssn_last4 || client.itin_last4 || client.ein_last4)}
+            defaultTaxpayerType={client.client_type !== "individual" ? "business" : "individual"}
             engagements={engagements}
             staffOptions={staffOptions}
-            templates={templates ?? []}
+            templates={usableTemplates.map((t) => ({ id: t.id, name: t.name }))}
             firmName={workspace.name}
             firmAddress={contact?.mailing_address ?? ""}
             firmPhone={branding?.support_phone ?? contact?.phone ?? ""}
