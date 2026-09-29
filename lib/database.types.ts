@@ -6908,6 +6908,7 @@ export type Database = {
           channels: string[] | null
           created_at: string
           dedupe_key: string | null
+          domain_id: string | null
           entity_id: string | null
           entity_type: string | null
           error: string | null
@@ -6932,6 +6933,7 @@ export type Database = {
           channels?: string[] | null
           created_at?: string
           dedupe_key?: string | null
+          domain_id?: string | null
           entity_id?: string | null
           entity_type?: string | null
           error?: string | null
@@ -6956,6 +6958,7 @@ export type Database = {
           channels?: string[] | null
           created_at?: string
           dedupe_key?: string | null
+          domain_id?: string | null
           entity_id?: string | null
           entity_type?: string | null
           error?: string | null
@@ -6975,6 +6978,13 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "notification_queue_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_email_domains"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notification_queue_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -7527,6 +7537,7 @@ export type Database = {
           name: string
           public_token: string
           requires_portal_signup: boolean
+          sending_domain_id: string | null
           slug: string
           status: string
           updated_at: string
@@ -7544,6 +7555,7 @@ export type Database = {
           name: string
           public_token?: string
           requires_portal_signup?: boolean
+          sending_domain_id?: string | null
           slug: string
           status?: string
           updated_at?: string
@@ -7561,6 +7573,7 @@ export type Database = {
           name?: string
           public_token?: string
           requires_portal_signup?: boolean
+          sending_domain_id?: string | null
           slug?: string
           status?: string
           updated_at?: string
@@ -7572,6 +7585,13 @@ export type Database = {
             columns: ["folder_id"]
             isOneToOne: false
             referencedRelation: "library_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organizer_templates_sending_domain_id_fkey"
+            columns: ["sending_domain_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_email_domains"
             referencedColumns: ["id"]
           },
           {

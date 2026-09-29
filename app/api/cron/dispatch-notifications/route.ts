@@ -104,6 +104,7 @@ type NotificationJob = {
   max_attempts: number;
   entity_type: string | null;
   entity_id: string | null;
+  domain_id: string | null;
 };
 
 type EmailTemplateCandidate = {
@@ -320,7 +321,7 @@ async function dispatchOne(supabase: ReturnType<typeof createServiceClient>, job
       const styleHtml = customCss ? `<style>${customCss}</style>` : "";
       const bannerHtml = bannerImageUrl ? `<img src="${bannerImageUrl}" alt="" style="max-width:100%;display:block;margin:0 auto 16px;" />` : "";
       const html = `${styleHtml}${bannerHtml}${renderTemplate(template.body_html, payload)}`;
-      const result = await sendEmailViaResend({ to: job.recipient_email, subject, html, workspaceId });
+      const result = await sendEmailViaResend({ to: job.recipient_email, subject, html, workspaceId, domainId: job.domain_id ?? undefined });
       if (result.reason === undefined) await recordProviderCheck("email", result.sent, result.error);
 
       let messageId: string | null = null;
