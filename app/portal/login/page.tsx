@@ -101,7 +101,7 @@ export default function PortalLoginPage() {
             <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
             Remember me
           </label>
-          <Link href="/forgot-password" className={styles.link}>
+          <Link href="/forgot-password?portal=1" className={styles.link}>
             Forgot password?
           </Link>
         </div>
