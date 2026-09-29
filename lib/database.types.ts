@@ -3965,6 +3965,8 @@ export type Database = {
           filed_as_attachment: boolean
           id: string
           resolved_body_html: string
+          reviewed_at: string | null
+          reviewed_by: string | null
           signature_image_path: string | null
           signature_type: string
           signed_at: string
@@ -3981,6 +3983,8 @@ export type Database = {
           filed_as_attachment?: boolean
           id?: string
           resolved_body_html: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           signature_image_path?: string | null
           signature_type?: string
           signed_at?: string
@@ -3997,6 +4001,8 @@ export type Database = {
           filed_as_attachment?: boolean
           id?: string
           resolved_body_html?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           signature_image_path?: string | null
           signature_type?: string
           signed_at?: string
@@ -12041,6 +12047,7 @@ export type Database = {
           default_compliance_officer_id: string | null
           default_relationship_manager_id: string | null
           default_reviewer_id: string | null
+          ero_capability_enabled: boolean
           id: string
           is_billing_exempt: boolean
           is_demo: boolean
@@ -12078,6 +12085,7 @@ export type Database = {
           default_compliance_officer_id?: string | null
           default_relationship_manager_id?: string | null
           default_reviewer_id?: string | null
+          ero_capability_enabled?: boolean
           id?: string
           is_billing_exempt?: boolean
           is_demo?: boolean
@@ -12115,6 +12123,7 @@ export type Database = {
           default_compliance_officer_id?: string | null
           default_relationship_manager_id?: string | null
           default_reviewer_id?: string | null
+          ero_capability_enabled?: boolean
           id?: string
           is_billing_exempt?: boolean
           is_demo?: boolean
@@ -12930,6 +12939,10 @@ export type Database = {
         }[]
       }
       can_access_admin_ai: { Args: never; Returns: boolean }
+      can_operate_client_book: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
+      }
       can_use_network_messaging: {
         Args: { p_workspace_id: string }
         Returns: boolean
@@ -14594,6 +14607,10 @@ export type Database = {
         Args: { p_document_request_id: string }
         Returns: undefined
       }
+      mark_engagement_letter_signature_reviewed: {
+        Args: { p_signature_id: string }
+        Returns: undefined
+      }
       mark_firm_payout_paid: {
         Args: { p_payment_note?: string; p_payout_id: string }
         Returns: undefined
@@ -15565,6 +15582,7 @@ export type Database = {
           default_compliance_officer_id: string | null
           default_relationship_manager_id: string | null
           default_reviewer_id: string | null
+          ero_capability_enabled: boolean
           id: string
           is_billing_exempt: boolean
           is_demo: boolean
