@@ -71,7 +71,7 @@ const QUEUE_CHECKS: QueueCheck[] = [
 
 const AUTOMATION_PENDING_STEPS_SOURCE = "stale-queue:automation_pending_steps";
 
-type WaitActionConfig = { wait_mode?: string; wait_timeout_days?: number } | null | undefined;
+type WaitActionConfig = { wait_mode?: string; wait_timeout_days?: number; wait_timeout_minutes?: number } | null | undefined;
 
 // automation_pending_steps needs its own check, separate from the generic
 // QUEUE_CHECKS loop above: a "wait until condition" step deliberately sits
@@ -105,7 +105,10 @@ async function findStaleAutomationSteps(supabase: ReturnType<typeof createServic
     const config = (row.automation_steps as unknown as { action_config?: WaitActionConfig } | null)?.action_config;
     const ageMinutes = (now - new Date(row.scheduled_for).getTime()) / 60000;
     if (config?.wait_mode === "until_condition") {
-      const timeoutMinutes = (config.wait_timeout_days ?? 1) * 24 * 60 + CONDITION_WAIT_GRACE_MINUTES;
+      const timeoutMinutes =
+        config.wait_timeout_minutes != null
+          ? Number(config.wait_timeout_minutes) + CONDITION_WAIT_GRACE_MINUTES
+          : (config.wait_timeout_days ?? 1) * 24 * 60 + CONDITION_WAIT_GRACE_MINUTES;
       return ageMinutes > timeoutMinutes;
     }
     return ageMinutes > STALE_AFTER_MINUTES;

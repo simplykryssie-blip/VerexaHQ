@@ -773,16 +773,25 @@ export function StepCard({
                 Timeout counts as
                 <select
                   disabled={!canManage}
-                  value={config.wait_timeout_business_hours != null ? "business_hours" : "calendar_days"}
+                  value={
+                    config.wait_timeout_business_hours != null
+                      ? "business_hours"
+                      : config.wait_timeout_minutes != null
+                        ? "minutes"
+                        : "calendar_days"
+                  }
                   onChange={(e) => {
                     const mode = e.target.value;
                     setConfig((current) => {
                       const next = { ...current } as Record<string, unknown>;
+                      delete next.wait_timeout_days;
+                      delete next.wait_timeout_business_hours;
+                      delete next.wait_timeout_minutes;
                       if (mode === "business_hours") {
-                        delete next.wait_timeout_days;
                         next.wait_timeout_business_hours = "16";
+                      } else if (mode === "minutes") {
+                        next.wait_timeout_minutes = "30";
                       } else {
-                        delete next.wait_timeout_business_hours;
                         next.wait_timeout_days = "30";
                       }
                       return next;
@@ -793,23 +802,39 @@ export function StepCard({
                 >
                   <option value="calendar_days">Calendar days</option>
                   <option value="business_hours">Business hours</option>
+                  <option value="minutes">Minutes</option>
                 </select>
               </label>
               <label className="flex flex-col gap-1 text-xs text-muted">
-                {config.wait_timeout_business_hours != null ? "Give up after (business hours)" : "Give up after (days)"}
+                {config.wait_timeout_business_hours != null
+                  ? "Give up after (business hours)"
+                  : config.wait_timeout_minutes != null
+                    ? "Give up after (minutes)"
+                    : "Give up after (days)"}
                 <input
                   disabled={!canManage}
                   type="number"
                   min={1}
                   step={config.wait_timeout_business_hours != null ? "0.5" : "1"}
-                  value={(config.wait_timeout_business_hours ?? config.wait_timeout_days ?? (config.wait_timeout_business_hours != null ? "16" : "30")) as string}
-                  onChange={(e) => setField(config.wait_timeout_business_hours != null ? "wait_timeout_business_hours" : "wait_timeout_days", e.target.value)}
+                  value={
+                    (config.wait_timeout_business_hours ?? config.wait_timeout_minutes ?? config.wait_timeout_days ?? "30") as string
+                  }
+                  onChange={(e) =>
+                    setField(
+                      config.wait_timeout_business_hours != null
+                        ? "wait_timeout_business_hours"
+                        : config.wait_timeout_minutes != null
+                          ? "wait_timeout_minutes"
+                          : "wait_timeout_days",
+                      e.target.value
+                    )
+                  }
                   className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
                 />
               </label>
             </div>
             <span className="text-[11px] normal-case text-muted">
-              If the condition still hasn&apos;t been met after that many days, the workflow continues anyway instead of waiting
+              If the condition still hasn&apos;t been met after that {config.wait_timeout_business_hours != null ? "many business hours" : config.wait_timeout_minutes != null ? "many minutes" : "many days"}, the workflow continues anyway instead of waiting
               forever.
             </span>
           </div>
