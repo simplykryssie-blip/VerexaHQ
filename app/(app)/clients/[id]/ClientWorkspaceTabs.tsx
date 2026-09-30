@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { sanitizeRichTextHtml } from "@/lib/sanitizeRichTextHtml";
 import { TaxIdReveal } from "./TaxIdReveal";
 import { OrganizerResponseCard } from "@/components/organizer/OrganizerResponseCard";
 import { DateOfBirthInput } from "./DateOfBirthInput";
@@ -1305,7 +1306,10 @@ export function NotesTab({ clientId, workspaceId, notes }: { clientId: string; w
                 </div>
                 <EditNoteForm note={n} />
               </div>
-              <div className="prose prose-sm max-w-none whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: n.body }} />
+              <div
+                className="prose prose-sm max-w-none whitespace-pre-wrap"
+                dangerouslySetInnerHTML={{ __html: sanitizeRichTextHtml(n.body) }}
+              />
               <p className="mt-1 text-xs text-muted">{new Date(n.created_at).toLocaleString()}</p>
             </li>
           ))}
@@ -1380,7 +1384,10 @@ export function TasksTab({
                     {t.priority && <span className="text-xs capitalize text-muted">({t.priority})</span>}
                   </div>
                   {t.description && (
-                    <div className="prose prose-sm mt-0.5 max-w-none text-xs text-muted" dangerouslySetInnerHTML={{ __html: t.description }} />
+                    <div
+                      className="prose prose-sm mt-0.5 max-w-none text-xs text-muted"
+                      dangerouslySetInnerHTML={{ __html: sanitizeRichTextHtml(t.description) }}
+                    />
                   )}
                   <div className="mt-1 flex items-center gap-3 text-xs text-muted">
                     {t.due_date && <span>Due {new Date(t.due_date).toLocaleDateString()}</span>}
