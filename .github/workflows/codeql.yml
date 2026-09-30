@@ -1,0 +1,54 @@
+name: "CodeQL SAST scan"
+
+# Static application security scan (SAST) for VerexaHQ, using GitHub's
+# official CodeQL action against the JavaScript/TypeScript application code
+# (Next.js app/components/lib). This is evidence-gathering only: it never
+# builds or runs the application, and it has no effect on runtime behavior.
+#
+# JavaScript/TypeScript analysis does not require a build step -- CodeQL's
+# extractor reads source directly -- so there is intentionally no autobuild/
+# npm install/npm build step here, keeping this workflow minimal and
+# independent of app-specific build secrets (e.g. Sentry source-map upload).
+#
+# Results are uploaded to the repository's GitHub Code Scanning (Security
+# tab) by the analyze step itself, and the generated SARIF file is also
+# retained as a downloadable workflow artifact for external evidence
+# submission (e.g. Zoom Marketplace security review).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
+          output: codeql-results
+
+      - name: Upload SARIF as workflow artifact (evidence retention)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-sarif-javascript-typescript
+          path: codeql-results
+          retention-days: 90
