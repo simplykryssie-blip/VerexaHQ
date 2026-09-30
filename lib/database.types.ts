@@ -3965,6 +3965,8 @@ export type Database = {
           filed_as_attachment: boolean
           id: string
           resolved_body_html: string
+          reviewed_at: string | null
+          reviewed_by: string | null
           signature_image_path: string | null
           signature_type: string
           signed_at: string
@@ -3981,6 +3983,8 @@ export type Database = {
           filed_as_attachment?: boolean
           id?: string
           resolved_body_html: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           signature_image_path?: string | null
           signature_type?: string
           signed_at?: string
@@ -3997,6 +4001,8 @@ export type Database = {
           filed_as_attachment?: boolean
           id?: string
           resolved_body_html?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           signature_image_path?: string | null
           signature_type?: string
           signed_at?: string
@@ -6902,6 +6908,7 @@ export type Database = {
           channels: string[] | null
           created_at: string
           dedupe_key: string | null
+          domain_id: string | null
           entity_id: string | null
           entity_type: string | null
           error: string | null
@@ -6926,6 +6933,7 @@ export type Database = {
           channels?: string[] | null
           created_at?: string
           dedupe_key?: string | null
+          domain_id?: string | null
           entity_id?: string | null
           entity_type?: string | null
           error?: string | null
@@ -6950,6 +6958,7 @@ export type Database = {
           channels?: string[] | null
           created_at?: string
           dedupe_key?: string | null
+          domain_id?: string | null
           entity_id?: string | null
           entity_type?: string | null
           error?: string | null
@@ -6969,6 +6978,13 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "notification_queue_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_email_domains"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notification_queue_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -7521,6 +7537,7 @@ export type Database = {
           name: string
           public_token: string
           requires_portal_signup: boolean
+          sending_domain_id: string | null
           slug: string
           status: string
           updated_at: string
@@ -7538,6 +7555,7 @@ export type Database = {
           name: string
           public_token?: string
           requires_portal_signup?: boolean
+          sending_domain_id?: string | null
           slug: string
           status?: string
           updated_at?: string
@@ -7555,6 +7573,7 @@ export type Database = {
           name?: string
           public_token?: string
           requires_portal_signup?: boolean
+          sending_domain_id?: string | null
           slug?: string
           status?: string
           updated_at?: string
@@ -7566,6 +7585,13 @@ export type Database = {
             columns: ["folder_id"]
             isOneToOne: false
             referencedRelation: "library_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organizer_templates_sending_domain_id_fkey"
+            columns: ["sending_domain_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_email_domains"
             referencedColumns: ["id"]
           },
           {
@@ -12041,6 +12067,7 @@ export type Database = {
           default_compliance_officer_id: string | null
           default_relationship_manager_id: string | null
           default_reviewer_id: string | null
+          ero_capability_enabled: boolean
           id: string
           is_billing_exempt: boolean
           is_demo: boolean
@@ -12078,6 +12105,7 @@ export type Database = {
           default_compliance_officer_id?: string | null
           default_relationship_manager_id?: string | null
           default_reviewer_id?: string | null
+          ero_capability_enabled?: boolean
           id?: string
           is_billing_exempt?: boolean
           is_demo?: boolean
@@ -12115,6 +12143,7 @@ export type Database = {
           default_compliance_officer_id?: string | null
           default_relationship_manager_id?: string | null
           default_reviewer_id?: string | null
+          ero_capability_enabled?: boolean
           id?: string
           is_billing_exempt?: boolean
           is_demo?: boolean
@@ -12600,6 +12629,18 @@ export type Database = {
       }
     }
     Functions: {
+      activate_public_engagement_letter_signup: {
+        Args: {
+          p_token: string
+        }
+        Returns: Json
+      }
+      activate_public_portal_signup: {
+        Args: {
+          p_token: string
+        }
+        Returns: Json
+      }
       _advance_pipeline_stage_unchecked: {
         Args: {
           p_entity_id: string
@@ -12930,6 +12971,10 @@ export type Database = {
         }[]
       }
       can_access_admin_ai: { Args: never; Returns: boolean }
+      can_operate_client_book: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
+      }
       can_use_network_messaging: {
         Args: { p_workspace_id: string }
         Returns: boolean
@@ -14594,6 +14639,10 @@ export type Database = {
         Args: { p_document_request_id: string }
         Returns: undefined
       }
+      mark_engagement_letter_signature_reviewed: {
+        Args: { p_signature_id: string }
+        Returns: undefined
+      }
       mark_firm_payout_paid: {
         Args: { p_payment_note?: string; p_payout_id: string }
         Returns: undefined
@@ -15565,6 +15614,7 @@ export type Database = {
           default_compliance_officer_id: string | null
           default_relationship_manager_id: string | null
           default_reviewer_id: string | null
+          ero_capability_enabled: boolean
           id: string
           is_billing_exempt: boolean
           is_demo: boolean

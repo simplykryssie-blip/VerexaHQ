@@ -10,7 +10,8 @@
       "refund_usage_unit",
       "credit_prepaid_balance",
       "grant_workspace_usage_meters",
-      "check_storage_capacity"
+      "check_storage_capacity",
+      "link_public_portal_account"
     ]
   },
   "acceptedOverloads": {
@@ -20,7 +21,8 @@
   "acceptedPublicFunctions": {
     "_comment": "SECURITY DEFINER functions confirmed, by manual review during the SECURITY DEFINER audit, to be safely authenticated-or-anon-executable despite the automated has_recognized_auth/has_token_lookup heuristics not detecting a standard predicate call or a `token = p_token` lookup pattern in their body. Each entry states why. A function already showing has_recognized_auth=true or has_token_lookup=true does NOT need to be listed here -- this list exists only for the residual cases those two heuristics miss.",
     "entries": {
-      "capture_public_lead_from_site_page": "Public marketing lead-capture form. workspace_id is derived entirely from a p_page_id/p_section_id lookup against a published site_pages/site_page_sections row -- never accepted directly from the caller -- so there is no caller-supplied identifier to authorize against. Confirmed via full body read."
+      "capture_public_lead_from_site_page": "Public marketing lead-capture form. workspace_id is derived entirely from a p_page_id/p_section_id lookup against a published site_pages/site_page_sections row -- never accepted directly from the caller -- so there is no caller-supplied identifier to authorize against. Confirmed via full body read.",
+      "capture_public_mkb_business_inquiry": "Public marketing lead-capture form for the MKB Financial Group website (source-of-truth backfilled in 20261102050000_backfill_capture_public_mkb_business_inquiry.sql). Flagged only because its p_phone argument matches the has_identifier_arg heuristic's 'phone' keyword -- it is not a real caller-supplied resource identifier. workspace_id is derived entirely from a p_page_id/p_section_id lookup against a published site_pages/site_page_sections row, exactly like capture_public_lead_from_site_page above, so there is no caller-supplied identifier to authorize against. A honeypot field and per-field length limits gate spam/abuse before any write. Lead creation is delegated to the existing find_or_create_public_lead path (itself gated by Phase 3.2's can_operate_client_book), not implemented ad hoc. Manual audit of the full body found no cross-tenant write path: every write is scoped to the workspace_id resolved from the published page/section, never to a caller-supplied value."
     }
   },
   "trackedSignatures": {
@@ -96,6 +98,30 @@
       },
       "resubmit_contact_share": {
         "args": "p_share_id uuid",
+        "isSecurityDefiner": true
+      },
+      "link_public_portal_account": {
+        "args": "p_workspace_id uuid, p_client_id uuid, p_auth_user_id uuid, p_email text, p_name text",
+        "isSecurityDefiner": true
+      },
+      "submit_public_organizer_response_with_signup": {
+        "args": "p_token uuid, p_first_name text, p_last_name text, p_email text, p_phone text, p_answers jsonb, p_auth_user_id uuid, p_client_id uuid",
+        "isSecurityDefiner": true
+      },
+      "capture_public_lead_from_contact_step": {
+        "args": "p_token uuid, p_first_name text, p_last_name text, p_email text, p_phone text, p_service_ids uuid[], p_auth_user_id uuid, p_middle_name text, p_suffix text, p_mailing_street text, p_mailing_city text, p_mailing_state text, p_mailing_zip text",
+        "isSecurityDefiner": true
+      },
+      "activate_public_portal_signup": {
+        "args": "p_token uuid",
+        "isSecurityDefiner": true
+      },
+      "sign_public_engagement_letter_with_signup": {
+        "args": "p_token uuid, p_first_name text, p_last_name text, p_email text, p_phone text, p_typed_name text, p_auth_user_id uuid, p_signature_type text, p_signature_image_path text",
+        "isSecurityDefiner": true
+      },
+      "activate_public_engagement_letter_signup": {
+        "args": "p_token uuid",
         "isSecurityDefiner": true
       }
     }

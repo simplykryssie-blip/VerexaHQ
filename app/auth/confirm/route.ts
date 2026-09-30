@@ -48,6 +48,59 @@ export async function GET(request: Request) {
   // time -- that's written straight to the auth.users row, not threaded
   // through any redirect URL, so it survives even when the query string
   // doesn't. It's consulted only as a fallback, after the URL-based params.
+  // Public-organizer self-serve signup (PublicOrganizerForm.tsx) stashes the
+  // organizer's own public token (never a client id or workspace id -- see
+  // the fix_public_organizer_portal_authorization migration) in
+  // user_metadata at signUp() time, the same way pending_invite_token does
+  // for staff invites above. The actual client_portal_users row is created
+  // here, once, right after this route establishes a REAL session for the
+  // now-confirmed user -- never earlier, when auth.uid() would still be
+  // null and there'd be nothing to bind the row to but a caller-supplied
+  // value. Runs unconditionally (before computing where to redirect) so it
+  // still happens even if Supabase's own redirect-URL allow-list stripped
+  // the emailRedirectTo's "next" query param before this route ever saw it.
+  // Failure here (link expired, workspace no longer operational) shouldn't
+  // break the sign-in itself -- the user still lands on /portal/dashboard,
+  // just without portal access yet, same as any other activation edge case.
+  // pending_portal_token is transport only, exactly like pending_invite_token
+  // above -- it is never treated as proof of anything by
+  // activate_public_portal_signup, which independently requires a matching
+  // public organizer submission before it will activate.
+  async function activatePendingOrganizerSignup() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const meta = user?.user_metadata as { pending_portal_token?: string } | undefined;
+    if (!meta?.pending_portal_token) return;
+    try {
+      await supabase.rpc("activate_public_portal_signup", { p_token: meta.pending_portal_token });
+    } catch {
+      // Non-fatal -- see comment above.
+    }
+  }
+
+  // Same pattern as activatePendingOrganizerSignup above, for the separate
+  // public engagement-letter-with-signup flow (PublicEngagementLetterSign.tsx).
+  // Kept as its own function and its own metadata key (pending_engagement_
+  // letter_token, never pending_portal_token) rather than folding into the
+  // organizer path above -- the two resolve a different template table
+  // (engagement_letter_templates vs organizer_templates) and call a
+  // different, independently-scoped activation RPC
+  // (activate_public_engagement_letter_signup), which requires a matching
+  // signed engagement-letter record, not an organizer submission.
+  async function activatePendingEngagementLetterSignup() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const meta = user?.user_metadata as { pending_engagement_letter_token?: string } | undefined;
+    if (!meta?.pending_engagement_letter_token) return;
+    try {
+      await supabase.rpc("activate_public_engagement_letter_signup", { p_token: meta.pending_engagement_letter_token });
+    } catch {
+      // Non-fatal -- see comment above.
+    }
+  }
+
   async function resolveNext() {
     if (explicitNext) {
       // invite_token rides as its own flat param (see app/join/page.tsx,
@@ -86,11 +139,15 @@ export async function GET(request: Request) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      await activatePendingOrganizerSignup();
+      await activatePendingEngagementLetterSignup();
       return withRememberMarker(NextResponse.redirect(`${origin}${await resolveNext()}`));
     }
   } else if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     if (!error) {
+      await activatePendingOrganizerSignup();
+      await activatePendingEngagementLetterSignup();
       return withRememberMarker(NextResponse.redirect(`${origin}${await resolveNext()}`));
     }
   }
