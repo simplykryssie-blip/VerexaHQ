@@ -12629,6 +12629,18 @@ export type Database = {
       }
     }
     Functions: {
+      activate_public_engagement_letter_signup: {
+        Args: {
+          p_token: string
+        }
+        Returns: Json
+      }
+      activate_public_portal_signup: {
+        Args: {
+          p_token: string
+        }
+        Returns: Json
+      }
       _advance_pipeline_stage_unchecked: {
         Args: {
           p_entity_id: string

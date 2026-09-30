@@ -10,7 +10,8 @@
       "refund_usage_unit",
       "credit_prepaid_balance",
       "grant_workspace_usage_meters",
-      "check_storage_capacity"
+      "check_storage_capacity",
+      "link_public_portal_account"
     ]
   },
   "acceptedOverloads": {
@@ -97,6 +98,30 @@
       },
       "resubmit_contact_share": {
         "args": "p_share_id uuid",
+        "isSecurityDefiner": true
+      },
+      "link_public_portal_account": {
+        "args": "p_workspace_id uuid, p_client_id uuid, p_auth_user_id uuid, p_email text, p_name text",
+        "isSecurityDefiner": true
+      },
+      "submit_public_organizer_response_with_signup": {
+        "args": "p_token uuid, p_first_name text, p_last_name text, p_email text, p_phone text, p_answers jsonb, p_auth_user_id uuid, p_client_id uuid",
+        "isSecurityDefiner": true
+      },
+      "capture_public_lead_from_contact_step": {
+        "args": "p_token uuid, p_first_name text, p_last_name text, p_email text, p_phone text, p_service_ids uuid[], p_auth_user_id uuid, p_middle_name text, p_suffix text, p_mailing_street text, p_mailing_city text, p_mailing_state text, p_mailing_zip text",
+        "isSecurityDefiner": true
+      },
+      "activate_public_portal_signup": {
+        "args": "p_token uuid",
+        "isSecurityDefiner": true
+      },
+      "sign_public_engagement_letter_with_signup": {
+        "args": "p_token uuid, p_first_name text, p_last_name text, p_email text, p_phone text, p_typed_name text, p_auth_user_id uuid, p_signature_type text, p_signature_image_path text",
+        "isSecurityDefiner": true
+      },
+      "activate_public_engagement_letter_signup": {
+        "args": "p_token uuid",
         "isSecurityDefiner": true
       }
     }

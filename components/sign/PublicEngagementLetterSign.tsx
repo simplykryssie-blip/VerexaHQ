@@ -95,7 +95,16 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent("/portal/dashboard")}`,
-          data: { first_name: firstName.trim(), last_name: lastName.trim() || null },
+          // Consulted by app/auth/confirm/route.ts once this address is
+          // confirmed and a real session exists -- the actual portal
+          // account is created there, from the confirmed session, not from
+          // anything passed by this (still pre-confirmation, unauthenticated)
+          // request. token is this engagement letter's own public share
+          // token, not a secret -- it's already the page's own URL, and is
+          // never treated as authorization on its own (the confirm route
+          // still requires a matching signed engagement-letter record
+          // before activating).
+          data: { first_name: firstName.trim(), last_name: lastName.trim() || null, pending_engagement_letter_token: token },
         },
       });
       if (signUpError || !signUpData.user) {
