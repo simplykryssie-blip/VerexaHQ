@@ -66,9 +66,15 @@ describe("AddForms.tsx -- Notes richtext upgrade", () => {
 });
 
 describe("ClientWorkspaceTabs.tsx -- Notes render upgrade", () => {
-  it("NotesTab renders the note body as HTML, not escaped plain text", () => {
+  it("NotesTab renders the note body as HTML, not escaped plain text -- sanitized at the render boundary, not raw", () => {
+    // n.body is staff-authored rich-text HTML; rendering it raw via
+    // dangerouslySetInnerHTML was a confirmed stored-XSS sink (CodeQL
+    // js/incomplete-multi-character-sanitization, PR #349). Still rendered
+    // as real HTML (not escaped to plain text), but through
+    // sanitizeRichTextHtml() -- see tests/sanitize-rich-text-html.test.ts
+    // for the sanitizer's own coverage.
     const body = extractFunction(tabsSource, "NotesTab");
-    expect(body).toMatch(/dangerouslySetInnerHTML=\{\{ __html: n\.body \}\}/);
+    expect(body).toMatch(/dangerouslySetInnerHTML=\{\{\s*__html:\s*sanitizeRichTextHtml\(n\.body\)\s*\}\}/);
   });
 
   it("the Overview widget's recent-notes preview strips HTML rather than showing literal tags", () => {
