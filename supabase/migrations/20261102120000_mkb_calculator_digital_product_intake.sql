@@ -611,7 +611,12 @@ begin
   returning id into v_purchase_id;
 
   if v_purchase_id is null then
-    select id, pipeline_run_id into v_purchase_id, v_run_id
+    -- "pipeline_run_id" alone is ambiguous here: RETURNS TABLE's own
+    -- pipeline_run_id output column is implicitly declared as a
+    -- same-named PL/pgSQL variable in scope, colliding with
+    -- digital_product_purchases.pipeline_run_id -- qualify explicitly.
+    select digital_product_purchases.id, digital_product_purchases.pipeline_run_id
+    into v_purchase_id, v_run_id
     from public.digital_product_purchases
     where workspace_id = p_owning_workspace_id and external_payment_id = p_external_payment_id;
     return query select false, v_purchase_id, v_client_id, v_run_id;
