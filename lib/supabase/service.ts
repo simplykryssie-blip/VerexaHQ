@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import { assertServiceRoleKeyMatchesProject, assertSupabaseProjectMatchesEnvironment, getAppEnvironment } from "@/lib/env";
 
 // Webhooks arrive unauthenticated (no user session) and are verified by
 // provider signature instead, so routes that receive them use the
@@ -17,7 +18,15 @@ import type { Database } from "@/lib/database.types";
 // this client to bypass that cache -- these reads are always meant to see
 // live data.
 export function createServiceClient() {
-  return createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  // VEREXA-ENV-001: fail closed rather than silently authenticating as the
+  // service role against the wrong Supabase project.
+  assertSupabaseProjectMatchesEnvironment(supabaseUrl, getAppEnvironment());
+  assertServiceRoleKeyMatchesProject(supabaseUrl, serviceRoleKey);
+
+  return createClient<Database>(supabaseUrl!, serviceRoleKey!, {
     global: {
       fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
     },
