@@ -25,6 +25,13 @@ export default function ResetPasswordPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  // Only one shared reset flow exists for both staff and portal accounts --
+  // forgot-password sets this when the request started from /portal/login,
+  // so a portal client lands back in the portal instead of hitting the
+  // staff dashboard's auth guard and bouncing to /login. Allowlisted to a
+  // single known value rather than trusted as an arbitrary redirect target.
+  const isPortal = searchParams.get("next") === "/portal/dashboard";
+  const forgotPasswordHref = isPortal ? "/forgot-password?portal=1" : "/forgot-password";
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +134,7 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    router.push("/dashboard");
+    router.push(isPortal ? "/portal/dashboard" : "/dashboard");
     router.refresh();
   }
 
@@ -152,7 +159,7 @@ export default function ResetPasswordPage() {
           Password reset links work once and expire after a short time. Request a new one to continue -- if you opened this
           on a different device or browser than the one you requested it from, request it again from this device instead.
         </p>
-        <Link href="/forgot-password" className={styles.submit} style={{ textDecoration: "none", display: "inline-block", textAlign: "center" }}>
+        <Link href={forgotPasswordHref} className={styles.submit} style={{ textDecoration: "none", display: "inline-block", textAlign: "center" }}>
           Request a new link
         </Link>
       </AuthShell>

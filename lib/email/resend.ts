@@ -22,6 +22,7 @@ export async function sendEmailViaResend({
   fromName,
   replyTo,
   workspaceId,
+  domainId,
 }: {
   to: string;
   subject: string;
@@ -30,6 +31,7 @@ export async function sendEmailViaResend({
   fromName?: string;
   replyTo?: string;
   workspaceId?: string;
+  domainId?: string;
 }): Promise<SendEmailResult> {
   if (!isEmailConfigured()) {
     return { sent: false, reason: "Email provider is not configured for this environment." };
@@ -59,25 +61,59 @@ export async function sendEmailViaResend({
   // default if nothing's configured or verification hasn't completed yet.
   //
   // A workspace can have more than one verified domain (ERO Office /
-  // Service Bureau multi-domain support) -- prefers whichever is marked
-  // primary, but still sends from any verified domain rather than falling
-  // all the way back to verexahq.com if the primary itself isn't verified
-  // yet (e.g. mid-switch between two domains).
+  // Service Bureau multi-domain support). A caller can pass domainId to
+  // pick a specific one (e.g. a per-organizer-template sending_domain_id,
+  // for a service bureau routing different brands through different
+  // domains) -- it must still be verified and belong to this workspace, or
+  // this falls through to the usual "primary verified domain" pick.
+  let usedCustomDomain = false;
   if (workspaceId) {
-    const { data: customDomain } = await supabase
-      .from("workspace_email_domains")
-      .select("domain, from_local_part, status")
-      .eq("workspace_id", workspaceId)
-      .eq("status", "verified")
-      .order("is_primary", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    let customDomain: { domain: string; from_local_part: string } | null = null;
+    if (domainId) {
+      const { data } = await supabase
+        .from("workspace_email_domains")
+        .select("domain, from_local_part")
+        .eq("id", domainId)
+        .eq("workspace_id", workspaceId)
+        .eq("status", "verified")
+        .maybeSingle();
+      customDomain = data;
+    }
+    if (!customDomain) {
+      const { data } = await supabase
+        .from("workspace_email_domains")
+        .select("domain, from_local_part")
+        .eq("workspace_id", workspaceId)
+        .eq("status", "verified")
+        .order("is_primary", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      customDomain = data;
+    }
     if (customDomain) {
       fromAddress = `${customDomain.from_local_part}@${customDomain.domain}`;
+      usedCustomDomain = true;
     }
   }
 
-  const displayName = fromName || process.env.EMAIL_FROM_NAME || "Verexa HQ CRM";
+  // branding.email_from_name/reply_to_email exist for firms to override the
+  // display name/reply-to on outgoing mail, but were never read anywhere --
+  // only applied here (when sending from the firm's own domain) so a
+  // workspace still on verexahq.com keeps the platform's own identity
+  // unless it explicitly asks otherwise via an explicit fromName/replyTo.
+  let resolvedFromName = fromName;
+  let resolvedReplyTo = replyTo;
+  if (usedCustomDomain && workspaceId && (!fromName || !replyTo)) {
+    const { data: brandingRow } = await supabase
+      .from("branding")
+      .select("email_from_name, display_name, reply_to_email")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    if (!resolvedFromName) resolvedFromName = brandingRow?.email_from_name || brandingRow?.display_name || undefined;
+    if (!resolvedReplyTo) resolvedReplyTo = brandingRow?.reply_to_email || undefined;
+  }
+
+  const displayName = resolvedFromName || process.env.EMAIL_FROM_NAME || "Verexa HQ CRM";
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -90,7 +126,7 @@ export async function sendEmailViaResend({
       to: [to],
       subject,
       html,
-      ...(replyTo ? { reply_to: replyTo } : {}),
+      ...(resolvedReplyTo ? { reply_to: resolvedReplyTo } : {}),
     }),
   });
 

@@ -7832,6 +7832,309 @@ export type Database = {
           },
         ]
       }
+      digital_products: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          price_cents: number
+          purchase_type: string
+          status: string
+          stripe_payment_link_id: string
+          stripe_price_id: string
+          stripe_product_id: string
+          target_process_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          price_cents: number
+          purchase_type?: string
+          status?: string
+          stripe_payment_link_id: string
+          stripe_price_id: string
+          stripe_product_id: string
+          target_process_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          price_cents?: number
+          purchase_type?: string
+          status?: string
+          stripe_payment_link_id?: string
+          stripe_price_id?: string
+          stripe_product_id?: string
+          target_process_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      digital_product_purchases: {
+        Row: {
+          amount: number
+          client_id: string | null
+          created_at: string
+          crm_integration_status: string
+          currency: string
+          customization_status: string
+          delivery_status: string
+          digital_product_id: string
+          external_checkout_session_id: string | null
+          external_customer_id: string | null
+          external_payment_id: string | null
+          id: string
+          lead_source: string
+          lead_type: string
+          payment_provider: string
+          payment_reference: string | null
+          payment_status: string
+          pipeline_run_id: string | null
+          product_name: string
+          product_price_cents: number
+          purchase_type: string
+          purchased_at: string
+          purchaser_email: string | null
+          purchaser_name: string | null
+          purchaser_phone: string | null
+          source: string
+          stripe_payment_link_id: string
+          stripe_price_id: string
+          stripe_product_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount: number
+          client_id?: string | null
+          created_at?: string
+          crm_integration_status?: string
+          currency?: string
+          customization_status?: string
+          delivery_status?: string
+          digital_product_id: string
+          external_checkout_session_id?: string | null
+          external_customer_id?: string | null
+          external_payment_id?: string | null
+          id?: string
+          lead_source?: string
+          lead_type?: string
+          payment_provider?: string
+          payment_reference?: string | null
+          payment_status?: string
+          pipeline_run_id?: string | null
+          product_name: string
+          product_price_cents: number
+          purchase_type?: string
+          purchased_at?: string
+          purchaser_email?: string | null
+          purchaser_name?: string | null
+          purchaser_phone?: string | null
+          source?: string
+          stripe_payment_link_id: string
+          stripe_price_id: string
+          stripe_product_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount?: number
+          client_id?: string | null
+          created_at?: string
+          crm_integration_status?: string
+          currency?: string
+          customization_status?: string
+          delivery_status?: string
+          digital_product_id?: string
+          external_checkout_session_id?: string | null
+          external_customer_id?: string | null
+          external_payment_id?: string | null
+          id?: string
+          lead_source?: string
+          lead_type?: string
+          payment_provider?: string
+          payment_reference?: string | null
+          payment_status?: string
+          pipeline_run_id?: string | null
+          product_name?: string
+          product_price_cents?: number
+          purchase_type?: string
+          purchased_at?: string
+          purchaser_email?: string | null
+          purchaser_name?: string | null
+          purchaser_phone?: string | null
+          source?: string
+          stripe_payment_link_id?: string
+          stripe_price_id?: string
+          stripe_product_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      digital_product_intake_forms: {
+        Row: {
+          created_at: string
+          digital_product_id: string
+          id: string
+          name: string
+          public_token: string
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          digital_product_id: string
+          id?: string
+          name: string
+          public_token?: string
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          digital_product_id?: string
+          id?: string
+          name?: string
+          public_token?: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      digital_product_intake_fields: {
+        Row: {
+          conditional_on_field_key: string | null
+          conditional_on_values: string[] | null
+          contact_lead_map: string | null
+          created_at: string
+          default_value: string | null
+          display_order: number
+          field_key: string
+          field_type: string
+          file_config: Json | null
+          form_id: string
+          help_text: string | null
+          id: string
+          is_required: boolean
+          label: string
+          options: Json | null
+          placeholder: string | null
+          section_name: string
+          static_content: string | null
+        }
+        Insert: {
+          conditional_on_field_key?: string | null
+          conditional_on_values?: string[] | null
+          contact_lead_map?: string | null
+          created_at?: string
+          default_value?: string | null
+          display_order?: number
+          field_key: string
+          field_type: string
+          file_config?: Json | null
+          form_id: string
+          help_text?: string | null
+          id?: string
+          is_required?: boolean
+          label: string
+          options?: Json | null
+          placeholder?: string | null
+          section_name: string
+          static_content?: string | null
+        }
+        Update: {
+          conditional_on_field_key?: string | null
+          conditional_on_values?: string[] | null
+          contact_lead_map?: string | null
+          created_at?: string
+          default_value?: string | null
+          display_order?: number
+          field_key?: string
+          field_type?: string
+          file_config?: Json | null
+          form_id?: string
+          help_text?: string | null
+          id?: string
+          is_required?: boolean
+          label?: string
+          options?: Json | null
+          placeholder?: string | null
+          section_name?: string
+          static_content?: string | null
+        }
+        Relationships: []
+      }
+      digital_product_intake_submissions: {
+        Row: {
+          answers: Json
+          client_id: string
+          created_at: string
+          form_id: string
+          id: string
+          purchase_id: string | null
+          submitted_at: string
+          workspace_id: string
+        }
+        Insert: {
+          answers?: Json
+          client_id: string
+          created_at?: string
+          form_id: string
+          id?: string
+          purchase_id?: string | null
+          submitted_at?: string
+          workspace_id: string
+        }
+        Update: {
+          answers?: Json
+          client_id?: string
+          created_at?: string
+          form_id?: string
+          id?: string
+          purchase_id?: string | null
+          submitted_at?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
+      workspace_digital_product_purchase_webhooks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          endpoint_token: string
+          rotated_at: string | null
+          signing_secret_encrypted: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          endpoint_token?: string
+          rotated_at?: string | null
+          signing_secret_encrypted: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          endpoint_token?: string
+          rotated_at?: string | null
+          signing_secret_encrypted?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       payment_methods: {
         Row: {
           brand: string | null
@@ -13710,6 +14013,61 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: string
+      }
+      get_public_digital_product_intake_form: {
+        Args: { p_token: string }
+        Returns: Json
+      }
+      submit_digital_product_intake: {
+        Args: { p_answers: Json; p_token: string }
+        Returns: Json
+      }
+      _advance_digital_product_pipeline_stage: {
+        Args: { p_pipeline_run_id: string; p_stage_name: string }
+        Returns: undefined
+      }
+      set_digital_product_purchase_webhook: {
+        Args: { p_workspace_id: string }
+        Returns: { endpoint_token: string; signing_secret: string }[]
+      }
+      get_digital_product_purchase_webhook_status: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          configured: boolean
+          endpoint_token: string | null
+          rotated_at: string | null
+        }[]
+      }
+      _resolve_digital_product_purchase_webhook: {
+        Args: { p_endpoint_token: string }
+        Returns: { workspace_id: string; signing_secret: string }[]
+      }
+      record_verified_digital_product_purchase: {
+        Args: {
+          p_amount: number
+          p_currency: string
+          p_digital_product_id: string
+          p_external_checkout_session_id?: string
+          p_external_customer_id?: string
+          p_external_payment_id: string
+          p_owning_workspace_id: string
+          p_payment_provider: string
+          p_payment_reference: string
+          p_purchased_at?: string
+          p_purchaser_email: string
+          p_purchaser_name: string
+          p_purchaser_phone: string
+        }
+        Returns: {
+          client_id: string | null
+          did_process: boolean
+          pipeline_run_id: string | null
+          purchase_id: string | null
+        }[]
+      }
+      fire_digital_product_purchase_automations: {
+        Args: { p_client_id: string; p_purchase_id: string }
+        Returns: undefined
       }
       find_workspaces_needing_auto_topup: {
         Args: never

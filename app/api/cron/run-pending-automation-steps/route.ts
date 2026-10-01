@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { withJobLogging } from "@/lib/cron/withJobLogging";
 import { isWorkspaceStatusOperational } from "@/lib/workspace";
+import { reportSystemFailure } from "@/lib/systemFailures";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -89,7 +90,22 @@ async function handleGET(request: Request) {
       blocked++;
       continue;
     }
-    const { data: shouldAdvance } = await supabase.rpc("should_advance_wait_until_step", { p_pending_id: row.id });
+    const { data: shouldAdvance, error: shouldAdvanceError } = await supabase.rpc("should_advance_wait_until_step", {
+      p_pending_id: row.id,
+    });
+    if (shouldAdvanceError) {
+      // An error here must never be treated as "go ahead" -- that would
+      // advance a wait-until-condition step without its condition ever
+      // having been evaluated. Leave the pending row exactly as-is (same
+      // as "still waiting") and surface the failure so it doesn't go
+      // unnoticed the way a stuck queue with no error at all would.
+      await reportSystemFailure("run-pending-automation-steps:should_advance_wait_until_step", shouldAdvanceError.message, {
+        workspaceId: row.workspace_id,
+        context: { pendingStepId: row.id, runId: row.run_id },
+      });
+      stillWaiting++;
+      continue;
+    }
     if (shouldAdvance === false) {
       stillWaiting++;
       continue;

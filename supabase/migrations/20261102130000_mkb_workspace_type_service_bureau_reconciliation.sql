@@ -1,0 +1,45 @@
+-- Reconciliation: MKB Financial Group must be a Service Bureau workspace.
+--
+-- FINDING (verified live against production, project daxpavvsotvsyqqntddc,
+-- 2026-09-30): public.workspaces.workspace_type for
+-- '2896bf43-95db-420f-9bb5-8854f537bbd1' (MKB Financial Group) is ALREADY
+-- 'service_bureau' in production right now -- it already has 2 rows in
+-- firm_packages (which is only writable by a service_bureau workspace per
+-- is_service_bureau_workspace()/20260927000000_service_bureau_tier_gate_packages.sql),
+-- consistent with it already operating as a Service Bureau. The earlier
+-- report that it was 'ero_office' was based on a stale HANDOFF.md note
+-- describing an EARLIER transition (independent_ptin -> ero_office); a
+-- later, likewise-unlogged direct SQL UPDATE apparently moved it on to
+-- service_bureau since then. No historical migration or HANDOFF.md entry
+-- records that second transition, exactly like the first one didn't.
+--
+-- There is no dedicated "change workspace type" RPC anywhere in this
+-- codebase (grep-confirmed) -- workspace_type is a plain column, read live
+-- everywhere via lib/workspaceCapabilities.ts's isEroOfficeTier/
+-- isServiceBureauTier/isEroManagementTier/etc. helpers, with no other
+-- table or flag that must change in lockstep. A direct UPDATE is the
+-- established (if historically unlogged) way this has always been done.
+--
+-- This migration is therefore a NO-OP against current production (the
+-- WHERE clause guards it) -- its purpose is to bring the *migration
+-- history itself* in line with what's actually live, so a fresh
+-- environment seeded from these migrations (a new staging project, a
+-- local dev reset) ends up with MKB as service_bureau too, instead of
+-- silently reverting to whatever workspace_type an earlier seed migration
+-- gave it.
+--
+-- Scope: exactly this one workspace id. No other workspace is touched.
+--
+-- PRE-EXISTING DATA NOTE (found during this audit, NOT fixed here -- out
+-- of scope for this change, flagged for a human decision): MKB has one
+-- existing firm_connections row as parent_workspace_id with
+-- relationship_type = 'ero_ptin'. Per
+-- lib/firmConnections.ts's CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE, a
+-- service_bureau parent's connections should use 'service_bureau_ero' or
+-- 'service_bureau_ptin', not 'ero_ptin' -- a leftover from before MKB was
+-- upgraded to service_bureau. This predates this change, is unrelated to
+-- the calculator intake feature, and is not touched here.
+update public.workspaces
+set workspace_type = 'service_bureau'
+where id = '2896bf43-95db-420f-9bb5-8854f537bbd1'
+  and workspace_type is distinct from 'service_bureau';

@@ -22,6 +22,8 @@ const RAIL_FOOT = (
 export default function ForgotPasswordPage() {
   const supabase = createClient();
   const searchParams = useSearchParams();
+  const isPortal = searchParams.get("portal") === "1";
+  const signInHref = isPortal ? "/portal/login" : "/login";
   const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -48,9 +50,10 @@ export default function ForgotPasswordPage() {
       // browser-side Supabase client auto-detect the session from the URL
       // on load, which works regardless of whether it arrives as a fragment
       // or a PKCE code.
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      const redirectTo = isPortal
+        ? `${window.location.origin}/reset-password?next=${encodeURIComponent("/portal/dashboard")}`
+        : `${window.location.origin}/reset-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
 
       if (error) {
         setError(error.message);
@@ -77,7 +80,7 @@ export default function ForgotPasswordPage() {
         <p className={styles.lede}>
           If an account exists for <strong>{email}</strong>, a password reset link has been sent.
         </p>
-        <Link href="/login" className={styles.submit} style={{ textDecoration: "none" }}>
+        <Link href={signInHref} className={styles.submit} style={{ textDecoration: "none" }}>
           Back to sign in
         </Link>
       </AuthShell>
@@ -118,7 +121,7 @@ export default function ForgotPasswordPage() {
       </form>
 
       <p className={styles.crosslink}>
-        <Link href="/login" className={styles.link}>
+        <Link href={signInHref} className={styles.link}>
           Back to sign in
         </Link>
       </p>
