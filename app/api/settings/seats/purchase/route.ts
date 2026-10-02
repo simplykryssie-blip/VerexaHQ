@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { getCurrentWorkspace, workspaceOperationalError, isWorkspaceStatusOperational } from "@/lib/workspace";
 import { previewSeatProrationAmount, ensureSeatSubscriptionItemQuantity, chargeOffSession } from "@/lib/stripe/client";
+import { hasAal2 } from "@/lib/auth/requireAal2";
 
 /**
  * Confirms and pays for one additional staff seat.
@@ -24,6 +25,15 @@ export async function POST() {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  // VEREXA-AAL-001: purchasing a seat charges the workspace's card -- a
+  // password-only session must not be sufficient on its own.
+  if (!(await hasAal2(supabase))) {
+    return NextResponse.json(
+      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
+      { status: 403 }
+    );
   }
 
   const allowed = await checkRateLimit(`seat-purchase:${user.id}`, 5, 60);

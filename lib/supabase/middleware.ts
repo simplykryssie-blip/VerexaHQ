@@ -11,7 +11,19 @@ const ALWAYS_PUBLIC_PATHS = ["/auth/callback", "/auth/confirm", "/forgot-passwor
 const STAFF_PUBLIC_PATHS = ["/login", "/accept-invitation", "/join", "/mfa-challenge", "/signup"];
 const PORTAL_PUBLIC_PATHS = ["/portal/login", "/portal/accept-invitation"];
 const PORTAL_BASIC_INFO_EXEMPT_PATHS = ["/portal/login", "/portal/accept-invitation", "/portal/basic-info"];
-const MFA_EXEMPT_STAFF_PATHS = ["/mfa-challenge", "/settings/security", "/login"];
+// VEREXA-AAL-001: these were previously one combined list that also
+// exempted /settings/security from the AAL2-step-up redirect below -- which
+// meant a session with a verified factor but no completed challenge this
+// session (the exact stolen-password scenario this finding is about) could
+// reach the one page that can remove that factor without ever being
+// challenged. Split in two: the step-up redirect (MFA_CHALLENGE_EXEMPT_PATHS)
+// no longer exempts /settings/security, so that path now forces the
+// challenge first. The enrollment-forcing redirect (MFA_ENROLLMENT_EXEMPT_PATHS)
+// still must exempt /settings/security -- it's that redirect's own
+// destination, and removing the exemption there would redirect a
+// no-factor-enrolled user visiting /settings/security back to itself.
+const MFA_CHALLENGE_EXEMPT_PATHS = ["/mfa-challenge", "/login"];
+const MFA_ENROLLMENT_EXEMPT_PATHS = ["/mfa-challenge", "/settings/security", "/login"];
 
 // How long a brand-new session gets before the missing-"remember me"-marker
 // check (below) starts enforcing -- covers the moment right after login,
@@ -169,32 +181,45 @@ export async function updateSession(request: NextRequest) {
     // verified factor that hasn't cleared this session's challenge sends the
     // user to /mfa-challenge; a workspace that requires MFA but where this
     // user has enrolled nothing sends them to enroll instead.
-    if (user && !isApiPath && !isPortalPath && !MFA_EXEMPT_STAFF_PATHS.some((path) => pathname.startsWith(path))) {
+    if (user && !isApiPath && !isPortalPath) {
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
-      if (aal && aal.currentLevel === "aal1" && aal.nextLevel === "aal2") {
+      // VEREXA-AAL-001: /settings/security is deliberately NOT exempt here
+      // (see MFA_CHALLENGE_EXEMPT_PATHS's own comment) -- a verified factor
+      // this session hasn't challenged yet must be challenged before
+      // reaching the page that can remove that factor.
+      if (aal && aal.currentLevel === "aal1" && aal.nextLevel === "aal2" && !MFA_CHALLENGE_EXEMPT_PATHS.some((path) => pathname.startsWith(path))) {
         const redirectUrl = new URL("/mfa-challenge", request.url);
         redirectUrl.searchParams.set("next", pathname);
         return NextResponse.redirect(redirectUrl);
       }
 
-      if (aal && aal.currentLevel === "aal1" && aal.nextLevel === "aal1") {
-        const { data: membership } = await supabase
+      if (aal && aal.currentLevel === "aal1" && aal.nextLevel === "aal1" && !MFA_ENROLLMENT_EXEMPT_PATHS.some((path) => pathname.startsWith(path))) {
+        // VEREXA-AAL-001: previously only the first active membership row
+        // (.limit(1), no explicit order) was checked, so whether enrollment
+        // was forced for a multi-workspace user depended on which row the
+        // query happened to return. Checking "does ANY active membership's
+        // workspace require MFA" is the safe, conservative model: a user
+        // can switch into any workspace they belong to at any time (see
+        // /api/workspace/switch), so if even one requires MFA, this user
+        // must not be allowed to go without a factor enrolled, independent
+        // of which workspace is currently selected.
+        const { data: memberships } = await supabase
           .from("workspace_users")
           .select("workspace_id")
           .eq("user_id", user.id)
-          .eq("status", "active")
-          .limit(1)
-          .maybeSingle();
+          .eq("status", "active");
 
-        if (membership) {
-          const { data: policy } = await supabase
+        const workspaceIds = (memberships ?? []).map((m) => m.workspace_id);
+        if (workspaceIds.length > 0) {
+          const { data: policies } = await supabase
             .from("workspace_security_policies")
-            .select("mfa_required")
-            .eq("workspace_id", membership.workspace_id)
-            .maybeSingle();
+            .select("workspace_id")
+            .in("workspace_id", workspaceIds)
+            .eq("mfa_required", true)
+            .limit(1);
 
-          if (policy?.mfa_required) {
+          if (policies && policies.length > 0) {
             return NextResponse.redirect(new URL("/settings/security", request.url));
           }
         }
