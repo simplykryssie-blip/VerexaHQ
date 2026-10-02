@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { sanitizeRichText } from "@/lib/sanitizeRichText";
 import type { TaskRow as TaskRowType } from "./EngagementWorkspaceTabs";
 
 export function TaskRow({ task }: { task: TaskRowType }) {
@@ -59,7 +60,7 @@ export function TaskRow({ task }: { task: TaskRowType }) {
             </span>
           )}
           {task.description && (
-            <div className="prose prose-sm mt-0.5 max-w-none text-xs text-muted" dangerouslySetInnerHTML={{ __html: task.description }} />
+            <div className="prose prose-sm mt-0.5 max-w-none text-xs text-muted" dangerouslySetInnerHTML={{ __html: sanitizeRichText(task.description) }} />
           )}
         </div>
       )}

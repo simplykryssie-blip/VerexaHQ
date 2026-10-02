@@ -66,9 +66,9 @@ describe("AddForms.tsx -- Notes richtext upgrade", () => {
 });
 
 describe("ClientWorkspaceTabs.tsx -- Notes render upgrade", () => {
-  it("NotesTab renders the note body as HTML, not escaped plain text", () => {
+  it("NotesTab renders the note body as HTML, not escaped plain text -- sanitized per VEREXA-XSS-001", () => {
     const body = extractFunction(tabsSource, "NotesTab");
-    expect(body).toMatch(/dangerouslySetInnerHTML=\{\{ __html: n\.body \}\}/);
+    expect(body).toMatch(/dangerouslySetInnerHTML=\{\{ __html: sanitizeRichText\(n\.body\) \}\}/);
   });
 
   it("the Overview widget's recent-notes preview strips HTML rather than showing literal tags", () => {
