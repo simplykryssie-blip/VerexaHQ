@@ -41,6 +41,19 @@ export async function GET(request: Request) {
 
   const supabase = createClient();
 
+  // VEREXA-AAL-001: unlike every other hasAal2() call site, this route
+  // never otherwise calls getUser() -- without it, hasAal2()'s getSession()
+  // read trusts a locally-cached JWT with no server-side revalidation, so a
+  // stale/revoked session could still carry an aal2 claim. Forcing a real
+  // getUser() round-trip first closes that gap.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    settingsUrl.searchParams.set("stripe_error", "Stripe connection could not be verified -- try again.");
+    return NextResponse.redirect(settingsUrl, 307);
+  }
+
   // VEREXA-AAL-001: defense in depth alongside /api/stripe/connect/start's
   // own AAL2 check -- this finalizes the exact same Stripe-account linkage,
   // reachable only via the state cookie /start itself set, but gated again
