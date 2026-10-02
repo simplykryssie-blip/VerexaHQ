@@ -1,7 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
-import { assertSupabaseProjectMatchesEnvironment, getAppEnvironment } from "@/lib/env";
+// VEREXA-ENV-001: import directly from lib/supabaseEnvIsolation.ts, NOT
+// "@/lib/env" -- that file's top-level @vercel/functions import can't be
+// resolved in this Edge-runtime bundle (its websocket helper requires the
+// Node-only `ws` package). See Session 38.
+import { assertSupabaseProjectMatchesEnvironment, getEdgeAppEnvironment } from "@/lib/supabaseEnvIsolation";
 
 const ALWAYS_PUBLIC_PATHS = ["/auth/callback", "/auth/confirm", "/forgot-password", "/reset-password", "/sign/", "/o/", "/e/", "/site/", "/book/", "/privacy", "/terms", "/contact", "/docs/"];
 const STAFF_PUBLIC_PATHS = ["/login", "/accept-invitation", "/join", "/mfa-challenge", "/signup"];
@@ -33,7 +37,7 @@ export async function updateSession(request: NextRequest) {
   // comment) -- an environment/Supabase-project mismatch is the one
   // failure that must escape uncaught instead of being swallowed into a
   // normal request continuing against the wrong Supabase project.
-  assertSupabaseProjectMatchesEnvironment(process.env.NEXT_PUBLIC_SUPABASE_URL, getAppEnvironment());
+  assertSupabaseProjectMatchesEnvironment(process.env.NEXT_PUBLIC_SUPABASE_URL, getEdgeAppEnvironment());
 
   try {
     // Verify environment variables are set
