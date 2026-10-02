@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { addProjectDomain, removeProjectDomain } from "@/lib/vercel/domains";
 import { isVercelDomainAutomationConfigured } from "@/lib/providerStatus";
 import { authorizedWebsite } from "@/lib/websites/auth";
+import { createClient } from "@/lib/supabase/server";
+import { hasAal2 } from "@/lib/auth/requireAal2";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   if (!isVercelDomainAutomationConfigured()) {
@@ -12,6 +14,16 @@ export async function POST(_request: Request, { params }: { params: { id: string
   if ("error" in result) return result.error;
   if (!result.website.custom_domain) {
     return NextResponse.json({ error: "No custom domain set on this website." }, { status: 400 });
+  }
+
+  // VEREXA-AAL-001: attaching a custom domain to a public website is a
+  // brand/domain-hijack vector if taken over -- a password-only session
+  // must not be sufficient on its own.
+  if (!(await hasAal2(createClient()))) {
+    return NextResponse.json(
+      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
+      { status: 403 }
+    );
   }
 
   const attach = await addProjectDomain(result.website.custom_domain);
@@ -35,6 +47,14 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if ("error" in result) return result.error;
   if (!result.website.custom_domain) {
     return NextResponse.json({ automated: true, removed: true });
+  }
+
+  // VEREXA-AAL-001: same domain-control surface as attaching one.
+  if (!(await hasAal2(createClient()))) {
+    return NextResponse.json(
+      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
+      { status: 403 }
+    );
   }
 
   const remove = await removeProjectDomain(result.website.custom_domain);

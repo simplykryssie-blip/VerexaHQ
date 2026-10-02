@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace, workspaceOperationalError, isWorkspaceStatusOperational } from "@/lib/workspace";
 import { getSubscriptionPrimaryItemId, updateSubscriptionItemQuantity } from "@/lib/stripe/client";
+import { hasAal2 } from "@/lib/auth/requireAal2";
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const workspace = await getCurrentWorkspace();
@@ -13,6 +14,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
 
   const supabase = createClient();
+
+  // VEREXA-AAL-001: accepting billing responsibility changes who pays for a
+  // connected firm -- a password-only session must not be sufficient on
+  // its own.
+  if (!(await hasAal2(supabase))) {
+    return NextResponse.json(
+      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
+      { status: 403 }
+    );
+  }
+
   const { data: connection, error } = await supabase.rpc("accept_firm_connection_billing", { p_connection_id: params.id });
   if (error || !connection) {
     return NextResponse.json({ error: error?.message ?? "Could not accept billing for this connection." }, { status: 400 });

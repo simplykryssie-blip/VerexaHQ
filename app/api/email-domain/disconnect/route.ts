@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace, workspaceOperationalError, isWorkspaceStatusOperational } from "@/lib/workspace";
 import { deleteResendDomain } from "@/lib/email/domains";
+import { hasAal2 } from "@/lib/auth/requireAal2";
 
 export async function POST(request: Request) {
   const workspace = await getCurrentWorkspace();
@@ -16,6 +17,16 @@ export async function POST(request: Request) {
   const { data: canManageSettings } = await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "settings.manage" });
   if (!canManageSettings) {
     return NextResponse.json({ error: "You don't have permission to manage this workspace's integrations." }, { status: 403 });
+  }
+
+  // VEREXA-AAL-001: removing the sending domain changes this workspace's
+  // email-sending control -- a password-only session must not be
+  // sufficient on its own.
+  if (!(await hasAal2(supabase))) {
+    return NextResponse.json(
+      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
+      { status: 403 }
+    );
   }
 
   // domainId disambiguates which of a workspace's (possibly several)

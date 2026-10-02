@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { isProductionEnvironment } from "@/lib/env";
 import { createCustomer, createSetupCheckoutSession, createDelayedStartSubscription } from "@/lib/stripe/client";
+import { hasAal2 } from "@/lib/auth/requireAal2";
 
 /**
  * One-off, platform-admin-only tool for migrating a pre-existing workspace
@@ -30,6 +31,15 @@ export async function POST(request: Request) {
   const { data: isPlatformAdmin } = await supabase.rpc("is_platform_admin");
   if (!isPlatformAdmin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // VEREXA-AAL-001: platform-admin billing migration -- a password-only
+  // session must not be sufficient on its own.
+  if (!(await hasAal2(supabase))) {
+    return NextResponse.json(
+      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
+      { status: 403 }
+    );
   }
 
   const body = await request.json().catch(() => null);

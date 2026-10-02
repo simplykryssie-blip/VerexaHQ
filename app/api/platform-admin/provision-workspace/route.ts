@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { hasAal2 } from "@/lib/auth/requireAal2";
 
 // Self-serve signup is closed (create_workspace's EXECUTE grant was
 // revoked from authenticated/anon/public -- see the
@@ -16,6 +17,16 @@ export async function POST(request: Request) {
   const { data: isPlatformAdmin } = await supabase.rpc("is_platform_admin");
   if (!isPlatformAdmin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // VEREXA-AAL-001: provisioning a new login + workspace is a privilege-
+  // granting action -- a password-only session must not be sufficient on
+  // its own.
+  if (!(await hasAal2(supabase))) {
+    return NextResponse.json(
+      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
+      { status: 403 }
+    );
   }
 
   const body = await request.json().catch(() => null);
