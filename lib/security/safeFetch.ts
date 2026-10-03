@@ -3,21 +3,37 @@ import * as http from "node:http";
 import * as https from "node:https";
 import * as net from "node:net";
 
-// VEREXA SSRF-001: centralized outbound-request guard for any feature that
-// fetches a URL supplied by a workspace user (currently the automation
-// "webhook" action -- see app/api/cron/send-pending-automation-webhooks).
-// The security boundary is the actual outbound TCP connection, not the
-// hostname string: a hostname that resolves to a public address today can
-// resolve to an internal/loopback address on the next lookup (DNS
-// rebinding), so every destination is resolved and IP-checked here, and the
-// real connection is pinned to the exact address that was checked via
-// Node's `lookup` socket option -- the global `fetch()` API has no
-// equivalent pinning hook, which is why this uses http.request/https.request
-// directly instead.
+// VEREXA SSRF: centralized outbound-request guard for any feature that
+// fetches a URL supplied by a workspace user. The security boundary is the
+// actual outbound TCP connection, not the hostname string: a hostname that
+// resolves to a public address today can resolve to an internal/loopback
+// address on the next lookup (DNS rebinding), so every destination is
+// resolved and IP-checked here, and the real connection is pinned to the
+// exact address that was checked via Node's `lookup` socket option -- the
+// global `fetch()` API has no equivalent pinning hook, which is why this
+// uses http.request/https.request directly instead.
+//
+// This file independently backs two call sites with different response
+// needs: a status-only outbound webhook POST (automation delivery, no body
+// needed) and a GET whose response body must actually be read (a banner
+// image fetched for PDF embedding). `safeFetch` covers the first; the
+// `*Buffer` variants cover the second, adding a hard response-size cap on
+// top of the same destination/redirect validation -- see
+// lib/documents/fetchImageBytesSafe.ts for that consumer.
 export class BlockedDestinationError extends Error {
   constructor(message = "Request blocked: destination not allowed") {
     super(message);
     this.name = "BlockedDestinationError";
+  }
+}
+
+// Thrown (never leaked to a caller's error message) when a response body
+// exceeds the caller's configured byte cap, whether that was knowable
+// upfront from Content-Length or only discovered mid-stream.
+export class ResponseTooLargeError extends Error {
+  constructor(message = "Response exceeded the maximum allowed size") {
+    super(message);
+    this.name = "ResponseTooLargeError";
   }
 }
 
@@ -134,7 +150,7 @@ export const defaultLookupAll: LookupAllFn = async (hostname) => {
   return addresses;
 };
 
-type IssueRequestOptions = {
+type PinnedRequestOptions = {
   protocol: "http:" | "https:";
   hostname: string;
   port: number;
@@ -148,13 +164,13 @@ type IssueRequestOptions = {
   signal?: AbortSignal;
 };
 
-type IssueRequestResult = {
-  status: number;
-  headers: http.IncomingHttpHeaders;
-};
+type RequestResult = { status: number; headers: http.IncomingHttpHeaders };
 
-export function issueRequestNode(opts: IssueRequestOptions): Promise<IssueRequestResult> {
-  return new Promise((resolve, reject) => {
+function startPinnedRequest<TResult extends RequestResult>(
+  opts: PinnedRequestOptions,
+  onResponse: (res: http.IncomingMessage, settle: { resolve: (r: TResult) => void; reject: (e: Error) => void }) => void
+): Promise<TResult> {
+  return new Promise<TResult>((resolve, reject) => {
     const transport = opts.protocol === "https:" ? https : http;
     const req = transport.request(
       {
@@ -176,11 +192,7 @@ export function issueRequestNode(opts: IssueRequestOptions): Promise<IssueReques
           callback(null, opts.pinnedAddress, opts.pinnedFamily);
         },
       },
-      (res) => {
-        res.resume(); // we only need status/headers for delivery bookkeeping
-        res.on("end", () => resolve({ status: res.statusCode ?? 0, headers: res.headers }));
-        res.on("error", reject);
-      }
+      (res) => onResponse(res, { resolve, reject })
     );
 
     req.on("timeout", () => req.destroy(new Error("Request timed out")));
@@ -196,6 +208,59 @@ export function issueRequestNode(opts: IssueRequestOptions): Promise<IssueReques
 
     if (opts.body) req.write(opts.body);
     req.end();
+  });
+}
+
+// Status-only variant for delivery bookkeeping (automation webhooks): the
+// response body is never needed, so it's drained and discarded rather than
+// buffered.
+export function issueRequestNode(opts: PinnedRequestOptions): Promise<RequestResult> {
+  return startPinnedRequest<RequestResult>(opts, (res, { resolve, reject }) => {
+    res.resume();
+    res.on("end", () => resolve({ status: res.statusCode ?? 0, headers: res.headers }));
+    res.on("error", reject);
+  });
+}
+
+type BufferedRequestOptions = PinnedRequestOptions & { maxBodyBytes: number };
+type BufferedRequestResult = RequestResult & { body: Buffer };
+
+// Body-returning variant for content that must actually be read (a banner
+// image). Enforces a hard byte cap both from a declared Content-Length
+// (reject before reading any body bytes) and while streaming (reject the
+// moment received bytes exceed the cap, regardless of what Content-Length
+// claimed or whether it was present at all) -- so a chunked or
+// length-lying response can never be buffered past the limit.
+export function issueRequestNodeBuffered(opts: BufferedRequestOptions): Promise<BufferedRequestResult> {
+  return startPinnedRequest<BufferedRequestResult>(opts, (res, { resolve, reject }) => {
+    const declaredLength = res.headers["content-length"] ? Number(res.headers["content-length"]) : null;
+    if (declaredLength !== null && Number.isFinite(declaredLength) && declaredLength > opts.maxBodyBytes) {
+      res.destroy();
+      reject(new ResponseTooLargeError());
+      return;
+    }
+
+    const chunks: Buffer[] = [];
+    let received = 0;
+    let rejected = false;
+    res.on("data", (chunk: Buffer) => {
+      if (rejected) return;
+      received += chunk.length;
+      if (received > opts.maxBodyBytes) {
+        rejected = true;
+        res.destroy();
+        reject(new ResponseTooLargeError());
+        return;
+      }
+      chunks.push(chunk);
+    });
+    res.on("end", () => {
+      if (rejected) return;
+      resolve({ status: res.statusCode ?? 0, headers: res.headers, body: Buffer.concat(chunks) });
+    });
+    res.on("error", (err) => {
+      if (!rejected) reject(err);
+    });
   });
 }
 
@@ -246,16 +311,17 @@ function assertRequestableUrl(url: URL): void {
   if (!url.hostname) throw new BlockedDestinationError();
 }
 
-// Fetches `rawUrl` only after resolving it to a concrete IP and confirming
-// that IP is not loopback/private/link-local/multicast/metadata, then pins
-// the actual connection to that exact IP. Redirects are followed manually
-// (never via fetch's automatic redirect-following) with the same
-// resolve-then-validate-then-pin treatment applied to every hop, a loop
-// guard, and a fixed hop limit -- so a redirect can never be used to reach a
-// destination the direct URL itself wouldn't have been allowed to reach.
-export async function safeFetch(rawUrl: string, init: SafeFetchInit = {}, deps: SafeFetchDeps = {}): Promise<SafeFetchResult> {
-  const lookupAll = deps.lookupAll ?? defaultLookupAll;
-  const issueRequest = deps.issueRequest ?? issueRequestNode;
+// Shared resolve-validate-connect-redirect loop. `issue` performs the one
+// actual pinned request for the current hop and returns at minimum
+// {status, headers}; the loop inspects only those two fields to decide
+// whether to follow a redirect, so it works unchanged whether `issue`
+// also returns a body (safeFetchBuffer) or not (safeFetch).
+async function runSafeRequestLoop<TResult extends RequestResult>(
+  rawUrl: string,
+  init: SafeFetchInit,
+  lookupAll: LookupAllFn,
+  issue: (opts: PinnedRequestOptions) => Promise<TResult>
+): Promise<TResult> {
   const maxRedirects = init.maxRedirects ?? DEFAULT_MAX_REDIRECTS;
   const timeoutMs = init.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const method = init.method ?? "GET";
@@ -282,7 +348,7 @@ export async function safeFetch(rawUrl: string, init: SafeFetchInit = {}, deps: 
     const port = currentUrl.port ? Number(currentUrl.port) : currentUrl.protocol === "https:" ? 443 : 80;
     const path = `${currentUrl.pathname}${currentUrl.search}`;
 
-    const result = await issueRequest({
+    const result = await issue({
       protocol: currentUrl.protocol as "http:" | "https:",
       hostname: currentUrl.hostname,
       port,
@@ -298,9 +364,7 @@ export async function safeFetch(rawUrl: string, init: SafeFetchInit = {}, deps: 
 
     const location = result.headers.location;
     const isRedirect = result.status >= 300 && result.status < 400 && typeof location !== "undefined";
-    if (!isRedirect) {
-      return { ok: result.status >= 200 && result.status < 300, status: result.status };
-    }
+    if (!isRedirect) return result;
 
     redirectCount++;
     if (redirectCount > maxRedirects) throw new BlockedDestinationError();
@@ -312,4 +376,53 @@ export async function safeFetch(rawUrl: string, init: SafeFetchInit = {}, deps: 
       throw new BlockedDestinationError();
     }
   }
+}
+
+// Fetches `rawUrl` only after resolving it to a concrete IP and confirming
+// that IP is not loopback/private/link-local/multicast/metadata, then pins
+// the actual connection to that exact IP. Redirects are followed manually
+// (never via fetch's automatic redirect-following) with the same
+// resolve-then-validate-then-pin treatment applied to every hop, a loop
+// guard, and a fixed hop limit -- so a redirect can never be used to reach a
+// destination the direct URL itself wouldn't have been allowed to reach.
+// Status-only: used for delivery bookkeeping where the response body is
+// never needed. For a caller that must read the body, use safeFetchBuffer.
+export async function safeFetch(rawUrl: string, init: SafeFetchInit = {}, deps: SafeFetchDeps = {}): Promise<SafeFetchResult> {
+  const lookupAll = deps.lookupAll ?? defaultLookupAll;
+  const issueRequest = deps.issueRequest ?? issueRequestNode;
+  const result = await runSafeRequestLoop(rawUrl, init, lookupAll, issueRequest);
+  return { ok: result.status >= 200 && result.status < 300, status: result.status };
+}
+
+export type SafeFetchBufferInit = SafeFetchInit & { maxBodyBytes?: number };
+export type SafeFetchBufferResult = { ok: boolean; status: number; body: Buffer };
+export type SafeFetchBufferDeps = {
+  lookupAll?: LookupAllFn;
+  issueRequest?: typeof issueRequestNodeBuffered;
+};
+
+// A letterhead/banner image is a small decorative graphic scaled to at most
+// ~90pt tall in the rendered PDF (lib/pdf/textPdf.ts's headerImage) -- a
+// legitimate upload is realistically well under 1MB. 8MB gives generous
+// headroom for an unusually large source image while still giving a hard,
+// known bound on memory used per request, regardless of what an
+// attacker-chosen destination claims or streams.
+export const DEFAULT_MAX_BODY_BYTES = 8 * 1024 * 1024;
+
+// Same destination/redirect protection as safeFetch, but actually returns
+// the response body -- bounded by maxBodyBytes (checked against a declared
+// Content-Length upfront, and again against actual bytes received while
+// streaming, so neither a truthful large Content-Length nor a lying/absent
+// one can defeat the cap). Never buffers past the limit.
+export async function safeFetchBuffer(
+  rawUrl: string,
+  init: SafeFetchBufferInit = {},
+  deps: SafeFetchBufferDeps = {}
+): Promise<SafeFetchBufferResult> {
+  const lookupAll = deps.lookupAll ?? defaultLookupAll;
+  const issueRequest = deps.issueRequest ?? issueRequestNodeBuffered;
+  const maxBodyBytes = init.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+
+  const result = await runSafeRequestLoop(rawUrl, init, lookupAll, (opts) => issueRequest({ ...opts, maxBodyBytes }));
+  return { ok: result.status >= 200 && result.status < 300, status: result.status, body: result.body };
 }
