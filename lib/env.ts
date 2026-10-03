@@ -1,6 +1,7 @@
 import { getEnv } from "@vercel/functions";
+import type { AppEnvironment } from "@/lib/supabaseEnvIsolation";
 
-export type AppEnvironment = "development" | "staging" | "production";
+export type { AppEnvironment };
 
 /**
  * Server-only. Reads VERCEL_ENV via `getEnv()` from `@vercel/functions`
@@ -36,3 +37,22 @@ export function isProductionEnvironment(): boolean {
 export function liveSendsAllowed(): boolean {
   return isProductionEnvironment() || process.env.ALLOW_LIVE_SENDS_OUTSIDE_PRODUCTION === "true";
 }
+
+// VEREXA-ENV-001: the actual isolation logic (project-ref validation,
+// service-role JWT check, browser/Edge environment detection) lives in
+// lib/supabaseEnvIsolation.ts, which has no @vercel/functions dependency.
+// Re-exported here so this file's existing Node/server consumers
+// (lib/supabase/service.ts, client.ts, server.ts) and
+// tests/env-isolation.test.ts can keep importing from "@/lib/env"
+// unchanged. Edge middleware must import lib/supabaseEnvIsolation.ts
+// directly instead -- importing anything from THIS file pulls in the
+// @vercel/functions import above, which is exactly what broke the Edge
+// build (Session 38): its websocket helper requires the Node-only `ws`
+// package, unresolvable in the Edge bundle.
+export {
+  assertSupabaseProjectMatchesEnvironment,
+  assertServiceRoleKeyMatchesProject,
+  getBrowserAppEnvironment,
+  getEdgeAppEnvironment,
+  __ENV_ISOLATION_TEST_ONLY__,
+} from "@/lib/supabaseEnvIsolation";
