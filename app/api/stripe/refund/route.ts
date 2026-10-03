@@ -4,6 +4,7 @@ import { createRefund } from "@/lib/stripe/client";
 import { isStripeConfigured } from "@/lib/providerStatus";
 import { recordProviderCheck } from "@/lib/providerHealth";
 import { getWorkspaceConnectAccount } from "@/lib/stripe/workspaceConnect";
+import { hasAal2 } from "@/lib/auth/requireAal2";
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -34,6 +35,15 @@ export async function POST(request: Request) {
   });
   if (!canManageBilling) {
     return NextResponse.json({ error: "Not authorized to issue refunds." }, { status: 403 });
+  }
+
+  // VEREXA-AAL-001: issuing a refund moves real money -- a password-only
+  // (stolen-credential) session must not be sufficient on its own.
+  if (!(await hasAal2(supabase))) {
+    return NextResponse.json(
+      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
+      { status: 403 }
+    );
   }
 
   if (!payment.stripe_payment_intent_id) {

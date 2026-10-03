@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { createSetupCheckoutSession } from "@/lib/stripe/client";
+import { hasAal2 } from "@/lib/auth/requireAal2";
 
 export async function POST(request: Request) {
   const workspace = await getCurrentWorkspace();
@@ -13,6 +14,15 @@ export async function POST(request: Request) {
   const { data: isAdmin } = await supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id });
   if (!isAdmin) {
     return NextResponse.json({ error: "Only a workspace admin can update the billing card." }, { status: 403 });
+  }
+
+  // VEREXA-AAL-001: changing the billing card is a payment-configuration
+  // action -- a password-only session must not be sufficient on its own.
+  if (!(await hasAal2(supabase))) {
+    return NextResponse.json(
+      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
+      { status: 403 }
+    );
   }
 
   const { data: sub } = await supabase.from("workspace_subscriptions").select("stripe_customer_id").eq("workspace_id", workspace.id).maybeSingle();

@@ -1,9 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "@/lib/database.types";
+import { assertSupabaseProjectMatchesEnvironment, getAppEnvironment } from "@/lib/env";
 
 export function createClient() {
   const cookieStore = cookies();
+
+  // VEREXA-ENV-001: fail closed rather than silently talking to the wrong
+  // Supabase project from a Server Component/Action.
+  assertSupabaseProjectMatchesEnvironment(process.env.NEXT_PUBLIC_SUPABASE_URL, getAppEnvironment());
 
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
