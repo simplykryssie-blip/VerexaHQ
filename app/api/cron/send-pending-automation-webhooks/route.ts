@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { withJobLogging } from "@/lib/cron/withJobLogging";
 import { isWorkspaceStatusOperational } from "@/lib/workspace";
+import { safeFetch } from "@/lib/security/safeFetch";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -58,11 +59,11 @@ async function handleGET(request: Request) {
   let failed = 0;
   for (const row of operationalPending) {
     try {
-      const res = await fetch(row.url, {
+      const res = await safeFetch(row.url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(row.payload),
-        signal: AbortSignal.timeout(15000),
+        timeoutMs: 15000,
       });
       if (!res.ok) throw new Error(`Webhook endpoint returned ${res.status}`);
       await supabase.from("automation_webhook_deliveries").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", row.id);
