@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { checkRateLimit, clientIp } from "@/lib/rateLimit";
 import { renderLetterPdf } from "@/lib/documents/renderLetterPdf";
-import { fetchImageBytes } from "@/lib/documents/fetchImageBytes";
+import { fetchImageBytesSafe } from "@/lib/documents/fetchImageBytesSafe";
 import { resolveClientServiceFolder } from "@/lib/documents/resolveClientServiceFolder";
 
 // Called right after a public engagement-letter signature succeeds
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
   const templateInfo = signature.engagement_letter_templates as unknown as { name?: string; banner_image_url?: string | null } | null;
   const templateName = templateInfo?.name ?? "Document";
-  const bannerImageBytes = await fetchImageBytes(templateInfo?.banner_image_url);
+  const bannerImageBytes = await fetchImageBytesSafe(templateInfo?.banner_image_url);
   const signedBy =
     signatureImageBytes || signature.typed_name
       ? { signatureImageBytes, typedName: signature.typed_name ?? signature.signer_name, signedAtLabel: signedAt }
