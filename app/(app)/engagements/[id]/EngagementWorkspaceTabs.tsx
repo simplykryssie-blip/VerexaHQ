@@ -24,7 +24,7 @@ import { TaxDetailsCard, type TaxDetailRow } from "@/components/tax/TaxDetailsCa
 import { OrganizerResponseCard } from "@/components/organizer/OrganizerResponseCard";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import { ENGAGEMENT_STATUS_OPTIONS, ENGAGEMENT_SHARE_STATUS_TONE, SIGNATURE_GATED_STATUSES } from "@/lib/engagementStatus";
-import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
+import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE, PAYMENT_STATUS_LABEL } from "@/lib/billingStatus";
 import { BankProductTransactionForm } from "@/components/billing/BankProductTransactionForm";
 import { BankProductStatusSelect } from "@/components/billing/BankProductStatusSelect";
 import { ReactivateQuoteButton } from "@/components/billing/ReactivateQuoteButton";
@@ -977,8 +977,8 @@ export function BillingTab({
                 </span>
                 <div className="flex items-center gap-3">
                   <span className="flex items-center gap-2 text-muted">
-                    <Badge tone={PAYMENT_STATUS_TONE[p.status] ?? "neutral"} className="capitalize">
-                      {p.status}
+                    <Badge tone={PAYMENT_STATUS_TONE[p.status] ?? "neutral"}>
+                      {PAYMENT_STATUS_LABEL[p.status] ?? p.status}
                     </Badge>
                     {money(p.amount)}
                   </span>

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/Badge";
 import type { IconChipTone } from "@/components/ui/IconChip";
 import { StatTile } from "@/components/ui/StatTile";
 import { Modal } from "@/components/Modal";
-import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE, BANK_PRODUCT_STATUS_TONE } from "@/lib/billingStatus";
+import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE, PAYMENT_STATUS_LABEL, BANK_PRODUCT_STATUS_TONE } from "@/lib/billingStatus";
 import { InvoiceQuoteForm, type EditingInvoiceQuote } from "./InvoiceQuoteForm";
 import { PreviewButton } from "./PreviewButton";
 import { NewBillingDocumentModal } from "./NewBillingDocumentModal";
@@ -323,8 +323,8 @@ export function BillingHub({
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Badge tone={PAYMENT_STATUS_TONE[p.status] ?? "neutral"} className="capitalize">
-                      {p.status}
+                    <Badge tone={PAYMENT_STATUS_TONE[p.status] ?? "neutral"}>
+                      {PAYMENT_STATUS_LABEL[p.status] ?? p.status}
                     </Badge>
                     <span className="text-slate">{money(p.amount)}</span>
                   </div>
