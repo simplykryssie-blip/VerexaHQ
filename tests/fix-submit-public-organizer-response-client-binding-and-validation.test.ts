@@ -21,12 +21,20 @@
 // disposable local Postgres 16 instance loaded with a minimal stand-in
 // schema (organizer_templates/organizer_fields/clients/organizer_responses/
 // organizer_response_answers, plus stub/no-op versions of the unchanged
-// helper functions this RPC calls) -- 10 real invocations covering forged
+// helper functions this RPC calls) -- 13 real invocations covering forged
 // p_client_id (did not land on the target), legitimate returning-client
 // resolution, a bogus/cross-workspace p_client_id, omitted required
 // fields, a conditionally-hidden field answered anyway (dropped, not
 // persisted, no exception), the same field made visible (persisted),
-// malformed vs. valid SSN, and malformed vs. valid signature shape -- all
+// malformed vs. valid SSN, malformed vs. valid signature shape, and --
+// added after a human-review pass found the first version of this
+// migration had an order-dependent visibility bug -- a 3-field chained
+// show_if dependency (Switch -> HiddenDep -> FinalRequired, with
+// FinalRequired's own visibility depending on HiddenDep's actual
+// submitted value while HiddenDep is itself conditionally hidden) run
+// through the SAME two field-creation orders (forward and reverse),
+// confirming byte-identical outcomes both ways, plus a third run proving
+// the chain still resolves to visible+persisted when it should. All 13
 // passed with the expected outcome. That harness was local-only, had no
 // connection to Supabase/Verexa, and was torn down afterward; it is not
 // part of this committed suite because it isn't CI-reproducible without a
@@ -143,12 +151,61 @@ describe("F-04: conditional (show_if) visibility, evaluated server-side", () => 
 
   it("documented choice: a conditionally-hidden field's answer is dropped, not rejected and not persisted", () => {
     expect(body).toMatch(/Documented choice: drop this field's answer entirely/);
-    expect(body).toMatch(/v_answer_text_by_field := v_answer_text_by_field - \(v_field\.id::text\);/);
-    expect(body).toMatch(/v_submitted_field_ids := v_submitted_field_ids - \(v_field\.id::text\);/);
+    expect(body).toMatch(/v_hidden_field_ids := v_hidden_field_ids \|\| jsonb_build_object\(v_field\.id::text, true\);/);
   });
 
-  it("the answer-insertion loop skips any field_id no longer tracked (hidden or unrecognized)", () => {
-    expect(body).toMatch(/if not \(v_submitted_field_ids \? \(v_answer->>'field_id'\)\) then\s*\n\s*-- Dropped above/);
+  it("the answer-insertion loop skips any field_id that is unrecognized OR hidden", () => {
+    expect(body).toMatch(
+      /if not \(v_submitted_field_ids \? \(v_answer->>'field_id'\)\) or \(v_hidden_field_ids \? \(v_answer->>'field_id'\)\) then/
+    );
+  });
+});
+
+describe("F-04 (human-review correction): visibility evaluation is order-independent", () => {
+  const body = fnBody();
+
+  it("v_answer_text_by_field is built exactly once and never written to again", () => {
+    // Every assignment to this map must be the single build-up line in the
+    // first answers pass (`||=` via `||`) -- never a subtraction/removal,
+    // which is what made the first version of this fix order-dependent on
+    // PostgreSQL's unspecified row iteration order over organizer_fields.
+    const assignments = body.match(/v_answer_text_by_field\s*:=[^;]*;/g) ?? [];
+    expect(assignments.length).toBeGreaterThan(0);
+    for (const assignment of assignments) {
+      expect(assignment).not.toMatch(/v_answer_text_by_field\s*-\s*\(/);
+    }
+    expect(body).not.toMatch(/v_answer_text_by_field := v_answer_text_by_field -/);
+  });
+
+  it("v_submitted_field_ids is likewise never mutated during visibility evaluation", () => {
+    expect(body).not.toMatch(/v_submitted_field_ids := v_submitted_field_ids -/);
+  });
+
+  it("hidden fields are tracked in a dedicated, separate set (v_hidden_field_ids), not by mutating the answer snapshot", () => {
+    expect(body).toMatch(/v_hidden_field_ids jsonb := '\{\}'::jsonb;/);
+    expect(body).toMatch(/v_hidden_field_ids := v_hidden_field_ids \|\| jsonb_build_object\(v_field\.id::text, true\);/);
+  });
+
+  it("each show_if rule reads the referenced field's value from the untouched original snapshot", () => {
+    const visibilityLoop = body.slice(body.indexOf("for v_rule in select"), body.indexOf("end loop;", body.indexOf("for v_rule in select")));
+    expect(visibilityLoop).toMatch(/v_rule_field_text := coalesce\(v_answer_text_by_field ->> \(v_rule->>'field_id'\), ''\);/);
+  });
+
+  it("documents the live-data-confirmed regression this correction fixes", () => {
+    expect(migration).toMatch(/Human-review correction/);
+    expect(migration).toMatch(/212 field pairs exist/);
+    expect(migration).toMatch(/2027 INDIVIDUAL\/SCH C INTAKE FORM/);
+  });
+});
+
+describe("F-04 (documented, out-of-scope compatibility considerations, not current regressions)", () => {
+  it("documents the legacy conditional_logic shape limitation", () => {
+    expect(migration).toMatch(/legacy pre-multi-\s*\n--\s*condition shape/);
+    expect(migration).toMatch(/fails open to "visible"/);
+  });
+
+  it("documents the page_break required-field limitation", () => {
+    expect(migration).toMatch(/page_break field marked is_required=true/);
   });
 });
 

@@ -57,6 +57,47 @@
 --      already no-ops on a malformed signature answer, but only after it
 --      has been persisted as if valid).
 --
+-- Human-review correction: the first version of this migration computed
+-- each field's show_if visibility by reading v_answer_text_by_field, then
+-- DELETED that field's own entry from the same map once found hidden. For
+-- a field B whose show_if references field A, this made B's computed
+-- visibility depend on whether A had already been processed (and
+-- scrubbed) in the same loop -- i.e. on PostgreSQL's unspecified row
+-- iteration order over organizer_fields, not on anything meaningful. Live
+-- production data confirmed this was a real, not just theoretical, risk:
+-- 212 field pairs exist where a field's show_if references another field
+-- that itself has show_if logic, 4 of them required, on a real template
+-- ("2027 INDIVIDUAL/SCH C INTAKE FORM" -- "Do you need to add a spouse"
+-- gating "Did you file with this spouse last year?"/"Name"/"Spouse
+-- SSN/ITIN"/"Spouse Date of Birth"). Fixed below: v_answer_text_by_field
+-- is now built once and never written to again -- every field's
+-- visibility is a pure function of the original submission, independent
+-- of any other field's outcome or of iteration order. A field found
+-- hidden is instead recorded in a separate v_hidden_field_ids set, applied
+-- only afterward, when deciding what to persist -- never fed back into
+-- visibility evaluation itself.
+--
+-- Two narrower shapes this migration still does not attempt to handle,
+-- left as explicit, documented compatibility considerations rather than
+-- expanding scope -- live production data has zero rows matching either,
+-- so neither is a current regression, only a latent one if such data is
+-- ever introduced:
+--   - A field's conditional_logic using the CLIENT's legacy pre-multi-
+--     condition shape (a bare {field_id, operator, value} rule with no
+--     show_if.conditions wrapper -- see parseConditionalLogic's own
+--     "Legacy shape" branch) is not recognized by the check below
+--     (jsonb_typeof(v_cond -> 'conditions') = 'array' is false for it) and
+--     so fails open to "visible", same as having no conditional_logic at
+--     all. parseConditionalLogic would correctly evaluate it. If such a
+--     row is ever required AND legacy-shaped, this would raise a false
+--     "Please answer" the client itself would not have asked for.
+--   - The required-field type filter below excludes
+--     section/rich_text/repeating_section but not page_break -- a
+--     page_break field marked is_required=true (not something the
+--     builder UI is expected to produce, and not present in any current
+--     row) would be treated as an answerable required field and always
+--     fail, since nothing ever submits an answer for a pagination marker.
+--
 -- Deliberately NOT in scope, and left for a future pass if ever prioritized:
 --   - Per-instance conditional logic / required-ness for repeating_section
 --     CHILD fields (PublicRepeatingSection evaluates each child's show_if
@@ -93,6 +134,7 @@ declare
   v_field record;
   v_answer_text_by_field jsonb := '{}'::jsonb;
   v_submitted_field_ids jsonb := '{}'::jsonb;
+  v_hidden_field_ids jsonb := '{}'::jsonb;
   v_raw_value jsonb;
   v_raw_text text;
   v_visible boolean;
@@ -176,6 +218,12 @@ begin
         if v_rule->>'field_id' is null or v_rule->>'operator' is null then
           continue;
         end if;
+        -- Always reads from the original, never-mutated submission
+        -- snapshot -- field B's visibility, when B's show_if references
+        -- field A, depends only on what A was actually submitted as,
+        -- never on whether A itself was separately computed visible or
+        -- hidden, and never on which order organizer_fields happens to be
+        -- iterated in.
         v_rule_field_text := coalesce(v_answer_text_by_field ->> (v_rule->>'field_id'), '');
         select coalesce(array_agg(btrim(piece)) filter (where btrim(piece) <> ''), array[]::text[])
           into v_rule_field_array
@@ -207,10 +255,13 @@ begin
 
     if not v_visible then
       -- Documented choice: drop this field's answer entirely rather than
-      -- rejecting the whole submission. Remove it from both maps so it is
-      -- skipped by the answer-insertion loop below.
-      v_answer_text_by_field := v_answer_text_by_field - (v_field.id::text);
-      v_submitted_field_ids := v_submitted_field_ids - (v_field.id::text);
+      -- rejecting the whole submission -- recorded here, applied only
+      -- when the answer-insertion loop below decides what to persist.
+      -- v_answer_text_by_field and v_submitted_field_ids are deliberately
+      -- never written to by this branch: a different field's own show_if
+      -- may still legitimately need to read this field's actual submitted
+      -- value, independent of whether this field is itself visible.
+      v_hidden_field_ids := v_hidden_field_ids || jsonb_build_object(v_field.id::text, true);
       continue;
     end if;
 
@@ -228,9 +279,10 @@ begin
 
   for v_answer in select * from jsonb_array_elements(coalesce(p_answers, '[]'::jsonb))
   loop
-    if not (v_submitted_field_ids ? (v_answer->>'field_id')) then
-      -- Dropped above: either not a real field_id or belonged to a
-      -- conditionally-hidden top-level field.
+    if not (v_submitted_field_ids ? (v_answer->>'field_id')) or (v_hidden_field_ids ? (v_answer->>'field_id')) then
+      -- Either not a real field_id, or belonged to a top-level field this
+      -- submission resolved as conditionally hidden (v_hidden_field_ids,
+      -- computed above from the untouched answer snapshot).
       continue;
     end if;
 
