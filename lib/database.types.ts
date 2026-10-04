@@ -7974,6 +7974,7 @@ export type Database = {
           payment_method_id: string | null
           recorded_by: string | null
           reference: string | null
+          refunded_amount: number
           status: string
           stripe_checkout_session_id: string | null
           stripe_payment_intent_id: string | null
@@ -7994,6 +7995,7 @@ export type Database = {
           payment_method_id?: string | null
           recorded_by?: string | null
           reference?: string | null
+          refunded_amount?: number
           status?: string
           stripe_checkout_session_id?: string | null
           stripe_payment_intent_id?: string | null
@@ -8014,6 +8016,7 @@ export type Database = {
           payment_method_id?: string | null
           recorded_by?: string | null
           reference?: string | null
+          refunded_amount?: number
           status?: string
           stripe_checkout_session_id?: string | null
           stripe_payment_intent_id?: string | null

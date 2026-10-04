@@ -59,7 +59,7 @@ import { Badge } from "@/components/ui/Badge";
 import { StatTile } from "@/components/ui/StatTile";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { ENGAGEMENT_STATUS_TONE, ENGAGEMENT_PRIORITY_TONE, ENGAGEMENT_STATUS_OPTIONS, isOpenEngagementStatus } from "@/lib/engagementStatus";
-import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
+import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE, PAYMENT_STATUS_LABEL } from "@/lib/billingStatus";
 
 // Mirrors lib/dashboard/data.ts's ENGAGEMENT_PIPELINE_STATUSES (which can't be
 // imported here -- it pulls in a server-only Supabase client, breaking this
@@ -1179,8 +1179,8 @@ export function BillingTab({
                 </span>
                 <div className="flex items-center gap-3">
                   <span className="flex items-center gap-2 text-muted">
-                    <Badge tone={PAYMENT_STATUS_TONE[p.status] ?? "neutral"} className="capitalize">
-                      {p.status}
+                    <Badge tone={PAYMENT_STATUS_TONE[p.status] ?? "neutral"}>
+                      {PAYMENT_STATUS_LABEL[p.status] ?? p.status}
                     </Badge>
                     {money(p.amount)}
                   </span>
