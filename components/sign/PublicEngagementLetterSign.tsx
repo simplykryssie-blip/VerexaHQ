@@ -134,7 +134,7 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
         fetch("/api/documents/file-signed-engagement-letter", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ signatureId }),
+          body: JSON.stringify({ signatureId, token }),
         }).catch(() => {});
       }
       setAccountCreated(true);
@@ -162,7 +162,7 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
       fetch("/api/documents/file-signed-engagement-letter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ signatureId }),
+        body: JSON.stringify({ signatureId, token }),
       }).catch(() => {
         // Best-effort -- the signature itself is already recorded and safe;
         // filing it into Documents can be retried later if this fails.

@@ -16,6 +16,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const state = vi.hoisted(() => ({
   signatureRow: null as Record<string, unknown> | null,
+  templateRow: null as Record<string, unknown> | null,
   rpcResult: { data: true, error: null } as { data: unknown; error: unknown },
   uploadError: null as { message: string } | null,
   insertError: null as { message: string } | null,
@@ -55,10 +56,11 @@ function makeBuilder(mode: { kind: "select" | "insert" | "update"; table: string
     limit: () => builder,
     insert: () => builder,
     update: () => builder,
-    maybeSingle: () =>
-      Promise.resolve(
-        mode.table === "engagement_letter_public_signatures" ? { data: state.signatureRow, error: null } : { data: null, error: null }
-      ),
+    maybeSingle: () => {
+      if (mode.table === "engagement_letter_public_signatures") return Promise.resolve({ data: state.signatureRow, error: null });
+      if (mode.table === "engagement_letter_templates") return Promise.resolve({ data: state.templateRow, error: null });
+      return Promise.resolve({ data: null, error: null });
+    },
     single: () => Promise.resolve({ data: null, error: null }),
     then: (resolve: (v: { data: unknown; error: unknown }) => unknown) => {
       if (mode.kind === "insert") return resolve({ data: null, error: state.insertError });
@@ -106,6 +108,7 @@ describe("POST /api/documents/file-signed-engagement-letter -- SSRF protection",
     state.rpcResult = { data: true, error: null };
     state.httpRequestCalls = 0;
     state.httpsRequestCalls = 0;
+    state.templateRow = { id: "template-1", workspace_id: "ws-1" };
   });
 
   it("never opens a connection for a poisoned banner_image_url pointing at cloud metadata, and still files the document", async () => {
@@ -113,6 +116,7 @@ describe("POST /api/documents/file-signed-engagement-letter -- SSRF protection",
       id: "sig-1",
       workspace_id: "ws-1",
       client_id: "client-1",
+      engagement_letter_template_id: "template-1",
       resolved_body_html: "<p>Agreed terms.</p>",
       filed_as_attachment: false,
       signature_type: "typed",
@@ -124,7 +128,7 @@ describe("POST /api/documents/file-signed-engagement-letter -- SSRF protection",
     };
 
     const { POST } = await import("@/app/api/documents/file-signed-engagement-letter/route");
-    const res = await POST(request({ signatureId: "sig-1" }));
+    const res = await POST(request({ signatureId: "sig-1", token: "share-token-1" }));
 
     expect(state.httpRequestCalls).toBe(0);
     expect(state.httpsRequestCalls).toBe(0);
@@ -138,6 +142,7 @@ describe("POST /api/documents/file-signed-engagement-letter -- SSRF protection",
       id: "sig-2",
       workspace_id: "ws-1",
       client_id: "client-1",
+      engagement_letter_template_id: "template-1",
       resolved_body_html: "<p>Agreed terms.</p>",
       filed_as_attachment: false,
       signature_type: "typed",
@@ -149,7 +154,7 @@ describe("POST /api/documents/file-signed-engagement-letter -- SSRF protection",
     };
 
     const { POST } = await import("@/app/api/documents/file-signed-engagement-letter/route");
-    const res = await POST(request({ signatureId: "sig-2" }));
+    const res = await POST(request({ signatureId: "sig-2", token: "share-token-1" }));
 
     expect(state.httpRequestCalls).toBe(0);
     expect(state.httpsRequestCalls).toBe(0);
@@ -161,6 +166,7 @@ describe("POST /api/documents/file-signed-engagement-letter -- SSRF protection",
       id: "sig-3",
       workspace_id: "ws-1",
       client_id: "client-1",
+      engagement_letter_template_id: "template-1",
       resolved_body_html: "<p>Agreed terms.</p>",
       filed_as_attachment: false,
       signature_type: "typed",
@@ -172,7 +178,7 @@ describe("POST /api/documents/file-signed-engagement-letter -- SSRF protection",
     };
 
     const { POST } = await import("@/app/api/documents/file-signed-engagement-letter/route");
-    const res = await POST(request({ signatureId: "sig-3" }));
+    const res = await POST(request({ signatureId: "sig-3", token: "share-token-1" }));
 
     expect(state.httpRequestCalls).toBe(0);
     expect(state.httpsRequestCalls).toBe(0);
