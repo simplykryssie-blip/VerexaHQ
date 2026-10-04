@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { verifyResendSignature } from "@/lib/email/resend";
 import { createServiceClient } from "@/lib/supabase/service";
+import { markWebhookProcessed } from "@/lib/stripe/handleCheckoutCompleted";
+
+// P16-03/P16-05;P18-07: svix-timestamp is Unix seconds; reject anything
+// outside a 5-minute window before trusting the event (same tolerance as
+// claim_stripe_webhook_event and the Zoom webhook's own freshness check).
+const MAX_TIMESTAMP_SKEW_SECONDS = 5 * 60;
 
 // Resend delivers delivery/open/bounce events as svix-signed webhooks --
 // see https://resend.com/docs/dashboard/webhooks/event-types. This closes
@@ -20,15 +26,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
+  const timestampSeconds = Number(svixTimestamp);
+  if (!Number.isFinite(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > MAX_TIMESTAMP_SKEW_SECONDS) {
+    return NextResponse.json({ error: "Request timestamp is stale" }, { status: 400 });
+  }
+
   const event = JSON.parse(payload) as { type: string; data: { email_id?: string } };
   const emailId = event.data.email_id;
 
   const supabase = createServiceClient();
-  const { data: logRow } = await supabase
-    .from("webhook_events")
-    .insert({ provider: "resend", event_type: event.type, external_id: emailId, payload: event as never })
-    .select("id")
+
+  // Atomic claim/dedup, generalizing the same pattern claim_stripe_webhook_event
+  // already established -- svixId is always present (unlike emailId, which
+  // some event types omit) so dedup here is never skipped. A duplicate/
+  // retried delivery comes back should_process: false and is safely
+  // ignored rather than reprocessed (double-incrementing open/click counts).
+  const { data: claim, error: claimError } = await supabase
+    .rpc("claim_provider_webhook_event", {
+      p_provider: "resend",
+      p_event_id: emailId ?? svixId,
+      p_event_type: event.type,
+      p_payload: event as never,
+    })
     .single();
+
+  if (claimError) {
+    return NextResponse.json({ error: "Could not record webhook event" }, { status: 500 });
+  }
+  if (!claim?.should_process) {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
+  const logRow = { id: claim.id };
 
   if (emailId) {
     const now = new Date().toISOString();
@@ -54,9 +82,7 @@ export async function POST(request: Request) {
     }
   }
 
-  if (logRow) {
-    await supabase.from("webhook_events").update({ status: "processed", processed_at: new Date().toISOString() }).eq("id", logRow.id);
-  }
+  await markWebhookProcessed(supabase, logRow.id, undefined);
 
   return NextResponse.json({ received: true });
 }
