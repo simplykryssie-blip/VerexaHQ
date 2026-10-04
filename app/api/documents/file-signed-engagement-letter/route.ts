@@ -13,28 +13,54 @@ import { resolveClientServiceFolder } from "@/lib/documents/resolveClientService
 // server-authoritative HTML by signature id rather than trusting anything
 // the caller sends -- the caller only proves which signature to file, not
 // what it says.
+//
+// P18-02/P10-02/P12-02: a bare signatureId proves nothing on its own -- any
+// caller who learned or guessed one (a database id, not a secret) could
+// trigger this service-role filing pipeline for any workspace's signature.
+// The caller must additionally supply the same public_token the /e/[token]
+// page itself required to reach this flow, and that token must resolve to
+// the exact template the signature was actually taken against -- the same
+// boundary sign_public_engagement_letter(p_token, ...) already relies on to
+// authorize creating the signature in the first place.
 export async function POST(request: Request) {
   const allowed = await checkRateLimit(`file-signed-letter:${clientIp(request)}`, 20, 60);
   if (!allowed) {
     return NextResponse.json({ error: "Too many requests. Try again shortly." }, { status: 429 });
   }
 
-  const { signatureId } = await request.json().catch(() => ({ signatureId: null }));
+  const { signatureId, token } = await request.json().catch(() => ({ signatureId: null, token: null }));
   if (typeof signatureId !== "string") {
     return NextResponse.json({ error: "signatureId is required" }, { status: 400 });
+  }
+  if (typeof token !== "string" || !token) {
+    return NextResponse.json({ error: "token is required" }, { status: 400 });
   }
 
   const supabase = createServiceClient();
 
+  const { data: template } = await supabase
+    .from("engagement_letter_templates")
+    .select("id, workspace_id")
+    .eq("public_token", token)
+    .eq("is_public", true)
+    .eq("status", "published")
+    .maybeSingle();
+  if (!template) {
+    return NextResponse.json({ error: "This link is no longer available" }, { status: 404 });
+  }
+
   const { data: signature } = await supabase
     .from("engagement_letter_public_signatures")
     .select(
-      "id, workspace_id, client_id, resolved_body_html, filed_as_attachment, signature_type, signature_image_path, typed_name, signer_name, signed_at, engagement_letter_templates(name, banner_image_url)"
+      "id, workspace_id, client_id, engagement_letter_template_id, resolved_body_html, filed_as_attachment, signature_type, signature_image_path, typed_name, signer_name, signed_at, engagement_letter_templates(name, banner_image_url)"
     )
     .eq("id", signatureId)
     .maybeSingle();
 
   if (!signature) {
+    return NextResponse.json({ error: "Signature not found" }, { status: 404 });
+  }
+  if (signature.engagement_letter_template_id !== template.id || signature.workspace_id !== template.workspace_id) {
     return NextResponse.json({ error: "Signature not found" }, { status: 404 });
   }
   if (signature.filed_as_attachment) {
