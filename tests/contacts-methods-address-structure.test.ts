@@ -19,7 +19,7 @@ const addFormsSource = readFileSync(join(repoRoot, "app/(app)/clients/[id]/AddFo
 const channelFormsSource = readFileSync(join(repoRoot, "app/(app)/clients/[id]/ContactChannelForms.tsx"), "utf8");
 const inlineFormSource = readFileSync(join(repoRoot, "components/InlineAddForm.tsx"), "utf8");
 const primaryAddressMigration = readFileSync(
-  join(migrationsDir, "20261031090000_client_addresses_single_primary.sql"),
+  join(migrationsDir, "20261031090001_client_addresses_single_primary.sql"),
   "utf8"
 );
 
@@ -119,7 +119,7 @@ describe("client_addresses.street2 -- structured secondary/unit field", () => {
 });
 
 describe("street2 migration -- additive only, no existing data touched", () => {
-  const source = readFileSync(join(migrationsDir, "20261031080000_client_addresses_street2.sql"), "utf8");
+  const source = readFileSync(join(migrationsDir, "20261031080001_client_addresses_street2.sql"), "utf8");
 
   it("adds a nullable column, nothing else", () => {
     expect(source).toContain("alter table public.client_addresses add column if not exists street2 text;");
