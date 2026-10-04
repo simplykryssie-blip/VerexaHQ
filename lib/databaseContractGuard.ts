@@ -1,6 +1,6 @@
 // Pure policy layer for the database contract guard (see
 // tests/database-contract-guard.test.ts and supabase/migrations/
-// 20260925000000_database_contract_guard.sql). The SQL side is a stable
+// 20260925000001_database_contract_guard.sql). The SQL side is a stable
 // set of facts about the live database's SECURITY DEFINER surface; this
 // module is where those facts get compared against the checked-in
 // baseline (tests/fixtures/database-contract-baseline.json) to decide
