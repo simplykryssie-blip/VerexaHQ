@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  pull_request:
+    paths:
+      - ".github/workflows/tls-evidence.yml"
 
 permissions:
   contents: read
