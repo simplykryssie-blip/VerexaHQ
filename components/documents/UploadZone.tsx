@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { UploadCloud } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { renderEmail } from "@/lib/email/template";
 import type { Audience, EntityType } from "./types";
@@ -35,7 +34,6 @@ export function UploadZone({
   clientEmail?: string | null;
 }) {
   const router = useRouter();
-  const supabase = createClient();
   const toast = useToast();
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -46,36 +44,27 @@ export function UploadZone({
 
   async function uploadFiles(files: FileList | File[]) {
     setUploading(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
     const visibility = audience === "portal" || shareWithClient ? "client_visible" : "internal";
 
     let succeeded = 0;
     let failed = 0;
 
     for (const file of Array.from(files)) {
-      const path = `${workspaceId}/${entityId}/${Date.now()}-${file.name}`;
-      const { error: uploadErr } = await supabase.storage.from("client-documents").upload(path, file);
-      if (uploadErr) {
-        failed += 1;
-        continue;
-      }
-      const { error: insertErr } = await supabase.from("attachments").insert({
-        workspace_id: workspaceId,
-        entity_type: entityType,
-        entity_id: entityId,
-        folder_id: folderId,
-        file_name: file.name,
-        storage_path: path,
-        mime_type: file.type || null,
-        file_size_bytes: file.size,
-        uploaded_by: user?.id,
-        visibility,
-        category: category || null,
-      });
-      if (insertErr) failed += 1;
-      else succeeded += 1;
+      // P10-02: the actual content type and size are determined server-side
+      // from the real bytes -- file.type/file.size are never trusted for
+      // the stored object's Content-Type or the attachments row.
+      const formData = new FormData();
+      formData.set("file", file);
+      formData.set("workspaceId", workspaceId);
+      formData.set("entityType", entityType);
+      formData.set("entityId", entityId);
+      if (folderId) formData.set("folderId", folderId);
+      if (category) formData.set("category", category);
+      formData.set("visibility", visibility);
+
+      const res = await fetch("/api/documents/upload", { method: "POST", body: formData });
+      if (res.ok) succeeded += 1;
+      else failed += 1;
     }
 
     setUploading(false);
