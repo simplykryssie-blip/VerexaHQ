@@ -1,0 +1,37 @@
+name: SAST Evidence (Zoom Beta)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep-sast:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep SAST
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm             -v "$PWD:/src"             semgrep/semgrep:latest             semgrep scan --config auto --sarif --output /src/semgrep.sarif /src
+
+      - name: Verify SAST report exists
+        run: test -s semgrep.sarif
+
+      - name: Upload SAST evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sast-semgrep-evidence
+          path: semgrep.sarif
+          retention-days: 90
+          if-no-files-found: error
