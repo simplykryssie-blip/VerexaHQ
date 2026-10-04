@@ -17,12 +17,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Run Semgrep SAST
-        uses: semgrep/semgrep-action@v1
-        continue-on-error: true
-        with:
-          config: p/default
-          generateSarif: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm             -v "$PWD:/src"             semgrep/semgrep:latest             semgrep scan --config auto --sarif --output /src/semgrep.sarif /src
+
+      - name: Verify SAST report exists
+        run: test -s semgrep.sarif
+
       - name: Upload SAST evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -30,4 +34,4 @@ jobs:
           name: sast-semgrep-evidence
           path: semgrep.sarif
           retention-days: 90
-          if-no-files-found: warn
+          if-no-files-found: error
