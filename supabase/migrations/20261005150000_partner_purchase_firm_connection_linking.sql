@@ -72,6 +72,13 @@ alter table public.firm_connections add constraint firm_connections_parent_prosp
 --    pending/active/past_due purchase per connection at a time -- a
 --    second purchase attempted while the first is still active correctly
 --    errors, same business rule the invite-based flow has always had.
+-- CREATE OR REPLACE only replaces a function with the SAME parameter
+-- list -- adding a new trailing parameter creates a second, overloaded
+-- function instead, which made an RPC call omitting p_business_name
+-- ambiguous between the two signatures. Drop the pre-existing 13-arg
+-- signature explicitly so only the 14-arg version below remains.
+drop function if exists public.record_verified_partner_purchase(uuid, uuid, text, text, text, numeric, text, text, text, text, text, text, timestamp with time zone);
+
 create or replace function public.record_verified_partner_purchase(p_owning_workspace_id uuid, p_package_id uuid, p_purchaser_name text, p_purchaser_email text, p_purchaser_phone text, p_amount numeric, p_currency text, p_payment_provider text, p_payment_reference text, p_external_payment_id text, p_external_customer_id text DEFAULT NULL::text, p_external_checkout_session_id text DEFAULT NULL::text, p_purchased_at timestamp with time zone DEFAULT now(), p_business_name text DEFAULT NULL::text)
  returns TABLE(did_process boolean, purchase_id uuid, onboarding_id uuid, partner_prospect_id uuid)
  language plpgsql
