@@ -48,5 +48,14 @@ begin
 end;
 $function$;
 
+-- Revoking from PUBLIC alone is not enough here: Supabase grants EXECUTE on
+-- every new public-schema function to anon/authenticated/service_role via
+-- its own default privileges, separately from PUBLIC's own implicit grant.
+-- Confirmed live against verexahq-test: anon and authenticated both still
+-- had EXECUTE after a plain "revoke all ... from public" alone. Same class
+-- of gap previously closed elsewhere in this codebase
+-- (close_residual_public_execute_grants, least_privilege_security_definer_cleanup).
 revoke all on function public.claim_notification_queue_jobs(int, int) from public;
+revoke execute on function public.claim_notification_queue_jobs(int, int) from anon;
+revoke execute on function public.claim_notification_queue_jobs(int, int) from authenticated;
 grant execute on function public.claim_notification_queue_jobs(int, int) to service_role;
