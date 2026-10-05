@@ -173,3 +173,17 @@ begin
   return query select true, v_purchase_id, v_onboarding_id, v_prospect_id;
 end;
 $function$;
+
+-- CREATE OR REPLACE for a NEW signature creates a new catalog object, which
+-- does NOT inherit the original 13-arg function's grants -- it gets
+-- Postgres's default (PUBLIC EXECUTE), silently reopening exactly the
+-- access the original migration (20260917134844) explicitly revoked. Must
+-- be re-applied here for the 14-arg signature, matching that original
+-- intent: service_role only, since this function trusts its
+-- p_owning_workspace_id/p_package_id arguments without any auth.uid()
+-- check and is only ever meant to be called from a server-side webhook
+-- handler using the service-role client.
+drop function if exists public.record_verified_partner_purchase_legacy_13arg_unused(uuid, uuid, text, text, text, numeric, text, text, text, text, text, text, timestamp with time zone);
+
+revoke all on function public.record_verified_partner_purchase(uuid, uuid, text, text, text, numeric, text, text, text, text, text, text, timestamp with time zone, text) from public, anon, authenticated;
+grant execute on function public.record_verified_partner_purchase(uuid, uuid, text, text, text, numeric, text, text, text, text, text, text, timestamp with time zone, text) to service_role;
