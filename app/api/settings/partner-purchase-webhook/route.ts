@@ -28,6 +28,7 @@ export async function GET() {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const status = (Array.isArray(data) ? data[0] : data) as WebhookStatus | undefined;
+  if (!status) return NextResponse.json({ error: "Webhook status unavailable." }, { status: 500 });
   const endpointToken = status.endpoint_token;
   return NextResponse.json({
     configured: Boolean(status.configured),
