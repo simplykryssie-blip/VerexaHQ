@@ -11,7 +11,7 @@ type WebhookStatus = {
 
 async function getAdminWorkspace() {
   const supabase = createClient();
-  const { data: workspace } = await supabase.rpc("get_current_workspace");
+  const workspace = await getCurrentWorkspace();
   if (!workspace?.id) return { supabase, workspace: null };
   const { data: canManage } = await supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id });
   if (!canManage) return { supabase, workspace: null };
