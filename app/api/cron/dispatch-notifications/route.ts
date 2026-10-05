@@ -12,6 +12,10 @@ export const maxDuration = 60;
 
 const BATCH_SIZE = 50;
 const RETRY_BACKOFF_MINUTES = 5;
+// This function's own maxDuration is 60s, so a claim that's still
+// "processing" after 2x that has to be from a run that crashed or timed
+// out mid-flight, not one that's merely still working -- safe to reclaim.
+const STALE_CLAIM_AFTER_SECONDS = 120;
 
 // A suspended/archived/permanently_archived workspace must not continue
 // normal business communications -- but the customer must still be able to
@@ -39,13 +43,14 @@ async function handleGET(request: Request) {
   const supabase = createServiceClient();
   const nowIso = new Date().toISOString();
 
-  const { data: jobs } = await supabase
-    .from("notification_queue")
-    .select("*")
-    .eq("status", "pending")
-    .lte("scheduled_at", nowIso)
-    .order("scheduled_at", { ascending: true })
-    .limit(BATCH_SIZE);
+  // Atomically claims rows into 'processing' (FOR UPDATE SKIP LOCKED under
+  // the hood) so an overlapping cron invocation can never pick up the same
+  // job -- see claim_notification_queue_jobs (P09-03). A job left stuck in
+  // 'processing' past STALE_CLAIM_AFTER_SECONDS is reclaimed the same way.
+  const { data: jobs } = await supabase.rpc("claim_notification_queue_jobs", {
+    p_limit: BATCH_SIZE,
+    p_stale_after_seconds: STALE_CLAIM_AFTER_SECONDS,
+  });
 
   const resolved = await resolveDispatchContext(supabase, jobs ?? []);
 
@@ -349,7 +354,13 @@ async function dispatchOne(supabase: ReturnType<typeof createServiceClient>, job
       const styleHtml = customCss ? `<style>${customCss}</style>` : "";
       const bannerHtml = bannerImageUrl ? `<img src="${bannerImageUrl}" alt="" style="max-width:100%;display:block;margin:0 auto 16px;" />` : "";
       const html = `${styleHtml}${bannerHtml}${renderTemplate(template.body_html, payload)}`;
-      const result = await sendEmailViaResend({ to: job.recipient_email, subject, html, workspaceId });
+      const result = await sendEmailViaResend({
+        to: job.recipient_email,
+        subject,
+        html,
+        workspaceId,
+        idempotencyKey: `notification-queue:${job.id}`,
+      });
       if (result.reason === undefined) await recordProviderCheck("email", result.sent, result.error);
 
       let messageId: string | null = null;
@@ -415,9 +426,15 @@ async function dispatchOne(supabase: ReturnType<typeof createServiceClient>, job
       await supabase.from("notification_queue").update({ status: "failed", attempts, error }).eq("id", job.id);
       return "dead";
     }
+    // Explicitly releases the 'processing' claim back to 'pending' -- the
+    // row otherwise sits claimed until STALE_CLAIM_AFTER_SECONDS elapses,
+    // delaying a legitimate retry for no reason (the job was claimed by
+    // *this* run, not an orphan).
     await supabase
       .from("notification_queue")
       .update({
+        status: "pending",
+        claimed_at: null,
         attempts,
         error,
         scheduled_at: new Date(Date.now() + attempts * RETRY_BACKOFF_MINUTES * 60_000).toISOString(),

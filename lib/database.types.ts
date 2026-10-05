@@ -6906,6 +6906,7 @@ export type Database = {
           attempts: number
           channel: string
           channels: string[] | null
+          claimed_at: string | null
           created_at: string
           dedupe_key: string | null
           domain_id: string | null
@@ -6931,6 +6932,7 @@ export type Database = {
           attempts?: number
           channel: string
           channels?: string[] | null
+          claimed_at?: string | null
           created_at?: string
           dedupe_key?: string | null
           domain_id?: string | null
@@ -6956,6 +6958,7 @@ export type Database = {
           attempts?: number
           channel?: string
           channels?: string[] | null
+          claimed_at?: string | null
           created_at?: string
           dedupe_key?: string | null
           domain_id?: string | null
@@ -13062,6 +13065,35 @@ export type Database = {
           id: string
           run_id: string
           workspace_id: string
+        }[]
+      }
+      claim_notification_queue_jobs: {
+        Args: { p_limit?: number; p_stale_after_seconds?: number }
+        Returns: {
+          attempts: number
+          channel: string
+          channels: string[] | null
+          claimed_at: string | null
+          created_at: string
+          dedupe_key: string | null
+          domain_id: string | null
+          entity_id: string | null
+          entity_type: string | null
+          error: string | null
+          event_type: string | null
+          id: string
+          max_attempts: number
+          payload: Json
+          priority: string | null
+          read_at: string | null
+          recipient_email: string | null
+          recipient_phone: string | null
+          recipient_user_id: string | null
+          scheduled_at: string
+          sent_at: string | null
+          status: string
+          template_key: string
+          workspace_id: string | null
         }[]
       }
       claim_pending_paid_seat: {
