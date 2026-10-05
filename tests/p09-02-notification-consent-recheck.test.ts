@@ -64,18 +64,17 @@ function genericBuilder(): Record<string, unknown> {
 
 vi.mock("@/lib/supabase/service", () => ({
   createServiceClient: () => ({
+    rpc: (name: string) => {
+      // P09-03: the cron claims jobs atomically via this RPC instead of a
+      // plain SELECT -- see claim_notification_queue_jobs. Every other RPC
+      // this route calls (record_provider_check, via recordProviderCheck)
+      // is mocked at the module level above, so nothing else reaches here.
+      if (name === "claim_notification_queue_jobs") return Promise.resolve({ data: state.jobs, error: null });
+      throw new Error(`unexpected rpc in test: ${name}`);
+    },
     from: (table: string) => {
       if (table === "notification_queue") {
         return {
-          select: () => ({
-            eq: () => ({
-              lte: () => ({
-                order: () => ({
-                  limit: () => thenable({ data: state.jobs, error: null }),
-                }),
-              }),
-            }),
-          }),
           update: (patch: Record<string, unknown>) => ({
             eq: (_col: string, id: string) => {
               state.updatedJobs.push({ id, patch });
