@@ -85,8 +85,55 @@ describe("handleExternalPartnerPurchaseCheckoutCompleted", () => {
       p_external_payment_id: "pi_test_123",
       p_external_customer_id: "cus_test_123",
       p_external_checkout_session_id: "cs_test_123",
+      p_business_name: null,
     });
     expect(result).toEqual({ didProcess: true, purchaseId: "purchase-1" });
+  });
+
+  it("prefers customer_details.individual_name over the business name for the purchaser's own name, and passes business_name separately", async () => {
+    const { supabase, rpc } = createMockSupabase({
+      packageRow: { id: PACKAGE_ID },
+      rpcResult: { did_process: true, purchase_id: "purchase-1", onboarding_id: "onboarding-1", partner_prospect_id: "prospect-1" },
+    });
+
+    await handleExternalPartnerPurchaseCheckoutCompleted(supabase, WORKSPACE_ID, {
+      ...baseSession,
+      customer_details: {
+        name: "MKB Financial Group",
+        individual_name: "Krystal Esters",
+        business_name: "MKB Financial Group",
+        email: "krystal@mkbfinancialgroup.com",
+        phone: "+13374473558",
+      },
+    });
+
+    expect(rpc).toHaveBeenCalledWith(
+      "record_verified_partner_purchase",
+      expect.objectContaining({
+        p_purchaser_name: "Krystal Esters",
+        p_business_name: "MKB Financial Group",
+      })
+    );
+  });
+
+  it("falls back to customer_details.name when individual_name is absent", async () => {
+    const { supabase, rpc } = createMockSupabase({
+      packageRow: { id: PACKAGE_ID },
+      rpcResult: { did_process: true, purchase_id: "purchase-1", onboarding_id: "onboarding-1", partner_prospect_id: "prospect-1" },
+    });
+
+    await handleExternalPartnerPurchaseCheckoutCompleted(supabase, WORKSPACE_ID, {
+      ...baseSession,
+      customer_details: { name: "Solo Buyer", email: "solo@example.com", phone: "+15559876543" },
+    });
+
+    expect(rpc).toHaveBeenCalledWith(
+      "record_verified_partner_purchase",
+      expect.objectContaining({
+        p_purchaser_name: "Solo Buyer",
+        p_business_name: null,
+      })
+    );
   });
 
   it("is idempotent for a duplicate webhook delivery -- did_process comes back false, no error thrown", async () => {
