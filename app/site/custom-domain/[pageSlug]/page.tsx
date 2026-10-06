@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 import { cache } from "react";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
@@ -27,26 +28,35 @@ function currentDomain() {
 }
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const data = await loadPage(currentDomain(), params.pageSlug);
-  if (!data) return { title: "Page not found" };
+  const domain = currentDomain();
+  const data = await loadPage(domain, params.pageSlug);
+  if (!data) return { title: "Page not found", robots: { index: false, follow: false } };
+
+  const canonical = `https://${domain}/${params.pageSlug === "home" ? "" : encodeURIComponent(params.pageSlug)}`;
+  const title = data.page.title === "Home" ? data.website.name : `${data.page.title} | ${data.website.name}`;
+  const description = data.page.meta_description ?? undefined;
+  const logo = data.branding?.logo_url?.startsWith("https://") ? data.branding.logo_url : undefined;
+
   return {
-    title: data.page.title,
-    description: data.page.meta_description ?? undefined,
+    title,
+    description,
     icons: data.website.favicon_url ? { icon: data.website.favicon_url } : undefined,
+    alternates: { canonical },
+    openGraph: {
+      type: "website",
+      title,
+      description,
+      url: canonical,
+      siteName: data.website.name,
+      images: logo ? [{ url: logo }] : undefined,
+    },
+    twitter: { card: "summary", title, description, images: logo ? [logo] : undefined },
   };
 }
 
 export default async function CustomDomainSitePage({ params }: { params: Params }) {
   const data = await loadPage(currentDomain(), params.pageSlug);
-
-  if (!data) {
-    return (
-      <div className="mx-auto max-w-md p-8 text-center">
-        <h1 className="text-lg font-semibold text-ink">This page isn&apos;t available</h1>
-        <p className="mt-2 text-sm text-muted">It may have been unpublished, or the link is incorrect.</p>
-      </div>
-    );
-  }
+  if (!data) notFound();
 
   return <PublicSitePage workspaceSlug={data.workspace_slug} websiteSlug={data.website_slug} data={data} />;
 }

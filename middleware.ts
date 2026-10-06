@@ -43,6 +43,15 @@ export async function middleware(request: NextRequest) {
   const isCrossDomainSafePath = CROSS_DOMAIN_SAFE_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 
   if (!isAppHostname(hostname) && !isCrossDomainSafePath) {
+    // Search-engine documents need their own content types, not the generic
+    // page resolver's HTML response for a page named "robots.txt" or
+    // "sitemap.xml". Preserve Host so the handler can resolve this website.
+    if (pathname === "/robots.txt" || pathname === "/sitemap.xml") {
+      const url = request.nextUrl.clone();
+      url.pathname = pathname === "/robots.txt" ? "/api/site-seo/robots" : "/api/site-seo/sitemap";
+      return NextResponse.rewrite(url);
+    }
+
     // Site page slugs are a single flat segment (site_pages.slug has no
     // nesting), so only the first path segment is ever meaningful; the bare
     // domain root maps to the "home" page by convention.
