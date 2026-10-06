@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { addProjectDomain, removeProjectDomain } from "@/lib/vercel/domains";
 import { isVercelDomainAutomationConfigured } from "@/lib/providerStatus";
 import { authorizedWebsite } from "@/lib/websites/auth";
-import { createClient } from "@/lib/supabase/server";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   if (!isVercelDomainAutomationConfigured()) {
