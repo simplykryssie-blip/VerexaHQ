@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Trash2, X, Globe, CheckCircle2, RefreshCw } from "lucide-react";
 import { CopyIconButton, CopyRecordButton } from "@/components/CopyIconButton";
@@ -72,18 +72,18 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
   const [ownershipChallenge, setOwnershipChallenge] = useState<OwnershipChallenge[] | null>(null);
   const mfaResumeStarted = useRef(false);
 
-  function redirectToMfaChallenge(action: "connect" | "disconnect") {
+  const redirectToMfaChallenge = useCallback((action: "connect" | "disconnect") => {
     const params = new URLSearchParams(window.location.search);
     params.set("tab", "settings");
     params.set("domainMfa", action);
     const returnPath = window.location.pathname + "?" + params.toString();
     router.push("/mfa-challenge?next=" + encodeURIComponent(returnPath));
-  }
+  }, [router]);
 
   // Idempotent -- safe to call on every Connect/Verify click. Attaching a
   // domain that's already attached to this project just returns its
   // current state instead of erroring.
-  async function attachDomain(): Promise<AttachResult> {
+  const attachDomain = useCallback(async (): Promise<AttachResult> => {
     const res = await fetch(`/api/websites/${website.id}/attach-domain`, { method: "POST" });
     const result = (await res.json().catch(() => null)) as AttachResult | null;
     if (!result) return { automated: false };
@@ -99,7 +99,7 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
       toast.show(result.error, "error");
     }
     return result;
-  }
+  }, [toast, website.id]);
 
   async function saveDomain() {
     const next = normalizeDomain(domainInput);
@@ -159,7 +159,7 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
     toast.show("Domain disconnected", "success");
   }
 
-  async function verifyDomain(skipAttach = false) {
+  const verifyDomain = useCallback(async (skipAttach = false) => {
     setVerifying(true);
     if (!skipAttach) {
       const attach = await attachDomain();
@@ -180,7 +180,7 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
     setDomainVerified(result.verified);
     setDomainVerifiedAt(result.verified ? new Date().toISOString() : null);
     toast.show(result.verified ? "DNS is pointing correctly" : "DNS record not detected yet", result.verified ? "success" : "error");
-  }
+  }, [attachDomain, redirectToMfaChallenge, toast, website.id]);
 
   useEffect(() => {
     const action = searchParams.get("domainMfa");
