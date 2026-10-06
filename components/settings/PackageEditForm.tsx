@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { PartnerPurchaseWebhookSettings } from "@/components/settings/PartnerPurchaseWebhookSettings";
 
 export type PackageDetail = {
   id: string;
@@ -248,6 +249,7 @@ export function PackageEditForm({ pkg, canManage }: { pkg: PackageDetail; canMan
           </select>
         </label>
       </div>
+      <PartnerPurchaseWebhookSettings />
     </div>
   );
 }

@@ -12,6 +12,10 @@ export const maxDuration = 60;
 
 const BATCH_SIZE = 50;
 const RETRY_BACKOFF_MINUTES = 5;
+// This function's own maxDuration is 60s, so a claim that's still
+// "processing" after 2x that has to be from a run that crashed or timed
+// out mid-flight, not one that's merely still working -- safe to reclaim.
+const STALE_CLAIM_AFTER_SECONDS = 120;
 
 // A suspended/archived/permanently_archived workspace must not continue
 // normal business communications -- but the customer must still be able to
@@ -39,13 +43,14 @@ async function handleGET(request: Request) {
   const supabase = createServiceClient();
   const nowIso = new Date().toISOString();
 
-  const { data: jobs } = await supabase
-    .from("notification_queue")
-    .select("*")
-    .eq("status", "pending")
-    .lte("scheduled_at", nowIso)
-    .order("scheduled_at", { ascending: true })
-    .limit(BATCH_SIZE);
+  // Atomically claims rows into 'processing' (FOR UPDATE SKIP LOCKED under
+  // the hood) so an overlapping cron invocation can never pick up the same
+  // job -- see claim_notification_queue_jobs (P09-03). A job left stuck in
+  // 'processing' past STALE_CLAIM_AFTER_SECONDS is reclaimed the same way.
+  const { data: jobs } = await supabase.rpc("claim_notification_queue_jobs", {
+    p_limit: BATCH_SIZE,
+    p_stale_after_seconds: STALE_CLAIM_AFTER_SECONDS,
+  });
 
   const resolved = await resolveDispatchContext(supabase, jobs ?? []);
 
@@ -122,6 +127,7 @@ type DispatchContext = {
   emailTemplatesBySlug: Map<string, EmailTemplateCandidate[]>;
   smsTemplatesBySlug: Map<string, SmsTemplateCandidate[]>;
   workspaceStatusById: Map<string, string>;
+  optOutByClientId: Map<string, { smsOptOut: boolean; emailOptOut: boolean }>;
 };
 
 // Every job independently re-resolves the same handful of lookups
@@ -155,6 +161,17 @@ async function resolveDispatchContext(supabase: ReturnType<typeof createServiceC
   for (const invite of invites ?? []) {
     if (!portalInviteByClientId.has(invite.client_id)) portalInviteByClientId.set(invite.client_id, invite);
   }
+
+  // P09-02: a client can opt out between the moment execute_automation_step
+  // enqueued this job and this cron tick actually dispatching it (scheduled
+  // sends, retry backoff can both leave a job sitting for a while) --
+  // re-read current consent right before sending rather than trusting the
+  // one-time check that happened at enqueue.
+  const { data: optOutRows } =
+    clientIds.length > 0
+      ? await supabase.from("clients").select("id, sms_opt_out, email_opt_out").in("id", clientIds)
+      : { data: [] as { id: string; sms_opt_out: boolean; email_opt_out: boolean }[] };
+  const optOutByClientId = new Map((optOutRows ?? []).map((c) => [c.id, { smsOptOut: c.sms_opt_out, emailOptOut: c.email_opt_out }]));
 
   const workspaceIds = Array.from(new Set(jobs.map((j) => j.workspace_id).filter((id): id is string => Boolean(id))));
   const emailSlugs = Array.from(new Set(jobs.filter((j) => j.channel === "Email").map((j) => j.template_key)));
@@ -200,7 +217,7 @@ async function resolveDispatchContext(supabase: ReturnType<typeof createServiceC
       : { data: [] as { id: string; status: string }[] };
   const workspaceStatusById = new Map((workspaceRows ?? []).map((w) => [w.id, w.status]));
 
-  return { engagementClientId, portalInviteByClientId, emailTemplatesBySlug, smsTemplatesBySlug, workspaceStatusById };
+  return { engagementClientId, portalInviteByClientId, emailTemplatesBySlug, smsTemplatesBySlug, workspaceStatusById, optOutByClientId };
 }
 
 function resolveClientIdFromContext(context: DispatchContext, entityType: string | null, entityId: string | null) {
@@ -296,6 +313,23 @@ async function dispatchOne(supabase: ReturnType<typeof createServiceClient>, job
 
   try {
     const clientId = resolveClientIdFromContext(context, job.entity_type, job.entity_id);
+
+    // P09-02: consent was only ever checked once, when execute_automation_step
+    // enqueued this job -- a client who opts out in the meantime (this job
+    // can sit for a while: scheduled sends, retry backoff) must not still
+    // receive it just because the check already passed back then. Only
+    // applies to client-facing jobs (recipient_user_id is set only for
+    // send_notification's internal staff-alert branch, which isn't gated by
+    // a client's own consent at all) and is exempt for the same billing-
+    // recovery keys the workspace-suspension check above already carves out.
+    if (clientId && !BILLING_RECOVERY_TEMPLATE_KEYS.has(job.template_key) && !job.recipient_user_id) {
+      const optOut = context.optOutByClientId.get(clientId);
+      if ((job.channel === "Email" && optOut?.emailOptOut) || (job.channel === "SMS" && optOut?.smsOptOut)) {
+        await supabase.from("notification_queue").update({ status: "failed", error: "client has opted out of this channel since the job was enqueued" }).eq("id", job.id);
+        return "dead";
+      }
+    }
+
     const { portalLink, portalInviteLink } = resolvePortalMergeFieldsFromContext(context, clientId);
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
     const payload: Record<string, unknown> = { ...basePayload, portal_link: portalLink, dashboard_url: `${appUrl}/dashboard` };
@@ -320,7 +354,13 @@ async function dispatchOne(supabase: ReturnType<typeof createServiceClient>, job
       const styleHtml = customCss ? `<style>${customCss}</style>` : "";
       const bannerHtml = bannerImageUrl ? `<img src="${bannerImageUrl}" alt="" style="max-width:100%;display:block;margin:0 auto 16px;" />` : "";
       const html = `${styleHtml}${bannerHtml}${renderTemplate(template.body_html, payload)}`;
-      const result = await sendEmailViaResend({ to: job.recipient_email, subject, html, workspaceId });
+      const result = await sendEmailViaResend({
+        to: job.recipient_email,
+        subject,
+        html,
+        workspaceId,
+        idempotencyKey: `notification-queue:${job.id}`,
+      });
       if (result.reason === undefined) await recordProviderCheck("email", result.sent, result.error);
 
       let messageId: string | null = null;
@@ -386,9 +426,15 @@ async function dispatchOne(supabase: ReturnType<typeof createServiceClient>, job
       await supabase.from("notification_queue").update({ status: "failed", attempts, error }).eq("id", job.id);
       return "dead";
     }
+    // Explicitly releases the 'processing' claim back to 'pending' -- the
+    // row otherwise sits claimed until STALE_CLAIM_AFTER_SECONDS elapses,
+    // delaying a legitimate retry for no reason (the job was claimed by
+    // *this* run, not an orphan).
     await supabase
       .from("notification_queue")
       .update({
+        status: "pending",
+        claimed_at: null,
         attempts,
         error,
         scheduled_at: new Date(Date.now() + attempts * RETRY_BACKOFF_MINUTES * 60_000).toISOString(),

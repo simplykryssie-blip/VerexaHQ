@@ -74,7 +74,19 @@ export async function handleCheckoutSessionCompleted(
   // Triggers apply_payment_to_invoice, which updates the invoice status
   // and posts the client_ledger entry, and payments_enqueue_receipt,
   // which emails the client a receipt -- no extra logic needed here.
-  const { data: payment } = await supabase
+  //
+  // P12-01: a failed insert here must never be reported to Stripe as a
+  // successfully processed webhook. Stripe has already charged the card by
+  // this point, so silently swallowing an insert error would leave the
+  // payment accepted by Stripe but permanently unrecorded in Verexa -- and
+  // because the caller marks this webhook event 'processed' right after
+  // this function returns, claim_stripe_webhook_event would never allow it
+  // to be retried. A 23505 on uq_payments_stripe_checkout_session /
+  // uq_payments_stripe_payment_intent means this exact session was already
+  // recorded by an earlier attempt at this same event -- that's a retry
+  // succeeding idempotently, not a new failure, so it resolves to the
+  // existing row instead of throwing.
+  let { data: payment, error: paymentError } = await supabase
     .from("payments")
     .insert({
       workspace_id: workspaceId,
@@ -89,6 +101,20 @@ export async function handleCheckoutSessionCompleted(
     })
     .select("id")
     .single();
+
+  if (paymentError) {
+    if (paymentError.code === "23505") {
+      const { data: existing } = await supabase.from("payments").select("id").eq("stripe_checkout_session_id", session.id).maybeSingle();
+      if (!existing) {
+        throw new Error(
+          `Stripe payment insert conflict for invoice ${invoiceId} (checkout session ${session.id}) did not resolve to an existing row: ${paymentError.message}`
+        );
+      }
+      payment = existing;
+    } else {
+      throw new Error(`Failed to record Stripe payment for invoice ${invoiceId} (checkout session ${session.id}): ${paymentError.message}`);
+    }
+  }
 
   if (paymentPlanId && payment) {
     await supabase.from("payment_plans").update({ status: "paid", paid_payment_id: payment.id }).eq("id", paymentPlanId);

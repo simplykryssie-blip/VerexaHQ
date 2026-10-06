@@ -3,6 +3,28 @@ import { withSentryConfig } from "@sentry/nextjs/config";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // VEREXA ZOOM-DAST-001: suppress the framework's own "X-Powered-By: Next.js"
+  // response header (ZAP passive finding "Server Leaks Information via
+  // X-Powered-By HTTP Response Header Field").
+  poweredByHeader: false,
+  // VEREXA ZOOM-DAST-001: global response headers for the two other
+  // narrowly-scoped ZAP passive findings from the Zoom DAST evidence run
+  // (see HANDOFF.md) -- anti-clickjacking and MIME-sniffing protection.
+  // CSP is intentionally excluded here: it requires further evidence
+  // (Sentry ingestion host, Supabase connect-src, a nonce strategy for the
+  // framework's own inline hydration script, and a stance on the app's
+  // pervasive inline `style=""` usage) before it can be defined safely.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+        ],
+      },
+    ];
+  },
   // Disable static generation for error pages
   onDemandEntries: {
     maxInactiveAge: 60 * 1000,

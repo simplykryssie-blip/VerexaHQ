@@ -22,6 +22,7 @@ export async function sendEmailViaResend({
   fromName,
   replyTo,
   workspaceId,
+  idempotencyKey,
 }: {
   to: string;
   subject: string;
@@ -30,6 +31,13 @@ export async function sendEmailViaResend({
   fromName?: string;
   replyTo?: string;
   workspaceId?: string;
+  // Resend deduplicates by this key for 24h: if a crash/timeout causes the
+  // same notification_queue job to be reclaimed and resent, Resend returns
+  // the original send instead of actually emailing the recipient twice.
+  // Callers with a stable per-job identifier (e.g. the queue row's id)
+  // should always pass one; this is what closes the resend-on-crash gap
+  // for email (see P09-04).
+  idempotencyKey?: string;
 }): Promise<SendEmailResult> {
   if (!isEmailConfigured()) {
     return { sent: false, reason: "Email provider is not configured for this environment." };
@@ -84,6 +92,7 @@ export async function sendEmailViaResend({
     headers: {
       Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
       "Content-Type": "application/json",
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
     },
     body: JSON.stringify({
       from: `${displayName} <${fromAddress}>`,

@@ -70,6 +70,7 @@ async function handleGET(request: Request) {
   let stillWaiting = 0;
   let deferred = 0;
   let blocked = 0;
+  let failed = 0;
   for (const row of pending ?? []) {
     if (Date.now() - startedAt > DEADLINE_MS) {
       deferred = (pending?.length ?? 0) - processed - stillWaiting;
@@ -89,16 +90,36 @@ async function handleGET(request: Request) {
       blocked++;
       continue;
     }
-    const { data: shouldAdvance } = await supabase.rpc("should_advance_wait_until_step", { p_pending_id: row.id });
+    // P08-02: every RPC result below is now checked for `error`. The
+    // pending row -- "the only durable 'still waiting' marker" this step
+    // has -- is deleted only when we have positive evidence the call
+    // actually ran (no error), never on a guess. An error here (a genuine
+    // RPC failure, as opposed to a normal business-logic outcome like the
+    // step's own action legitimately failing, which these RPCs already
+    // catch internally and report as a successful call) must leave the row
+    // in place so a future tick -- or, failing that, the stale-queue safety
+    // net in check-stale-automation-queues -- can still find it.
+    const { data: shouldAdvance, error: shouldAdvanceError } = await supabase.rpc("should_advance_wait_until_step", {
+      p_pending_id: row.id,
+    });
+    if (shouldAdvanceError) {
+      console.error(`run-pending-automation-steps: should_advance_wait_until_step failed for pending step ${row.id}`, shouldAdvanceError);
+      failed++;
+      continue;
+    }
     if (shouldAdvance === false) {
       stillWaiting++;
       continue;
     }
     const actionType = (row.automation_steps as unknown as { action_type?: string } | null)?.action_type;
-    if (actionType === "condition") {
-      await supabase.rpc("start_next_automation_step", { p_run_id: row.run_id });
-    } else {
-      await supabase.rpc("execute_automation_step", { p_run_id: row.run_id, p_step_id: row.automation_step_id });
+    const { error: advanceError } =
+      actionType === "condition"
+        ? await supabase.rpc("start_next_automation_step", { p_run_id: row.run_id })
+        : await supabase.rpc("execute_automation_step", { p_run_id: row.run_id, p_step_id: row.automation_step_id });
+    if (advanceError) {
+      console.error(`run-pending-automation-steps: advancing run ${row.run_id} (pending step ${row.id}) failed`, advanceError);
+      failed++;
+      continue;
     }
     await supabase.from("automation_pending_steps").delete().eq("id", row.id);
     processed++;
@@ -134,7 +155,7 @@ async function handleGET(request: Request) {
     resumed++;
   }
 
-  return NextResponse.json({ processed, stillWaiting, deferred, blocked, resumed });
+  return NextResponse.json({ processed, stillWaiting, deferred, blocked, failed, resumed });
 }
 
 export const GET = withJobLogging("run-pending-automation-steps", handleGET);
