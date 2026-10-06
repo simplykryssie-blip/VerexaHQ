@@ -77,9 +77,9 @@ export function SectionPreview({
       // it's safe to render for real here rather than a static stand-in.
       return <PricingTableSection config={section.config as never} />;
     case "custom_html": {
-      const cfg = section.config as { html?: string };
+      const cfg = section.config as { html?: string; full_width?: boolean };
       return (
-        <section className="mx-auto max-w-5xl px-6 py-8">
+        <section className={cfg.full_width ? "" : "mx-auto max-w-5xl px-6 py-8"}>
           {cfg.html ? (
             <SandboxedHtmlPreview html={cfg.html} customCss={customCss} />
           ) : (

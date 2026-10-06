@@ -46,12 +46,12 @@ export function PublicSitePage({
         // eslint-disable-next-line react/no-danger
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: page.schema_markup }} />
       )}
-      {(branding?.logo_url || showLoginLink) && (
+      {((!website.hide_platform_header && branding?.logo_url) || showLoginLink) && (
         <header
           className={`flex items-center justify-between ${website.header_background ? "px-6 py-4" : "border-b border-border px-6 py-4"}`}
           style={website.header_background ? { background: website.header_background, borderBottom: "1px solid rgba(255,255,255,0.08)" } : undefined}
         >
-          {branding?.logo_url ? (
+          {!website.hide_platform_header && branding?.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={branding.logo_url} alt={branding.display_name ?? page.title} className="h-8 w-auto" />
           ) : (

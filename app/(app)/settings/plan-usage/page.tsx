@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { isSubscriptionStatusPaid } from "@/lib/stripe/subscriptionWebhooks";
 import { CreditCard } from "lucide-react";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { SettingsCard } from "@/components/settings/SettingsCard";
@@ -105,14 +106,14 @@ export default async function PlanUsagePage() {
               />
             </SettingsCard>
           )}
-          {workspace.is_owner && subscription.stripe_status !== "active" && (
+          {workspace.is_owner && !isSubscriptionStatusPaid(subscription.stripe_status) && (
             <div className="mt-6">
               <SettingsCard title="Resume your subscription" description="Complete or retry your Verexa subscription payment to restore full access.">
                 <ResumeCheckoutButton />
               </SettingsCard>
             </div>
           )}
-          {subscription.stripe_status === "active" && (
+          {isSubscriptionStatusPaid(subscription.stripe_status) && (
           <>
           <div className="mt-6">
           <SettingsCard title={plan.name} description="Contact Verexa to change plans.">

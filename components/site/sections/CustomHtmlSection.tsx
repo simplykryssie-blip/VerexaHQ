@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from "react";
 
-type CustomHtmlConfig = { html?: string };
+type CustomHtmlConfig = { html?: string; full_width?: boolean };
 
 type MenuClassList = {
   contains(token: string): boolean;
@@ -85,7 +85,7 @@ export function CustomHtmlSection({ config }: { config: CustomHtmlConfig }) {
     <section
       ref={containerRef}
       onClickCapture={handleClickCapture}
-      className="mx-auto max-w-5xl px-6 py-8"
+      className={config.full_width ? "" : "mx-auto max-w-5xl px-6 py-8"}
       dangerouslySetInnerHTML={{ __html: config.html }}
     />
   );

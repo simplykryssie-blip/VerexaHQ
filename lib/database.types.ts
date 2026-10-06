@@ -9984,6 +9984,7 @@ export type Database = {
           folder_id: string | null
           head_tracking_code: string | null
           header_background: string | null
+          hide_platform_header: boolean
           id: string
           name: string
           slug: string
@@ -10002,6 +10003,7 @@ export type Database = {
           folder_id?: string | null
           head_tracking_code?: string | null
           header_background?: string | null
+          hide_platform_header?: boolean
           id?: string
           name: string
           slug: string
@@ -10020,6 +10022,7 @@ export type Database = {
           folder_id?: string | null
           head_tracking_code?: string | null
           header_background?: string | null
+          hide_platform_header?: boolean
           id?: string
           name?: string
           slug?: string

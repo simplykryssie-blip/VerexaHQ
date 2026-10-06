@@ -15,6 +15,8 @@ export type SiteWebsiteInfo = {
   body_tracking_code: string | null;
   /** CSS background for the logo header -- null keeps the default plain white/light header. Lets a dark-themed site (e.g. a sidebar-logo variant meant for a dark background) show its logo without clashing against white. */
   header_background: string | null;
+  /** Opt-out of the platform logo header entirely -- for a site whose own page content already supplies its own header/branding (e.g. a full custom_html document with its own nav). Off by default. */
+  hide_platform_header: boolean;
 };
 
 export type FunnelPageRef = { id: string; slug: string; title: string; position: number };
