@@ -71,6 +71,22 @@ describe("addProjectDomain", () => {
     expect(result).toEqual({ ok: true, data: payload });
   });
 
+  it("checks the project's existing domains first and never calls POST when already attached", async () => {
+    const payload = attachedDomainPayload("monarchtaxsuite.com");
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).includes("/domains?")) {
+        throw new Error("POST /domains should not be called when the domain is already attached to this project");
+      }
+      return { ok: true, json: async () => payload };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await addProjectDomain("monarchtaxsuite.com");
+
+    expect(result).toEqual({ ok: true, data: payload });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("surfaces a real error when the domain is genuinely owned by someone else", async () => {
     const fetchMock = vi.fn(async (url: string) => {
       if (String(url).includes("/domains?")) {
