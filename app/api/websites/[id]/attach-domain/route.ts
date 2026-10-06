@@ -39,7 +39,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     return NextResponse.json({ automated: true, removed: true });
   }
 
-  // VEREXA-AAL-001: same domain-control surface as attaching one.
+  // VEREXA-AAL-001: disconnecting a custom domain remains a protected domain-control action.
   if (!(await hasAal2(createClient()))) {
     return NextResponse.json(
       { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
