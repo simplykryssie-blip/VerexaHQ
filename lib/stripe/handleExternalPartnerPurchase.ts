@@ -1,5 +1,18 @@
 import { createServiceClient } from "@/lib/supabase/service";
 
+// Stripe Checkout's own "Add custom field" feature on a Payment Link --
+// configured once per link in the Stripe Dashboard, not a separate Verexa
+// intake step. A session's custom_fields entries show up at this top-level
+// array, never nested under customer_details (Stripe has no native
+// business-name/individual-name split there).
+const BUSINESS_NAME_CUSTOM_FIELD_KEY = "business_name";
+
+type CheckoutSessionCustomField = {
+  key: string;
+  type: string;
+  text?: { value?: string | null } | null;
+};
+
 type CheckoutSession = {
   id: string;
   payment_link?: string | null;
@@ -9,16 +22,21 @@ type CheckoutSession = {
   customer?: string | { id: string } | null;
   customer_details?: {
     name?: string | null;
-    individual_name?: string | null;
-    business_name?: string | null;
     email?: string | null;
     phone?: string | null;
   } | null;
+  custom_fields?: CheckoutSessionCustomField[] | null;
 };
 
 function customerId(customer: CheckoutSession["customer"]): string | null {
   if (!customer) return null;
   return typeof customer === "string" ? customer : customer.id;
+}
+
+function customFieldValue(fields: CheckoutSessionCustomField[] | null | undefined, key: string): string | null {
+  const field = fields?.find((f) => f.key === key);
+  const value = field?.text?.value?.trim();
+  return value ? value : null;
 }
 
 /**
@@ -61,11 +79,7 @@ export async function handleExternalPartnerPurchaseCheckoutCompleted(
     .rpc("record_verified_partner_purchase", {
       p_owning_workspace_id: workspaceId,
       p_package_id: pkg.id,
-      // customer_details.name mirrors the BUSINESS name when business-name
-      // collection is enabled on the Payment Link -- individual_name is the
-      // actual purchaser. Prefer the real person; fall back to whatever
-      // name Stripe did collect rather than leaving the buyer nameless.
-      p_purchaser_name: session.customer_details.individual_name ?? session.customer_details.name ?? "",
+      p_purchaser_name: session.customer_details.name ?? "",
       p_purchaser_email: session.customer_details.email,
       p_purchaser_phone: session.customer_details.phone ?? "",
       p_amount: (session.amount_total ?? 0) / 100,
@@ -77,7 +91,10 @@ export async function handleExternalPartnerPurchaseCheckoutCompleted(
       p_external_checkout_session_id: session.id,
       // Explicit null (not undefined) so this key always reaches
       // PostgREST -- an omitted key can resolve to a different overload.
-      p_business_name: session.customer_details.business_name ?? null,
+      // Optional per package: only populated when the Payment Link has a
+      // custom field keyed "business_name" configured and the purchaser
+      // filled it in.
+      p_business_name: customFieldValue(session.custom_fields, BUSINESS_NAME_CUSTOM_FIELD_KEY),
     })
     .maybeSingle();
 
