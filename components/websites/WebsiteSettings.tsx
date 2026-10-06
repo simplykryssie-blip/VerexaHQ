@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Trash2, X, Globe, CheckCircle2, RefreshCw } from "lucide-react";
 import { CopyIconButton, CopyRecordButton } from "@/components/CopyIconButton";
 import { formatDnsRecordForCopy } from "@/lib/dns/formatDnsRecordForCopy";
@@ -46,10 +46,11 @@ type VerifyResult = {
 };
 
 type OwnershipChallenge = { type: string; domain: string; value: string; reason: string };
-type AttachResult = { automated: boolean; verified?: boolean; verification?: OwnershipChallenge[]; error?: string };
+type AttachResult = { automated: boolean; verified?: boolean; verification?: OwnershipChallenge[]; error?: string; requiresMfa?: boolean };
 
 export function WebsiteSettings({ website, canManage }: { website: Website; canManage: boolean }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const toast = useToast();
   const [name, setName] = useState(website.name);
@@ -69,6 +70,15 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
   const [automated, setAutomated] = useState<boolean | null>(null);
   const [ownershipChallenge, setOwnershipChallenge] = useState<OwnershipChallenge[] | null>(null);
+  const mfaResumeStarted = useRef(false);
+
+  function redirectToMfaChallenge(action: "connect" | "disconnect") {
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", "settings");
+    params.set("domainMfa", action);
+    const returnPath = window.location.pathname + "?" + params.toString();
+    router.push("/mfa-challenge?next=" + encodeURIComponent(returnPath));
+  }
 
   // Idempotent -- safe to call on every Connect/Verify click. Attaching a
   // domain that's already attached to this project just returns its
@@ -80,6 +90,12 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
     setAutomated(result.automated);
     setOwnershipChallenge(result.verification && result.verification.length > 0 ? result.verification : null);
     if (!res.ok && result.error) {
+      if (
+        res.status === 403 &&
+        result.error === "This action requires two-factor verification. Complete your authenticator challenge and try again."
+      ) {
+        return { ...result, requiresMfa: true };
+      }
       toast.show(result.error, "error");
     }
     return result;
@@ -103,15 +119,29 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
     setDomainVerified(false);
     setDomainVerifiedAt(null);
     setVerifyResult(null);
-    await attachDomain();
+    const attach = await attachDomain();
+    if (attach.requiresMfa) {
+      setSavingDomain(false);
+      redirectToMfaChallenge("connect");
+      return;
+    }
     setSavingDomain(false);
     toast.show("Domain saved -- checking DNS...", "success");
-    await verifyDomain();
+    await verifyDomain(true);
   }
 
   async function removeDomain() {
     if (!confirm(`Disconnect ${savedDomain}? Visitors on that domain will stop reaching this website.`)) return;
-    await fetch(`/api/websites/${website.id}/attach-domain`, { method: "DELETE" }).catch(() => null);
+    const response = await fetch(`/api/websites/${website.id}/attach-domain`, { method: "DELETE" }).catch(() => null);
+    const result = response ? ((await response.json().catch(() => null)) as AttachResult | null) : null;
+    if (response?.status === 403 && result?.error === "This action requires two-factor verification. Complete your authenticator challenge and try again.") {
+      redirectToMfaChallenge("disconnect");
+      return;
+    }
+    if (response && !response.ok) {
+      toast.show(result?.error ?? "Couldn't disconnect the domain.", "error");
+      return;
+    }
     const { error } = await supabase
       .from("site_websites")
       .update({ custom_domain: null, domain_verified: false, domain_verified_at: null })
@@ -129,9 +159,16 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
     toast.show("Domain disconnected", "success");
   }
 
-  async function verifyDomain() {
+  async function verifyDomain(skipAttach = false) {
     setVerifying(true);
-    await attachDomain();
+    if (!skipAttach) {
+      const attach = await attachDomain();
+      if (attach.requiresMfa) {
+        setVerifying(false);
+        redirectToMfaChallenge("connect");
+        return;
+      }
+    }
     const res = await fetch(`/api/websites/${website.id}/verify-domain`, { method: "POST" });
     const result = await res.json().catch(() => null);
     setVerifying(false);
@@ -144,6 +181,58 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
     setDomainVerifiedAt(result.verified ? new Date().toISOString() : null);
     toast.show(result.verified ? "DNS is pointing correctly" : "DNS record not detected yet", result.verified ? "success" : "error");
   }
+
+  useEffect(() => {
+    const action = searchParams.get("domainMfa");
+    if (!action || (action !== "connect" && action !== "disconnect") || mfaResumeStarted.current) return;
+
+    mfaResumeStarted.current = true;
+
+    async function resumeDomainAction() {
+      try {
+        if (action === "connect") {
+          const attach = await attachDomain();
+          if (attach.requiresMfa) {
+            toast.show("Two-factor verification is still required. Please try again.", "error");
+            return;
+          }
+          if (attach.error || !attach.automated) return;
+          await verifyDomain(true);
+        } else {
+          const response = await fetch(`/api/websites/${website.id}/attach-domain`, { method: "DELETE" });
+          const result = (await response.json().catch(() => null)) as AttachResult | null;
+          if (!response.ok) {
+            toast.show(result?.error ?? "Couldn't disconnect the domain.", "error");
+            return;
+          }
+
+          const { error } = await supabase
+            .from("site_websites")
+            .update({ custom_domain: null, domain_verified: false, domain_verified_at: null })
+            .eq("id", website.id);
+          if (error) {
+            toast.show(error.message, "error");
+            return;
+          }
+
+          setSavedDomain(null);
+          setDomainInput("");
+          setDomainVerified(false);
+          setDomainVerifiedAt(null);
+          setVerifyResult(null);
+          setOwnershipChallenge(null);
+          toast.show("Domain disconnected", "success");
+        }
+      } finally {
+        const params = new URLSearchParams(window.location.search);
+        params.delete("domainMfa");
+        params.set("tab", "settings");
+        router.replace(window.location.pathname + "?" + params.toString());
+      }
+    }
+
+    void resumeDomainAction();
+  }, [searchParams, supabase, toast, router, website.id]);
 
   async function save() {
     setSaving(true);
@@ -268,7 +357,7 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
               </div>
               {canManage && (
                 <div className="flex items-center gap-1.5">
-                  <Button variant="secondary" size="sm" onClick={verifyDomain} disabled={verifying}>
+                  <Button variant="secondary" size="sm" onClick={() => verifyDomain()} disabled={verifying}>
                     <RefreshCw size={12} className={verifying ? "animate-spin" : ""} />
                     {verifying ? "Checking..." : "Verify DNS"}
                   </Button>
