@@ -70,6 +70,7 @@ export async function POST(request: Request) {
         currency?: string;
         payment_link?: string | null;
         customer_details?: { name?: string | null; email?: string | null; phone?: string | null } | null;
+        custom_fields?: { key: string; type: string; text?: { value?: string | null } | null }[] | null;
         metadata?: { invoice_id?: string; payment_plan_id?: string; workspace_id?: string; type?: string; purchase_id?: string };
       };
       let result =
