@@ -5,7 +5,7 @@
 // and has no internal authorization check -- provision_phone_number_record/
 // bill_and_pause_phone_numbers (a missed revoke of a default grant) and
 // resolve_organizer_response_service (a deliberate-but-unnecessary grant,
-// SD-1). See supabase/migrations/20260925000000_database_contract_guard.sql
+// SD-1). See supabase/migrations/20260925000001_database_contract_guard.sql
 // for the read-only introspection RPC this pulls facts from, and
 // lib/databaseContractGuard.ts for the policy/comparison logic against
 // tests/fixtures/database-contract-baseline.json.

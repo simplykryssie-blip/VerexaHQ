@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { checkRateLimit, clientIp } from "@/lib/rateLimit";
 import { TextPdf } from "@/lib/pdf/textPdf";
@@ -15,10 +16,11 @@ import { TextPdf } from "@/lib/pdf/textPdf";
 // request just completed -- it's a no-op ("notYetComplete") until the last
 // pending signer finishes, and idempotent (final_pdf_attachment_id already
 // set => "alreadyFiled") if called again afterwards. Accepts either a
-// public signing token or an authenticated caller's signatureRequestId --
-// same trust model as file-signed-engagement-letter's own comment: proving
-// you know a valid token/id is what authorizes filing, not anything else
-// about the request content.
+// public signing token (the signer's own proof of access) or an
+// authenticated staff caller's signatureRequestId -- unlike the token, a
+// bare signatureRequestId is just a database id, not proof of anything, so
+// that path requires a real session with 'signatures.request' permission
+// on the request's own workspace before any mutation runs.
 export async function POST(request: Request) {
   const allowed = await checkRateLimit(`sign-finalize:${clientIp(request)}`, 20, 60);
   if (!allowed) {
@@ -49,12 +51,35 @@ export async function POST(request: Request) {
 
   const { data: sigRequest } = await supabase
     .from("signature_requests")
-    .select("id, attachment_id, status, final_pdf_attachment_id, title")
+    .select("id, workspace_id, attachment_id, status, final_pdf_attachment_id, title")
     .eq("id", requestId)
     .maybeSingle();
   if (!sigRequest) {
     return NextResponse.json({ error: "Signature request not found" }, { status: 404 });
   }
+
+  // The token path already proved the caller is this request's own signer
+  // (the earlier access_token lookup). A bare signatureRequestId proves
+  // nothing on its own -- without this, any caller who learned or guessed
+  // an id could trigger the service-role mutations below for a signature
+  // request belonging to a workspace they have no relationship to.
+  if (!token) {
+    const sessionClient = createClient();
+    const {
+      data: { user },
+    } = await sessionClient.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+    const { data: authorized } = await sessionClient.rpc("has_permission", {
+      p_workspace_id: sigRequest.workspace_id,
+      p_permission_key: "signatures.request",
+    });
+    if (!authorized) {
+      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+    }
+  }
+
   if (sigRequest.final_pdf_attachment_id) {
     return NextResponse.json({ ok: true, alreadyFiled: true });
   }

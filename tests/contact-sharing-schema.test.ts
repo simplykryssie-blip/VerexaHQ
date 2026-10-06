@@ -15,7 +15,7 @@ import { dirname, join } from "node:path";
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsDir = join(repoRoot, "supabase/migrations");
 
-const phase0 = readFileSync(join(migrationsDir, "20261031100000_contact_sharing_one_active_ero_constraint.sql"), "utf8");
+const phase0 = readFileSync(join(migrationsDir, "20261031100001_contact_sharing_one_active_ero_constraint.sql"), "utf8");
 const phase1 = readFileSync(join(migrationsDir, "20261031110000_contact_sharing_schema.sql"), "utf8");
 const phase2 = readFileSync(join(migrationsDir, "20261031120000_contact_sharing_rpcs.sql"), "utf8");
 const disconnectIntegration = readFileSync(join(migrationsDir, "20261031130000_contact_sharing_disconnect_integration.sql"), "utf8");

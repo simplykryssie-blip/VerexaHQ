@@ -419,7 +419,7 @@ export function PublicOrganizerForm({
         fetch("/api/documents/file-organizer-response", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ responseId }),
+          body: JSON.stringify({ responseId, token }),
         }).catch(() => {});
       }
       setAccountCreated(true);
@@ -447,7 +447,7 @@ export function PublicOrganizerForm({
       fetch("/api/documents/file-organizer-response", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ responseId }),
+        body: JSON.stringify({ responseId, token }),
       }).catch(() => {
         // Best-effort -- the submission itself is already recorded; filing
         // it into Documents can be retried later if this fails.

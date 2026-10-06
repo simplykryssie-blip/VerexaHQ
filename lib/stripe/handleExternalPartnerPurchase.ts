@@ -7,7 +7,13 @@ type CheckoutSession = {
   amount_total?: number | null;
   currency?: string | null;
   customer?: string | { id: string } | null;
-  customer_details?: { name?: string | null; email?: string | null; phone?: string | null } | null;
+  customer_details?: {
+    name?: string | null;
+    individual_name?: string | null;
+    business_name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  } | null;
 };
 
 function customerId(customer: CheckoutSession["customer"]): string | null {
@@ -55,7 +61,11 @@ export async function handleExternalPartnerPurchaseCheckoutCompleted(
     .rpc("record_verified_partner_purchase", {
       p_owning_workspace_id: workspaceId,
       p_package_id: pkg.id,
-      p_purchaser_name: session.customer_details.name ?? "",
+      // customer_details.name mirrors the BUSINESS name when business-name
+      // collection is enabled on the Payment Link -- individual_name is the
+      // actual purchaser. Prefer the real person; fall back to whatever
+      // name Stripe did collect rather than leaving the buyer nameless.
+      p_purchaser_name: session.customer_details.individual_name ?? session.customer_details.name ?? "",
       p_purchaser_email: session.customer_details.email,
       p_purchaser_phone: session.customer_details.phone ?? "",
       p_amount: (session.amount_total ?? 0) / 100,
@@ -65,6 +75,9 @@ export async function handleExternalPartnerPurchaseCheckoutCompleted(
       p_external_payment_id: session.payment_intent ?? session.id,
       p_external_customer_id: customerId(session.customer) ?? undefined,
       p_external_checkout_session_id: session.id,
+      // Explicit null (not undefined) so this key always reaches
+      // PostgREST -- an omitted key can resolve to a different overload.
+      p_business_name: session.customer_details.business_name ?? null,
     })
     .maybeSingle();
 

@@ -113,34 +113,23 @@ export function DocumentList({
     const docEntityId = doc.entity_id ?? entityId;
     if (!docEntityType || !docEntityId) return;
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const path = `${workspaceId}/${docEntityId}/${Date.now()}-${file.name}`;
-    const { error: uploadErr } = await supabase.storage.from("client-documents").upload(path, file);
-    if (uploadErr) {
-      toast.show(uploadErr.message, "error");
+    // P10-02: the actual content type and size are determined server-side
+    // from the real bytes, and the replaced row's folder/category/version
+    // are re-read server-side from the existing attachment -- file.type/
+    // file.size and client-held folder/category/version are never trusted.
+    const formData = new FormData();
+    formData.set("file", file);
+    formData.set("workspaceId", workspaceId);
+    formData.set("entityType", docEntityType);
+    formData.set("entityId", docEntityId);
+    formData.set("replacesAttachmentId", doc.id);
+
+    const res = await fetch("/api/documents/upload", { method: "POST", body: formData });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      toast.show(body.error ?? "Could not upload the new version.", "error");
       return;
     }
-    const { error: insertErr } = await supabase.from("attachments").insert({
-      workspace_id: workspaceId,
-      entity_type: docEntityType,
-      entity_id: docEntityId,
-      folder_id: doc.folder_id,
-      category: doc.category,
-      file_name: file.name,
-      storage_path: path,
-      mime_type: file.type || null,
-      file_size_bytes: file.size,
-      uploaded_by: user?.id,
-      replaces_attachment_id: doc.id,
-      version: (doc.version ?? 1) + 1,
-    });
-    if (insertErr) {
-      toast.show(insertErr.message, "error");
-      return;
-    }
-    await supabase.from("attachments").update({ is_latest_version: false }).eq("id", doc.id);
     toast.show("New version uploaded", "success");
     router.refresh();
   }

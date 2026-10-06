@@ -6906,6 +6906,7 @@ export type Database = {
           attempts: number
           channel: string
           channels: string[] | null
+          claimed_at: string | null
           created_at: string
           dedupe_key: string | null
           domain_id: string | null
@@ -6931,6 +6932,7 @@ export type Database = {
           attempts?: number
           channel: string
           channels?: string[] | null
+          claimed_at?: string | null
           created_at?: string
           dedupe_key?: string | null
           domain_id?: string | null
@@ -6956,6 +6958,7 @@ export type Database = {
           attempts?: number
           channel?: string
           channels?: string[] | null
+          claimed_at?: string | null
           created_at?: string
           dedupe_key?: string | null
           domain_id?: string | null
@@ -7974,6 +7977,7 @@ export type Database = {
           payment_method_id: string | null
           recorded_by: string | null
           reference: string | null
+          refunded_amount: number
           status: string
           stripe_checkout_session_id: string | null
           stripe_payment_intent_id: string | null
@@ -7994,6 +7998,7 @@ export type Database = {
           payment_method_id?: string | null
           recorded_by?: string | null
           reference?: string | null
+          refunded_amount?: number
           status?: string
           stripe_checkout_session_id?: string | null
           stripe_payment_intent_id?: string | null
@@ -8014,6 +8019,7 @@ export type Database = {
           payment_method_id?: string | null
           recorded_by?: string | null
           reference?: string | null
+          refunded_amount?: number
           status?: string
           stripe_checkout_session_id?: string | null
           stripe_payment_intent_id?: string | null
@@ -12629,18 +12635,6 @@ export type Database = {
       }
     }
     Functions: {
-      activate_public_engagement_letter_signup: {
-        Args: {
-          p_token: string
-        }
-        Returns: Json
-      }
-      activate_public_portal_signup: {
-        Args: {
-          p_token: string
-        }
-        Returns: Json
-      }
       _advance_pipeline_stage_unchecked: {
         Args: {
           p_entity_id: string
@@ -12862,6 +12856,14 @@ export type Database = {
           seat: Database["public"]["Tables"]["workspace_paid_seats"]["Row"]
         }[]
       }
+      activate_public_engagement_letter_signup: {
+        Args: { p_token: string }
+        Returns: Json
+      }
+      activate_public_portal_signup: {
+        Args: { p_token: string }
+        Returns: Json
+      }
       add_client_address: {
         Args: {
           p_address_type?: string
@@ -13065,6 +13067,35 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      claim_notification_queue_jobs: {
+        Args: { p_limit?: number; p_stale_after_seconds?: number }
+        Returns: {
+          attempts: number
+          channel: string
+          channels: string[] | null
+          claimed_at: string | null
+          created_at: string
+          dedupe_key: string | null
+          domain_id: string | null
+          entity_id: string | null
+          entity_type: string | null
+          error: string | null
+          event_type: string | null
+          id: string
+          max_attempts: number
+          payload: Json
+          priority: string | null
+          read_at: string | null
+          recipient_email: string | null
+          recipient_phone: string | null
+          recipient_user_id: string | null
+          scheduled_at: string
+          sent_at: string | null
+          status: string
+          template_key: string
+          workspace_id: string | null
+        }[]
+      }
       claim_pending_paid_seat: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -13088,6 +13119,18 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      claim_provider_webhook_event: {
+        Args: {
+          p_event_id: string
+          p_event_type: string
+          p_payload: Json
+          p_provider: string
+        }
+        Returns: {
+          id: string
+          should_process: boolean
+        }[]
       }
       claim_stripe_webhook_event: {
         Args: { p_event_id: string; p_event_type: string; p_payload: Json }
@@ -14390,6 +14433,7 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: undefined
       }
+      has_aal2: { Args: never; Returns: boolean }
       has_accepted_platform_terms: {
         Args: { p_version: string }
         Returns: boolean
