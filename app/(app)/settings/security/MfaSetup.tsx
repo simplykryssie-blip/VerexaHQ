@@ -74,9 +74,26 @@ export function MfaSetup() {
 
   async function removeFactor(id: string) {
     if (!confirm("Remove this authenticator? You'll need to set up MFA again to re-enable it.")) return;
-    const { error } = await supabase.auth.mfa.unenroll({ factorId: id });
-    if (error) {
-      toast.show(error.message, "error");
+
+    // VEREXA-AAL-001: this is a UX nicety only, not the security boundary --
+    // the real enforcement is server-side in /api/settings/mfa/unenroll
+    // (which checks the session's actual `aal` claim, not nextLevel). This
+    // just avoids a round trip to the server for the common case of an
+    // already-stepped-up session or one with nothing to challenge yet.
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal?.currentLevel !== "aal2") {
+      toast.show("Complete your two-factor challenge before removing this authenticator.", "error");
+      return;
+    }
+
+    const response = await fetch("/api/settings/mfa/unenroll", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ factorId: id }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      toast.show(result.error ?? "Could not remove this authenticator.", "error");
       return;
     }
     toast.show("Authenticator removed", "success");

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getCurrentWorkspace, workspaceOperationalError, isWorkspaceStatusOperational } from "@/lib/workspace";
 import { updateSubscriptionItemQuantity } from "@/lib/stripe/client";
+import { hasAal2 } from "@/lib/auth/requireAal2";
 
 /**
  * Removes an active paid seat -- stops future recurring billing only.
@@ -18,6 +19,15 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  // VEREXA-AAL-001: part of the same billing-configuration surface as seat
+  // purchase -- a password-only session must not be sufficient on its own.
+  if (!(await hasAal2(supabase))) {
+    return NextResponse.json(
+      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
+      { status: 403 }
+    );
   }
 
   const workspace = await getCurrentWorkspace();

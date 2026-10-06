@@ -27,7 +27,7 @@ export async function GET(request: Request, { params }: { params: { token: strin
   const { data: signer, error: signerError } = await supabase
     .from("signature_request_signers")
     .select(
-      "id, signature_request:signature_requests(attachment:attachments!signature_requests_attachment_id_fkey(storage_path, file_name, mime_type))"
+      "id, expires_at, signature_request:signature_requests(status, attachment:attachments!signature_requests_attachment_id_fkey(storage_path, file_name, mime_type))"
     )
     .eq("access_token", params.token)
     .maybeSingle();
@@ -36,9 +36,23 @@ export async function GET(request: Request, { params }: { params: { token: strin
     return NextResponse.json({ error: "Could not load document." }, { status: 500 });
   }
 
-  const attachment = (signer as any)?.signature_request?.attachment;
+  const signatureRequest = (signer as any)?.signature_request;
+  const attachment = signatureRequest?.attachment;
   if (!attachment) {
     return NextResponse.json({ error: "Invalid or expired signing link." }, { status: 404 });
+  }
+
+  // Mirror the same cancellation/expiry boundary record_signature_by_token
+  // and decline_signature_by_token already enforce (see migration
+  // signature_request_expiry_and_revoke) -- this route minted a working
+  // signed URL for a revoked or expired link regardless of those checks,
+  // since it reads the tables directly instead of going through the RPCs.
+  if (signatureRequest.status === "cancelled") {
+    return NextResponse.json({ error: "This signing link has been revoked." }, { status: 403 });
+  }
+  const expiresAt = (signer as any)?.expires_at;
+  if (expiresAt && new Date(expiresAt) < new Date()) {
+    return NextResponse.json({ error: "This signing link has expired." }, { status: 403 });
   }
 
   const { data, error } = await supabase.storage.from("client-documents").createSignedUrl(attachment.storage_path, 300);

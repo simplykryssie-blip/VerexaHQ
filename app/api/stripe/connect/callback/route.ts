@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { deriveConnectStatus, exchangeOAuthCode, fetchAccount } from "@/lib/stripe/client";
 import { getAppUrl } from "@/lib/appUrl";
+import { hasAal2 } from "@/lib/auth/requireAal2";
 
 export async function GET(request: Request) {
   const appUrl = getAppUrl(request);
@@ -39,6 +40,29 @@ export async function GET(request: Request) {
   }
 
   const supabase = createClient();
+
+  // VEREXA-AAL-001: unlike every other hasAal2() call site, this route
+  // never otherwise calls getUser() -- without it, hasAal2()'s getSession()
+  // read trusts a locally-cached JWT with no server-side revalidation, so a
+  // stale/revoked session could still carry an aal2 claim. Forcing a real
+  // getUser() round-trip first closes that gap.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    settingsUrl.searchParams.set("stripe_error", "Stripe connection could not be verified -- try again.");
+    return NextResponse.redirect(settingsUrl, 307);
+  }
+
+  // VEREXA-AAL-001: defense in depth alongside /api/stripe/connect/start's
+  // own AAL2 check -- this finalizes the exact same Stripe-account linkage,
+  // reachable only via the state cookie /start itself set, but gated again
+  // here in case that cookie/session's AAL state ever diverges.
+  if (!(await hasAal2(supabase))) {
+    settingsUrl.searchParams.set("stripe_error", "This action requires two-factor verification. Complete your authenticator challenge and try again.");
+    return NextResponse.redirect(settingsUrl, 307);
+  }
+
   const account = await fetchAccount(exchanged.data.stripeUserId);
   const status = account.ok ? deriveConnectStatus(account.data.charges_enabled, account.data.payouts_enabled, account.data.details_submitted) : "pending";
 

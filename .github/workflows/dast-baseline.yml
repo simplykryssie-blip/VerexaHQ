@@ -1,0 +1,282 @@
+name: DAST Baseline (Zoom Evidence)
+
+# READ THIS BEFORE CHANGING ANYTHING:
+# - Passive-only DAST evidence scan of EXACTLY 5 hard-coded, read-only,
+#   unauthenticated public pages. NOT a penetration test. NEVER an active
+#   scan, NEVER a spider/crawl.
+# - Target is always a manually-supplied Vercel PREVIEW deployment for this
+#   project, strictly validated below -- never production, never another
+#   project/domain.
+# - IMPORTANT: every Vercel deployment for this project (Preview AND
+#   Production) currently shares the SAME production Supabase database.
+#   There is no isolated staging database wired to any deployed
+#   environment. That is why this scan is deliberately limited to exactly
+#   5 read-only, unauthenticated, non-state-changing pages -- never
+#   authenticated areas, never anything that submits a form, never
+#   anything under /api/*. Do not widen scope without first standing up a
+#   genuinely isolated staging deployment.
+#
+# WHY THIS WORKFLOW DOES NOT USE zaproxy/action-baseline OR A ZAP CONTEXT
+# (design review + real-ZAP-instance testing, 2026-09-30):
+# zap-baseline.py (what action-baseline runs) always resets its spider
+# seed to the bare host root regardless of the -t path given to it, and
+# ZAP's context-scoped spider.scan() API requires that seed URL to itself
+# be in the context's scope. A context containing exactly these 5 URLs
+# (deliberately NOT including "/") was proven, against a real ZAP 2.16.1
+# instance, to make the scoped spider call fail to start outright (400,
+# "Failed to start the scan") -- and a context that DOES include "/" was
+# proven to work, but that scans the homepage too, which is out of the
+# approved scope. Adding "/" merely to satisfy the tool was explicitly
+# rejected. There is no existing zap-baseline.py flag for "explicit URL
+# list, no spider" -- its full flag list and control flow were read twice;
+# it unconditionally spiders.
+#
+# INSTEAD: this workflow drives the same official ZAP engine directly via
+# its own official Python API (zapv2 -- already installed inside the
+# official ghcr.io/zaproxy/zaproxy Docker image itself, confirmed from that
+# image's own Dockerfile; not a new dependency, not a new product):
+#   for each of the 5 hard-coded URLs:
+#       zap.core.access_url(url, followredirects=True)   # ONE fetch, not a crawl
+#       wait until zap.pscan.records_to_scan == 0          # let passive scanners run
+# zap.spider.*, zap.ajaxSpider.*, zap.ascan.*, and zap.context.* are never
+# called anywhere in this workflow. access_url() has no scope concept of
+# its own -- proven directly (it will fetch ANY url given, no restriction)
+# -- so the ENTIRE security boundary here is the hard-coded 5-URL list
+# below, which is a workflow constant, never derived from user input.
+#
+# workflow_dispatch ONLY. No push/pull_request/schedule trigger -- this
+# workflow is dormant until manually run against an explicitly supplied,
+# validated URL.
+
+on:
+  workflow_dispatch:
+    inputs:
+      preview_url:
+        description: >
+          The exact Vercel Preview deployment URL to scan (bare origin only,
+          e.g. https://verexa-tax-office-v2-abc1234-verexa-hq-crm.vercel.app --
+          no path, query, or fragment). Must be a Preview deployment for
+          this project, never Production. The 5 pages scanned are fixed
+          workflow constants, not derived from this input.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate-preview-url:
+    name: Validate preview_url (fail closed)
+    runs-on: ubuntu-latest
+    outputs:
+      validated_origin: ${{ steps.validate.outputs.origin }}
+    steps:
+      - name: Validate the supplied URL is a non-production Preview deployment of this project
+        id: validate
+        shell: bash
+        env:
+          RAW_URL: ${{ inputs.preview_url }}
+        run: |
+          set -euo pipefail
+
+          # Bare origin only: scheme://host, nothing after the host. This
+          # also restricts the ENTIRE value to [A-Za-z0-9.-], so it is safe
+          # to embed directly in the driver script's URL constants below --
+          # no quote/backslash/injection characters are possible.
+          if [[ ! "$RAW_URL" =~ ^https://[A-Za-z0-9.-]+$ ]]; then
+            echo "::error::preview_url must be https:// plus a bare hostname only -- no path, query, or fragment."
+            exit 1
+          fi
+
+          host="${RAW_URL#https://}"
+
+          # Explicit production-domain denylist -- DEFENSE IN DEPTH ONLY.
+          # The allowlist match below is the actual enforced primary control.
+          case "$host" in
+            verexahq.com|taxavenuepro.com|mcjconsultingfirm.com|mkbfinancialgroup.com|\
+            verexa-tax-office-v2.vercel.app|verexa-tax-office-v2-verexa-hq-crm.vercel.app|\
+            verexa-tax-office-v2-git-main-verexa-hq-crm.vercel.app)
+              echo "::error::preview_url resolves to a PRODUCTION domain ($host). Refusing to scan."
+              exit 1
+              ;;
+          esac
+
+          # PRIMARY CONTROL: must match one of this project's two real Preview
+          # URL shapes, verified against actual live Vercel deployments for
+          # this project (mcp__Vercel__list_deployments / get_project).
+          if [[ "$host" =~ ^verexa-tax-office-v2-[a-z0-9]+-verexa-hq-crm\.vercel\.app$ ]]; then
+            : # deployment-ID form -- OK
+          elif [[ "$host" =~ ^verexa-tax-office-v2-git-[a-z0-9-]+-verexa-hq-crm\.vercel\.app$ ]] \
+               && [[ "$host" != "verexa-tax-office-v2-git-main-verexa-hq-crm.vercel.app" ]]; then
+            : # git-branch-alias form, not main -- OK
+          else
+            echo "::error::preview_url does not match a known Preview-deployment hostname pattern for verexa-tax-office-v2 ($host). Refusing to scan an unverified target."
+            exit 1
+          fi
+
+          echo "origin=$RAW_URL" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### DAST target validated"
+            echo "- Supplied URL: \`$RAW_URL\`"
+            echo "- Human check: confirm this is the Preview deployment for the PR/commit you intend to scan before proceeding."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  dast-baseline:
+    name: Exact-five-page passive DAST (no spider)
+    needs: validate-preview-url
+    runs-on: ubuntu-latest
+    env:
+      ORIGIN: ${{ needs.validate-preview-url.outputs.validated_origin }}
+    steps:
+      - name: Start ZAP daemon (official image, unmodified)
+        run: |
+          set -euo pipefail
+          docker run -d --name zap-daemon \
+            -p 127.0.0.1:8090:8090 \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap.sh -daemon -host 0.0.0.0 -port 8090 \
+              -config api.disablekey=true \
+              -config api.addrs.addr.name=.* \
+              -config api.addrs.addr.regex=true
+
+      - name: Wait for ZAP API to be ready (bounded)
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 40); do
+            if curl -sS -m 3 "http://127.0.0.1:8090/JSON/core/view/version/" 2>/dev/null | grep -q version; then
+              echo "ZAP API ready after ~$((i*3))s"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::ZAP API did not become ready within the timeout."
+          docker logs zap-daemon || true
+          exit 1
+
+      - name: Build the exact-five-URL driver script
+        run: |
+          set -euo pipefail
+          # The 5 approved paths are hard-coded HERE, in the workflow file,
+          # never derived from workflow_dispatch input or any discovery
+          # mechanism. This list is the entire security boundary of this
+          # scan -- see the header comment.
+          cat > driver.py <<PYEOF
+          import json
+          import sys
+          import time
+          from zapv2 import ZAPv2
+
+          ORIGIN = "${ORIGIN}"
+          APPROVED_PATHS = ["/privacy", "/terms", "/docs/zoom", "/login", "/signup"]
+          PASSIVE_SCAN_TIMEOUT_S = 60
+
+          def wait_for_passive_scan(zap, timeout_s):
+              start = time.time()
+              while True:
+                  remaining = int(zap.pscan.records_to_scan)
+                  if remaining == 0:
+                      return
+                  if time.time() - start > timeout_s:
+                      print("[exact-five-scan] WARNING: passive scan did not drain within "
+                            f"{timeout_s}s (remaining={remaining}) -- continuing anyway, this "
+                            "does not affect which URLs were requested.")
+                      return
+                  time.sleep(1)
+
+          def main():
+              zap = ZAPv2(apikey="", proxies={"http": "http://127.0.0.1:8090", "https": "http://127.0.0.1:8090"})
+              print("[exact-five-scan] ZAP version:", zap.core.version)
+
+              # No zap.spider.*, no zap.ajaxSpider.*, no zap.ascan.*, no
+              # zap.context.* anywhere in this script -- passive-only,
+              # exact-URL-only, by construction.
+              requested = []
+              for path in APPROVED_PATHS:
+                  url = ORIGIN + path
+                  print(f"[exact-five-scan] access_url: {url}")
+                  zap.core.access_url(url, followredirects=True)
+                  requested.append(url)
+                  wait_for_passive_scan(zap, PASSIVE_SCAN_TIMEOUT_S)
+
+              with open("exact_five_report.html", "w") as f:
+                  f.write(zap.core.htmlreport())
+              with open("exact_five_report.json", "w") as f:
+                  f.write(zap.core.jsonreport())
+
+              summary = {
+                  "target_origin": ORIGIN,
+                  "urls_requested": requested,
+                  "url_count": len(requested),
+                  "scan_mode": "passive-only",
+                  "spider_enabled": False,
+                  "ajax_spider_enabled": False,
+                  "active_scan_enabled": False,
+                  "total_alerts": int(zap.core.number_of_alerts()),
+              }
+              with open("scan-summary.json", "w") as f:
+                  json.dump(summary, f, indent=2)
+              print("[exact-five-scan] summary:", json.dumps(summary))
+
+          if __name__ == "__main__":
+              main()
+          PYEOF
+
+      - name: Run the exact-five-URL passive scan inside the ZAP container
+        run: |
+          set -euo pipefail
+          docker exec -i zap-daemon python3 - < driver.py
+          docker cp zap-daemon:/exact_five_report.html . 2>/dev/null || docker cp zap-daemon:/zap/exact_five_report.html .
+          docker cp zap-daemon:/exact_five_report.json . 2>/dev/null || docker cp zap-daemon:/zap/exact_five_report.json .
+          docker cp zap-daemon:/scan-summary.json . 2>/dev/null || docker cp zap-daemon:/zap/scan-summary.json .
+
+      - name: Verify expected reports were produced (fail closed)
+        run: |
+          set -euo pipefail
+          test -s exact_five_report.html
+          test -s exact_five_report.json
+          test -s scan-summary.json
+
+      - name: Write evidence summary
+        run: |
+          set -euo pipefail
+          python3 - <<'PYEOF'
+          import json
+          with open("scan-summary.json") as f:
+              s = json.load(f)
+          lines = [
+              "### Exact-five-page DAST evidence",
+              f"- Target Preview origin: `{s['target_origin']}`",
+              "- URLs requested (in order):",
+          ]
+          for u in s["urls_requested"]:
+              lines.append(f"  - `{u}`")
+          lines += [
+              f"- Scan mode: **{s['scan_mode']}**",
+              f"- Spider: **disabled**",
+              f"- AJAX spider: **disabled**",
+              f"- Active scan: **disabled**",
+              f"- URLs processed: **{s['url_count']}**",
+              f"- Total alerts (passive): **{s['total_alerts']}**",
+              "- Report artifacts: `exact_five_report.html`, `exact_five_report.json`",
+          ]
+          with open("step_summary.md", "w") as f:
+              f.write("\n".join(lines) + "\n")
+          PYEOF
+          cat step_summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dast-exact-five-page-evidence
+          path: |
+            exact_five_report.html
+            exact_five_report.json
+            scan-summary.json
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Stop and remove the ZAP container
+        if: always()
+        run: docker rm -f zap-daemon || true

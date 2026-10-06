@@ -4,6 +4,7 @@ import { createRefund } from "@/lib/stripe/client";
 import { isStripeConfigured } from "@/lib/providerStatus";
 import { recordProviderCheck } from "@/lib/providerHealth";
 import { getWorkspaceConnectAccount } from "@/lib/stripe/workspaceConnect";
+import { hasAal2 } from "@/lib/auth/requireAal2";
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
 
   const { data: payment, error: paymentError } = await supabase
     .from("payments")
-    .select("id, workspace_id, client_id, invoice_id, amount, status, stripe_payment_intent_id")
+    .select("id, workspace_id, client_id, invoice_id, amount, status, refunded_amount, stripe_payment_intent_id")
     .eq("id", paymentId)
     .single();
   if (paymentError || !payment) {
@@ -36,11 +37,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not authorized to issue refunds." }, { status: 403 });
   }
 
+  // VEREXA-AAL-001: issuing a refund moves real money -- a password-only
+  // (stolen-credential) session must not be sufficient on its own.
+  if (!(await hasAal2(supabase))) {
+    return NextResponse.json(
+      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
+      { status: 403 }
+    );
+  }
+
   if (!payment.stripe_payment_intent_id) {
     return NextResponse.json({ error: "This payment wasn't collected through Stripe -- refund it manually." }, { status: 400 });
   }
-  if (payment.status === "refunded") {
-    return NextResponse.json({ error: "This payment has already been refunded." }, { status: 400 });
+  // P12-02: track the true remaining refundable balance instead of trusting
+  // payment.status alone -- a prior partial refund must not be mistaken for
+  // a full one, and must not block refunding what's actually left.
+  const remaining = payment.amount - (payment.refunded_amount ?? 0);
+  if (remaining <= 0) {
+    return NextResponse.json({ error: "This payment has already been fully refunded." }, { status: 400 });
+  }
+  if (amount !== undefined && (!(amount > 0) || amount > remaining)) {
+    return NextResponse.json(
+      { error: `Refund amount must be greater than zero and cannot exceed the remaining refundable balance of ${remaining.toFixed(2)}.` },
+      { status: 400 }
+    );
   }
 
   if (!isStripeConfigured()) {
@@ -52,7 +72,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ configured: false, reason: connectAccount.reason }, { status: 200 });
   }
 
-  const refundAmount = amount ?? payment.amount;
+  const refundAmount = amount ?? remaining;
   const result = await createRefund({
     paymentIntentId: payment.stripe_payment_intent_id,
     amount: refundAmount,
@@ -66,7 +86,14 @@ export async function POST(request: Request) {
   }
   await recordProviderCheck("stripe", true);
 
-  await supabase.from("payments").update({ status: "refunded" }).eq("id", paymentId);
+  const newRefundedAmount = (payment.refunded_amount ?? 0) + refundAmount;
+  await supabase
+    .from("payments")
+    .update({
+      status: newRefundedAmount >= payment.amount ? "refunded" : "partially_refunded",
+      refunded_amount: newRefundedAmount,
+    })
+    .eq("id", paymentId);
 
   if (payment.invoice_id) {
     const { data: invoice } = await supabase

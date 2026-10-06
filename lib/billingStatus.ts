@@ -13,6 +13,14 @@ export const PAYMENT_STATUS_TONE: Record<string, BadgeTone> = {
   succeeded: "success",
   failed: "danger",
   refunded: "neutral",
+  partially_refunded: "warning",
+};
+
+export const PAYMENT_STATUS_LABEL: Record<string, string> = {
+  succeeded: "Succeeded",
+  failed: "Failed",
+  refunded: "Refunded",
+  partially_refunded: "Partially refunded",
 };
 
 export const BANK_PRODUCT_STATUS_TONE: Record<string, BadgeTone> = {

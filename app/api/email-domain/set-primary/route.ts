@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace, workspaceOperationalError, isWorkspaceStatusOperational } from "@/lib/workspace";
+import { hasAal2 } from "@/lib/auth/requireAal2";
 
 // Only meaningful for a workspace with more than one sending domain
 // (canUseMultipleSendingDomains) -- switches which verified domain
@@ -21,6 +22,16 @@ export async function POST(request: Request) {
   }
 
   const supabase = createClient();
+
+  // VEREXA-AAL-001: switching which domain sends this workspace's email --
+  // a password-only session must not be sufficient on its own.
+  if (!(await hasAal2(supabase))) {
+    return NextResponse.json(
+      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
+      { status: 403 }
+    );
+  }
+
   const { error } = await supabase.rpc("set_workspace_email_domain_primary", { p_domain_id: domainId });
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });

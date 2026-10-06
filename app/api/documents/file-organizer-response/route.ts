@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { checkRateLimit, clientIp } from "@/lib/rateLimit";
 import { formatAddressValue, formatNameValue } from "@/lib/organizer/formatValue";
@@ -41,17 +42,27 @@ async function buildOrganizerPdf(
 }
 
 // Called right after an organizer response is actually completed (public
-// intake link or the client-portal self-fill flow) so the answers show up
-// as a document in the client's Documents instead of only living in
+// intake link, the client-portal self-fill flow, or a staff-triggered
+// re-file from OrganizerResponseCard.tsx) so the answers show up as a
+// document in the client's Documents instead of only living in
 // organizer_response_answers. Answers are re-fetched server-side by
-// response id, same trust model as file-signed-engagement-letter.
+// response id, never trusting anything else the caller sends.
+//
+// P18-02/P10-02/P12-02: a bare responseId proves nothing on its own -- any
+// caller who learned or guessed one could trigger this service-role filing
+// pipeline for any workspace's organizer response. Three legitimate callers
+// exist, each with its own proof of access: the public intake link supplies
+// the same public_token submit_public_organizer_response(p_token, ...)
+// already relies on; the client portal flow has an authenticated portal
+// session scoped to the response's own client; and the staff flow has an
+// authenticated session with membership in the response's own workspace.
 export async function POST(request: Request) {
   const allowed = await checkRateLimit(`file-organizer-response:${clientIp(request)}`, 20, 60);
   if (!allowed) {
     return NextResponse.json({ error: "Too many requests. Try again shortly." }, { status: 429 });
   }
 
-  const { responseId } = await request.json().catch(() => ({ responseId: null }));
+  const { responseId, token } = await request.json().catch(() => ({ responseId: null, token: null }));
   if (typeof responseId !== "string") {
     return NextResponse.json({ error: "responseId is required" }, { status: 400 });
   }
@@ -60,13 +71,42 @@ export async function POST(request: Request) {
 
   const { data: response } = await supabase
     .from("organizer_responses")
-    .select("id, workspace_id, client_id, status, submitted_at, filed_as_attachment, organizer_templates(name)")
+    .select("id, workspace_id, client_id, organizer_template_id, status, submitted_at, filed_as_attachment, organizer_templates(name)")
     .eq("id", responseId)
     .maybeSingle();
 
   if (!response) {
     return NextResponse.json({ error: "Form response not found" }, { status: 404 });
   }
+
+  if (typeof token === "string" && token) {
+    const { data: template } = await supabase
+      .from("organizer_templates")
+      .select("id, workspace_id")
+      .eq("public_token", token)
+      .eq("is_public", true)
+      .eq("status", "published")
+      .maybeSingle();
+    if (!template || response.organizer_template_id !== template.id || response.workspace_id !== template.workspace_id) {
+      return NextResponse.json({ error: "Form response not found" }, { status: 404 });
+    }
+  } else {
+    const sessionClient = createClient();
+    const {
+      data: { user },
+    } = await sessionClient.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+    const [{ data: isPortalOwner }, { data: isStaffMember }] = await Promise.all([
+      sessionClient.rpc("is_portal_user_for_entity", { p_entity_type: "client", p_entity_id: response.client_id }),
+      sessionClient.rpc("is_workspace_member", { p_workspace_id: response.workspace_id }),
+    ]);
+    if (!isPortalOwner && !isStaffMember) {
+      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+    }
+  }
+
   if (response.status !== "submitted" && response.status !== "reviewed") {
     return NextResponse.json({ error: "This form has not been submitted yet" }, { status: 400 });
   }

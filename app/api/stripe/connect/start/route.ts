@@ -5,6 +5,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { isStripeConnectConfigured } from "@/lib/providerStatus";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { getAppUrl } from "@/lib/appUrl";
+import { hasAal2 } from "@/lib/auth/requireAal2";
 
 // Standard Connect OAuth: sends the admin to Stripe's own "Connect with
 // Stripe" page, where they can link an already-existing Stripe account or
@@ -28,6 +29,14 @@ export async function GET(request: Request) {
   const { data: canManageSettings } = await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "settings.manage" });
   if (!canManageSettings) {
     settingsUrl.searchParams.set("stripe_error", "You don't have permission to connect Stripe.");
+    return NextResponse.redirect(settingsUrl, 307);
+  }
+
+  // VEREXA-AAL-001: connecting a Stripe account controls where this
+  // workspace's future payouts go -- a password-only session must not be
+  // sufficient on its own.
+  if (!(await hasAal2(supabase))) {
+    settingsUrl.searchParams.set("stripe_error", "This action requires two-factor verification. Complete your authenticator challenge and try again.");
     return NextResponse.redirect(settingsUrl, 307);
   }
 
