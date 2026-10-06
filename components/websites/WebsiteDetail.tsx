@@ -19,6 +19,7 @@ type Website = {
   custom_domain: string | null;
   domain_verified: boolean;
   domain_verified_at: string | null;
+  hide_platform_header: boolean;
 };
 
 const TABS = ["pages", "popups", "media", "settings"] as const;

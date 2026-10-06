@@ -26,6 +26,7 @@ type Website = {
   custom_domain: string | null;
   domain_verified: boolean;
   domain_verified_at: string | null;
+  hide_platform_header: boolean;
 };
 
 // Strips a pasted protocol/path/trailing slash down to a bare hostname, so
@@ -58,6 +59,7 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
   const [faviconUrl, setFaviconUrl] = useState(website.favicon_url ?? "");
   const [headCode, setHeadCode] = useState(website.head_tracking_code ?? "");
   const [bodyCode, setBodyCode] = useState(website.body_tracking_code ?? "");
+  const [hidePlatformHeader, setHidePlatformHeader] = useState(website.hide_platform_header);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
@@ -244,6 +246,7 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
         favicon_url: faviconUrl || null,
         head_tracking_code: headCode || null,
         body_tracking_code: bodyCode || null,
+        hide_platform_header: hidePlatformHeader,
       })
       .eq("id", website.id);
     setSaving(false);
@@ -316,6 +319,26 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
               )}
             </>
           )}
+        </div>
+
+        <div className="mt-4 border-t border-border pt-3">
+          <label className="flex items-center gap-2 text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={hidePlatformHeader}
+              disabled={!canManage}
+              onChange={(e) => {
+                setHidePlatformHeader(e.target.checked);
+                setDirty(true);
+              }}
+              className="h-3.5 w-3.5 rounded border-border"
+            />
+            Hide the logo header
+          </label>
+          <p className="mt-1 text-[11px] text-muted">
+            By default every page shows a plain header with your workspace logo. Turn this on if this website&apos;s own pages already have
+            their own header/branding built in (e.g. a full custom HTML page) and the extra logo bar on top is redundant or shows the wrong brand.
+          </p>
         </div>
       </div>
 
