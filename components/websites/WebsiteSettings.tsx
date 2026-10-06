@@ -232,7 +232,7 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
     }
 
     void resumeDomainAction();
-  }, [searchParams, supabase, toast, router, website.id]);
+  }, [searchParams, supabase, toast, router, website.id, attachDomain, verifyDomain]);
 
   async function save() {
     setSaving(true);
