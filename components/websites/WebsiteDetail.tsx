@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageLibrary, type SitePageCard } from "./PageLibrary";
 import { PopupLibrary, type PopupCard } from "./PopupLibrary";
 import { WebsiteSettings } from "./WebsiteSettings";
@@ -35,7 +36,11 @@ export function WebsiteDetail({
   popups: PopupCard[];
   canManage: boolean;
 }) {
-  const [tab, setTab] = useState<(typeof TABS)[number]>("pages");
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const [tab, setTab] = useState<(typeof TABS)[number]>(
+    requestedTab === "settings" ? "settings" : "pages"
+  );
 
   return (
     <div>
