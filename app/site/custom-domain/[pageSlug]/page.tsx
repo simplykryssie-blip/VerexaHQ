@@ -35,7 +35,14 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const canonical = `https://${domain}/${params.pageSlug === "home" ? "" : encodeURIComponent(params.pageSlug)}`;
   const title = data.page.title === "Home" ? data.website.name : `${data.page.title} | ${data.website.name}`;
   const description = data.page.meta_description ?? undefined;
-  const logo = data.branding?.logo_url?.startsWith("https://") ? data.branding.logo_url : undefined;
+  // This website's own favicon takes priority over the owning workspace's
+  // branding logo -- a workspace can publish more than one differently-
+  // branded website (e.g. a product microsite alongside the firm's main
+  // site), and the link-preview thumbnail most chat apps show from
+  // openGraph/twitter images should reflect THIS site's brand, not
+  // whichever logo happens to be set on the workspace.
+  const workspaceLogo = data.branding?.logo_url?.startsWith("https://") ? data.branding.logo_url : undefined;
+  const shareImage = data.website.favicon_url?.startsWith("https://") ? data.website.favicon_url : workspaceLogo;
 
   return {
     title,
@@ -48,9 +55,9 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
       description,
       url: canonical,
       siteName: data.website.name,
-      images: logo ? [{ url: logo }] : undefined,
+      images: shareImage ? [{ url: shareImage }] : undefined,
     },
-    twitter: { card: "summary", title, description, images: logo ? [logo] : undefined },
+    twitter: { card: "summary", title, description, images: shareImage ? [shareImage] : undefined },
   };
 }
 
