@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronUp, ChevronDown, X, Plus } from "lucide-react";
+import { ChevronUp, ChevronDown, X, Plus, ExternalLink, Copy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
@@ -14,6 +14,7 @@ const STATUS_TONE: Record<string, BadgeTone> = { draft: "neutral", published: "s
 type MemberPage = { id: string; title: string; slug: string; status: string; funnel_position: number | null };
 type AvailablePage = { id: string; title: string; slug: string };
 type Funnel = { id: string; workspace_id: string; website_id: string; name: string; status: string };
+type Website = { id: string; slug: string; custom_domain: string | null; domain_verified: boolean };
 
 function slugify(title: string) {
   return (
@@ -27,11 +28,15 @@ function slugify(title: string) {
 
 export function FunnelManager({
   funnel,
+  website,
+  workspaceSlug,
   memberPages,
   availablePages,
   canManage,
 }: {
   funnel: Funnel;
+  website: Website;
+  workspaceSlug: string;
   memberPages: MemberPage[];
   availablePages: AvailablePage[];
   canManage: boolean;
@@ -45,6 +50,19 @@ export function FunnelManager({
   const [addingId, setAddingId] = useState("");
   const [creating, setCreating] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+
+  const entryPage = pages.find((p) => p.status === "published") ?? pages[0] ?? null;
+  const liveUrl = entryPage
+    ? website.domain_verified && website.custom_domain
+      ? `https://${website.custom_domain}${entryPage.slug === "home" ? "/" : `/${entryPage.slug}`}`
+      : `/site/${workspaceSlug}/${website.slug}/${entryPage.slug}`
+    : null;
+
+  async function copyLiveUrl() {
+    if (!liveUrl) return;
+    await navigator.clipboard.writeText(new URL(liveUrl, window.location.origin).toString());
+    toast.show("Funnel link copied.", "success");
+  }
 
   async function commitName() {
     const trimmed = name.trim() || funnel.name;
