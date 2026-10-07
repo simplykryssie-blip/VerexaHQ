@@ -5340,6 +5340,7 @@ export type Database = {
           amount: number | null
           billing_cadence: string | null
           canceled_at: string | null
+          client_id: string | null
           connection_id: string | null
           created_at: string
           currency: string
@@ -5370,6 +5371,7 @@ export type Database = {
           amount?: number | null
           billing_cadence?: string | null
           canceled_at?: string | null
+          client_id?: string | null
           connection_id?: string | null
           created_at?: string
           currency?: string
@@ -5400,6 +5402,7 @@ export type Database = {
           amount?: number | null
           billing_cadence?: string | null
           canceled_at?: string | null
+          client_id?: string | null
           connection_id?: string | null
           created_at?: string
           currency?: string
@@ -5427,6 +5430,13 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "firm_package_purchases_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "firm_package_purchases_connection_id_fkey"
             columns: ["connection_id"]

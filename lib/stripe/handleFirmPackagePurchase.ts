@@ -19,11 +19,15 @@ function subscriptionId(subscription: CheckoutSession["subscription"]): string |
 }
 
 /**
- * A connected firm finished paying for the package their ERO/Service Bureau
- * assigned them (one-time or the first cycle of a recurring one -- either
- * way this fires once, on session completion). Flips the purchase row
- * active, which is what fire_firm_package_purchase_automations() (an AFTER
- * UPDATE trigger) reacts to -- no automation-firing logic needed here.
+ * A buyer finished paying for a firm_packages row -- a connected firm's
+ * assigned package, or (generic Product model) a plain in-workspace client
+ * buying a Service/Digital Product directly via /api/products/checkout
+ * (one-time or the first cycle of a recurring one -- either way this fires
+ * once, on session completion). Flips the purchase row active, which is
+ * what fire_firm_package_purchase_automations() (an AFTER UPDATE trigger)
+ * reacts to -- no automation-firing logic needed here. Doesn't care which
+ * of connection_id/client_id/partner_prospect_id is the buyer; only the
+ * connection-specific firm_connections sync below is conditional.
  */
 export async function handleFirmPackagePurchaseCheckoutCompleted(
   supabase: ReturnType<typeof createServiceClient>,
@@ -33,7 +37,7 @@ export async function handleFirmPackagePurchaseCheckoutCompleted(
   if (!purchaseId) return { skipped: "missing purchase_id metadata" };
 
   const { data: purchase } = await supabase.from("firm_package_purchases").select("id, package_id, connection_id").eq("id", purchaseId).maybeSingle();
-  if (!purchase || !purchase.connection_id) return { skipped: "purchase not found" };
+  if (!purchase) return { skipped: "purchase not found" };
 
   await supabase
     .from("firm_package_purchases")
