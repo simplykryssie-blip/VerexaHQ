@@ -33,4 +33,20 @@ export const AUTOMATION_MERGE_FIELD_GROUPS: MergeFieldPickerGroup[] = [
       { token: "portal_link", label: "Client portal link" },
     ],
   },
+  {
+    // Resolves from a "Product Purchased" (or any purchase-triggered) run's
+    // own trigger_snapshot -- see fire_firm_package_purchase_automations'
+    // v_context. Only meaningful on a run started by that trigger; typed
+    // into a step on a run started some other way, these render empty, same
+    // as any other field outside this list.
+    group: "Purchase",
+    fields: [
+      { token: "purchaser_name", label: "Buyer name" },
+      { token: "purchaser_email", label: "Buyer email" },
+      { token: "purchaser_phone", label: "Buyer phone" },
+      { token: "package_purchase.package_name", label: "Product name" },
+      { token: "amount", label: "Purchase amount" },
+      { token: "payment_status", label: "Purchase status" },
+    ],
+  },
 ];

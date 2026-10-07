@@ -12,6 +12,11 @@ const EXTRA_LABELS: Record<string, string> = {
   plans: "Plans",
   "brand-center": "Brand Center",
   "review-queue": "Review Queue",
+  // Services/Packages lost their own top-level nav entries (merged into
+  // Products), so they're no longer in SETTINGS_NAV_ITEMS and need their
+  // breadcrumb labels listed explicitly here instead.
+  services: "Services",
+  packages: "Packages",
 };
 
 function buildStaticLabelMap(): Record<string, string> {

@@ -3,7 +3,7 @@ import { addProjectDomain, removeProjectDomain } from "@/lib/vercel/domains";
 import { isVercelDomainAutomationConfigured } from "@/lib/providerStatus";
 import { authorizedWebsite } from "@/lib/websites/auth";
 import { createClient } from "@/lib/supabase/server";
-import { hasAal2 } from "@/lib/auth/requireAal2";
+import { hasAal2, AAL2_REQUIRED_RESPONSE_BODY, AAL2_REQUIRED_STATUS } from "@/lib/auth/requireAal2";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   if (!isVercelDomainAutomationConfigured()) {
@@ -41,10 +41,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   // VEREXA-AAL-001: disconnecting a custom domain remains a protected domain-control action.
   if (!(await hasAal2(createClient()))) {
-    return NextResponse.json(
-      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
-      { status: 403 }
-    );
+    return NextResponse.json(AAL2_REQUIRED_RESPONSE_BODY, { status: AAL2_REQUIRED_STATUS });
   }
 
   const remove = await removeProjectDomain(result.website.custom_domain);

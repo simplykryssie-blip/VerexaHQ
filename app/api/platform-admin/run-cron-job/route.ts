@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { EXPECTED_INTERVAL_MINUTES } from "@/lib/cron/expectedIntervals";
-import { hasAal2 } from "@/lib/auth/requireAal2";
+import { hasAal2, AAL2_REQUIRED_RESPONSE_BODY, AAL2_REQUIRED_STATUS } from "@/lib/auth/requireAal2";
 
 // Lets a platform admin/IT user manually trigger one of the cron jobs from
 // the Systems dashboard -- useful for draining a backlog right away once
@@ -22,10 +22,7 @@ export async function POST(request: Request) {
   // VEREXA-AAL-001: platform-admin/IT-level action -- a password-only
   // session must not be sufficient on its own.
   if (!(await hasAal2(supabase))) {
-    return NextResponse.json(
-      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
-      { status: 403 }
-    );
+    return NextResponse.json(AAL2_REQUIRED_RESPONSE_BODY, { status: AAL2_REQUIRED_STATUS });
   }
 
   const { jobKey } = (await request.json()) as { jobKey?: string };

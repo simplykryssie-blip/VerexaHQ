@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { useAal2Gate } from "@/components/mfa/Aal2GateProvider";
 
 const CONNECT_STATUS_TONE: Record<string, BadgeTone> = {
   not_connected: "neutral",
@@ -19,9 +21,26 @@ const CONNECT_STATUS_LABEL: Record<string, string> = {
   active: "Active",
 };
 
-export function ConnectStripeButton({ connectStatus, error }: { connectStatus: string; error: string | null }) {
+// aal2Required covers both /api/stripe/connect/start and .../callback (the
+// OAuth redirect flow): the server can only signal this back via a query
+// param, not a JSON body, since the browser left this page entirely for
+// Stripe's own OAuth screen in between -- see those two routes'
+// aal2_required param. Renders the same "Set Up Two-Factor Authentication"
+// CTA the in-page Aal2GateProvider dialog uses, for the one gated action
+// here that never reaches that dialog at all.
+export function ConnectStripeButton({
+  connectStatus,
+  error,
+  aal2Required,
+}: {
+  connectStatus: string;
+  error: string | null;
+  aal2Required?: boolean;
+}) {
   const router = useRouter();
+  const pathname = usePathname();
   const toast = useToast();
+  const { handleAal2Response } = useAal2Gate();
   const [disconnecting, setDisconnecting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -30,7 +49,10 @@ export function ConnectStripeButton({ connectStatus, error }: { connectStatus: s
     try {
       const res = await fetch("/api/stripe/connect/disconnect", { method: "POST" });
       const data = (await res.json()) as { ok?: boolean; error?: string };
-      if (!res.ok || !data.ok) throw new Error(data.error ?? "Couldn't disconnect Stripe.");
+      if (!res.ok || !data.ok) {
+        if (await handleAal2Response(res, data)) return;
+        throw new Error(data.error ?? "Couldn't disconnect Stripe.");
+      }
       toast.show("Stripe disconnected", "success");
       router.refresh();
     } catch (e) {
@@ -45,7 +67,10 @@ export function ConnectStripeButton({ connectStatus, error }: { connectStatus: s
     try {
       const res = await fetch("/api/stripe/connect/refresh", { method: "POST" });
       const data = (await res.json()) as { ok?: boolean; status?: string; error?: string };
-      if (!res.ok || !data.ok) throw new Error(data.error ?? "Couldn't refresh Stripe status.");
+      if (!res.ok || !data.ok) {
+        if (await handleAal2Response(res, data)) return;
+        throw new Error(data.error ?? "Couldn't refresh Stripe status.");
+      }
       toast.show(`Status: ${CONNECT_STATUS_LABEL[data.status ?? ""] ?? data.status}`, "success");
       router.refresh();
     } catch (e) {
@@ -102,7 +127,19 @@ export function ConnectStripeButton({ connectStatus, error }: { connectStatus: s
           )}
         </div>
       </div>
-      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+      {error && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <p className="text-sm text-danger">{error}</p>
+          {aal2Required && (
+            <Link
+              href={`/settings/security?next=${encodeURIComponent(pathname || "/settings/integrations")}`}
+              className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90"
+            >
+              Set Up Two-Factor Authentication
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   );
 }
