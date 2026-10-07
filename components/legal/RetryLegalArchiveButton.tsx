@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAal2Gate } from "@/components/mfa/Aal2GateProvider";
 
 // Admin-only control (the underlying route re-checks is_platform_admin()
 // itself, so this button being hidden from non-admins in the UI is a
 // convenience, not the actual authorization boundary).
 export function RetryLegalArchiveButton({ archiveId }: { archiveId: string }) {
   const router = useRouter();
+  const { handleAal2Response } = useAal2Gate();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,6 +20,7 @@ export function RetryLegalArchiveButton({ archiveId }: { archiveId: string }) {
     setBusy(false);
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
+      if (await handleAal2Response(response, body)) return;
       setError(body.error ?? "Retry failed.");
       return;
     }

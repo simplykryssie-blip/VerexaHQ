@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CreditCard, X } from "lucide-react";
 import { useToast } from "@/components/Toast";
+import { useAal2Gate } from "@/components/mfa/Aal2GateProvider";
 
 const DISMISS_KEY = "billing-card-prompt-dismissed";
 
@@ -18,6 +19,7 @@ export function BillingCardPrompt({
   periodEnd: string | null;
 }) {
   const toast = useToast();
+  const { handleAal2Response } = useAal2Gate();
   const [dismissed, setDismissed] = useState(true);
   const [redirecting, setRedirecting] = useState(false);
 
@@ -39,6 +41,7 @@ export function BillingCardPrompt({
     const data = await res.json();
     if (!res.ok) {
       setRedirecting(false);
+      if (await handleAal2Response(res, data)) return;
       toast.show(data.error ?? "Could not start card setup.", "error");
       return;
     }

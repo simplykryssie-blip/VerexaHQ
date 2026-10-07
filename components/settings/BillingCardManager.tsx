@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CreditCard } from "lucide-react";
 import { useToast } from "@/components/Toast";
+import { useAal2Gate } from "@/components/mfa/Aal2GateProvider";
 
 const BRAND_LABEL: Record<string, string> = {
   visa: "Visa",
@@ -23,6 +24,7 @@ export function BillingCardManager({
   cardExpYear: number | null;
 }) {
   const toast = useToast();
+  const { handleAal2Response } = useAal2Gate();
   const [redirecting, setRedirecting] = useState(false);
 
   async function addCard() {
@@ -32,6 +34,7 @@ export function BillingCardManager({
       const data = await res.json();
       if (!res.ok || !data.url) {
         setRedirecting(false);
+        if (await handleAal2Response(res, data)) return;
         toast.show(data.error ?? "Could not start card setup.", "error");
         return;
       }

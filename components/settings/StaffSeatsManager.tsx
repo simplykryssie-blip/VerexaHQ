@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
+import { useAal2Gate } from "@/components/mfa/Aal2GateProvider";
 
 export type SeatSummary = {
   included_seats: number;
@@ -22,6 +23,7 @@ function formatCents(cents: number): string {
 export function StaffSeatsManager({ summary, activeSeats }: { summary: SeatSummary; activeSeats: ActivePaidSeat[] }) {
   const toast = useToast();
   const router = useRouter();
+  const { handleAal2Response } = useAal2Gate();
   const [previewing, setPreviewing] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -57,6 +59,7 @@ export function StaffSeatsManager({ summary, activeSeats }: { summary: SeatSumma
       const res = await fetch("/api/settings/seats/purchase", { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
+        if (await handleAal2Response(res, data)) return;
         toast.show(data.error ?? "Could not purchase seat", "error");
         return;
       }
@@ -86,6 +89,7 @@ export function StaffSeatsManager({ summary, activeSeats }: { summary: SeatSumma
       });
       const data = await res.json();
       if (!res.ok) {
+        if (await handleAal2Response(res, data)) return;
         toast.show(data.error ?? "Could not remove seat", "error");
         return;
       }
