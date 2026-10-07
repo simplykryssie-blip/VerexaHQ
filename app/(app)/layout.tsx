@@ -5,7 +5,9 @@ import { Sidebar } from "@/components/Sidebar";
 import { ScrollToTopOnNavigate } from "@/components/ScrollToTopOnNavigate";
 import { ToastProvider } from "@/components/Toast";
 import { ConfirmProvider } from "@/components/Confirm";
+import { Aal2GateProvider } from "@/components/mfa/Aal2GateProvider";
 import { GlobalClientDraftBanner } from "@/components/GlobalClientDraftBanner";
+import { MfaSetupBanner } from "@/components/MfaSetupBanner";
 import { BillingCardPrompt } from "@/components/BillingCardPrompt";
 import { SponsorshipTransitionBanner } from "@/components/SponsorshipTransitionBanner";
 import { SuspendedWorkspaceScreen } from "@/components/SuspendedWorkspaceScreen";
@@ -68,6 +70,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
     { data: softwareLinks },
     { data: myEroConnection },
     { data: sponsorshipTransitionRows },
+    mfaFactorsResult,
   ] = await Promise.all([
     supabase
       .from("workspace_security_policies")
@@ -133,7 +136,13 @@ export default async function AppLayout({ children, modal }: { children: React.R
     // to show, so it's fetched unconditionally rather than gated on
     // workspace.is_owner like needs_billing_card above.
     supabase.rpc("get_my_sponsorship_transition"),
+    // Account-level, not workspace-scoped -- the same factor covers every
+    // workspace this user belongs to (see VEREXA-AAL-001's enrollment/UX
+    // remediation). Drives MfaSetupBanner below; the actual AAL2 enforcement
+    // stays entirely in hasAal2()/requireAal2.ts, this is UI-only.
+    user ? supabase.auth.mfa.listFactors() : Promise.resolve({ data: null }),
   ]);
+  const hasVerifiedMfaFactor = Boolean(mfaFactorsResult?.data?.totp?.some((f) => f.status === "verified"));
 
   // Blocks the whole shell -- rendered instead of every other page, not a
   // dismissible overlay on top of one, so there is no route that skips it.
@@ -227,6 +236,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
     <div style={brandVars}>
       <ToastProvider>
        <ConfirmProvider>
+        <Aal2GateProvider>
         <IdleLogout timeoutMinutes={securityPolicy?.session_timeout_minutes ?? 60} loginPath="/login" />
         <a
           href="#main-content"
@@ -260,6 +270,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
           <main id="main-content" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pb-16 pt-14 lg:pt-0">
             <ScrollToTopOnNavigate containerId="main-content" />
             <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} currentUser={currentUser} />
+            <MfaSetupBanner hasVerifiedMfaFactor={hasVerifiedMfaFactor} />
             <GlobalClientDraftBanner />
             <SponsorshipTransitionBanner transition={sponsorshipTransition} />
             <BillingCardPrompt
@@ -272,6 +283,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
           </main>
         </div>
         <ModalSlotGate>{modal}</ModalSlotGate>
+        </Aal2GateProvider>
        </ConfirmProvider>
       </ToastProvider>
     </div>
