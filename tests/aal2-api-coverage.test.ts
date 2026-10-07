@@ -13,7 +13,16 @@ function source(relativePath: string): string {
 }
 
 function callsHasAal2(src: string): boolean {
-  return /import\s*\{\s*hasAal2\s*\}\s*from\s*"@\/lib\/auth\/requireAal2";/.test(src) && /hasAal2\(/.test(src);
+  // The import brace can carry other names alongside hasAal2 now --
+  // AAL2_REQUIRED_RESPONSE_BODY/AAL2_REQUIRED_STATUS (JSON routes) or
+  // AAL2_REQUIRED_RESPONSE_BODY/AAL2_REQUIRED_CODE (the two redirect-based
+  // Stripe Connect routes) -- see Session 2026-10-07's MFA enrollment/UX
+  // remediation. \bhasAal2\b anywhere inside the braces is what matters.
+  return /import\s*\{[^}]*\bhasAal2\b[^}]*\}\s*from\s*"@\/lib\/auth\/requireAal2";/.test(src) && /hasAal2\(/.test(src);
+}
+
+function returnsAal2RequiredBody(src: string): boolean {
+  return /AAL2_REQUIRED_RESPONSE_BODY/.test(src);
 }
 
 describe("VEREXA-AAL-001: high-impact API routes enforce hasAal2()", () => {
@@ -45,6 +54,30 @@ describe("VEREXA-AAL-001: high-impact API routes enforce hasAal2()", () => {
 
   it.each(protectedRoutes)("%s calls hasAal2()", (route) => {
     expect(callsHasAal2(source(route))).toBe(true);
+  });
+
+  // Every one of these routes returns a JSON body (not a redirect, unlike
+  // stripe/connect/start and .../callback below), so they can all use the
+  // single shared AAL2_REQUIRED_RESPONSE_BODY/AAL2_REQUIRED_STATUS constants
+  // instead of each inlining the same error object -- see
+  // lib/auth/requireAal2.ts and components/mfa/Aal2GateProvider.tsx, which
+  // relies on every one of these returning the same `code: "aal2_required"`
+  // shape to detect the error without matching on the human message text.
+  it.each(protectedRoutes)("%s returns the shared AAL2_REQUIRED_RESPONSE_BODY (carries code: \"aal2_required\")", (route) => {
+    expect(returnsAal2RequiredBody(source(route))).toBe(true);
+  });
+
+  // The two redirect-based Stripe Connect routes can't return a JSON body
+  // (the browser is mid-OAuth-redirect) -- they signal the same condition
+  // via an `aal2_required` query param instead, which
+  // app/(app)/settings/integrations/page.tsx + ConnectStripeButton.tsx read
+  // to render the same "Set Up Two-Factor Authentication" CTA.
+  const redirectBasedAal2Routes = ["app/api/stripe/connect/start/route.ts", "app/api/stripe/connect/callback/route.ts"];
+
+  it.each(redirectBasedAal2Routes)("%s signals aal2_required via a query param, not a JSON body", (route) => {
+    const src = source(route);
+    expect(callsHasAal2(src)).toBe(true);
+    expect(src).toMatch(/searchParams\.set\("aal2_required",\s*AAL2_REQUIRED_CODE\)/);
   });
 
   const deliberatelyUnprotectedRoutes = [
