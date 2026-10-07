@@ -46,6 +46,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: { par
     { data: canManage },
     { data: organizerTemplates },
     { data: services },
+    { data: products },
     { data: engagementLetterTemplates },
     { data: documentRequestTemplates },
     { data: processes },
@@ -103,6 +104,15 @@ export default async function WorkflowDetailPage({ params, searchParams }: { par
         .select("id, name, status")
         .eq("workspace_id", workspace.id)
         .neq("status", "archived")
+        .order("name"),
+      // Every platform_products row this workspace sells -- package, digital
+      // product, or service -- so a "Product Purchased" trigger's conditions
+      // can scope to a specific one, same picker pattern as services/
+      // pipelines above.
+      supabase
+        .from("platform_products")
+        .select("id, name")
+        .eq("workspace_id", workspace.id)
         .order("name"),
       supabase
         .from("engagement_letter_templates")
@@ -244,6 +254,10 @@ export default async function WorkflowDetailPage({ params, searchParams }: { par
       .map((s) => ({ id: s.id, name: s.name })),
   }));
 
+  const productOptions: TemplateOption[] = (products ?? [])
+    .filter((p): p is { id: string; name: string } => Boolean(p.id && p.name))
+    .map((p) => ({ id: p.id, name: p.name }));
+
   const staffOptions: StaffOption[] = staffMembers.map((m) => ({ id: m.user_id, display_name: m.display_name, is_owner: m.is_owner }));
 
   const automationOptions: AutomationOption[] = otherAutomations ?? [];
@@ -282,6 +296,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: { par
           engagementLetterTemplates={engagementLetterTemplates ?? []}
           documentRequestTemplates={documentRequestTemplates ?? []}
           services={services ?? []}
+          products={productOptions}
           serviceCategories={serviceCategories}
           pipelines={pipelines}
           staffOptions={staffOptions}

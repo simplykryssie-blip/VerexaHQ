@@ -591,6 +591,7 @@ function CanvasInner({
   engagementLetterTemplates,
   documentRequestTemplates,
   services,
+  products = [],
   serviceCategories,
   pipelines,
   staffOptions,
@@ -614,6 +615,7 @@ function CanvasInner({
   engagementLetterTemplates: TemplateOption[];
   documentRequestTemplates: TemplateOption[];
   services: TemplateOption[];
+  products?: TemplateOption[];
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
   staffOptions: StaffOption[];
@@ -1198,6 +1200,7 @@ function CanvasInner({
               engagementLetterTemplates={engagementLetterTemplates}
               documentRequestTemplates={documentRequestTemplates}
               services={services}
+              products={products}
               serviceCategories={serviceCategories}
               pipelines={pipelines}
               staffOptions={staffOptions}
@@ -1233,6 +1236,7 @@ function CanvasInner({
               targetLabels={targetLabels}
               staffOptions={staffOptions}
               services={services}
+              products={products}
               serviceCategories={serviceCategories}
               pipelines={pipelines}
               organizerTemplates={organizerTemplates}

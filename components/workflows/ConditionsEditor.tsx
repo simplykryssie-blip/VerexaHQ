@@ -59,6 +59,7 @@ type ValueKind =
   | "lead_stage"
   | "staff"
   | "service"
+  | "product"
   | "category"
   | "pipeline_stage"
   | "organizer_status"
@@ -99,6 +100,11 @@ const SELECT_OPS = ["eq", "neq"];
 const LIST_OPS = ["eq", "neq", "in", "not_in"];
 const ID_OPS = ["eq", "neq", "is_null", "is_not_null"];
 const NUMBER_OPS = ["eq", "neq", "gt", "gte", "lt", "lte"];
+// "Exists" / "does not exist" only -- for a buyer-identity field where the
+// field itself (a UUID) isn't something a user picks a value for, only
+// whether it's present. No value input renders for either op (see the
+// `condition.op !== "is_null" && ...` guard in ConditionRow below).
+const EXISTENCE_OPS = ["is_null", "is_not_null"];
 
 const CLIENT_TYPE_OPTIONS = ["individual", "business", "trust", "estate", "organization"];
 const CLIENT_SOURCE_OPTIONS = ["public_organizer_signup", "manual", "portal_basic_info"];
@@ -168,6 +174,22 @@ const PARTNER_ONBOARDING_STATUS_OPTIONS = [
 ];
 const PARTNER_ONBOARDING_REVIEW_STATUS_OPTIONS = ["approved", "rejected", "info_requested"];
 const FIRM_CONNECTION_RELATIONSHIP_TYPE_OPTIONS = ["service_bureau_ero", "ero_ptin", "service_bureau_ptin"];
+const PRODUCT_TYPE_OPTIONS = [
+  { value: "package", label: "Package" },
+  { value: "digital_product", label: "Digital Product" },
+  { value: "service", label: "Service" },
+];
+// Matches firm_package_purchases.status's own CHECK constraint exactly --
+// "Purchase status" here means payment status (the directive's own "pending/
+// processing/paid/failed/refunded"; this app's actual model is pending/
+// active/past_due/canceled -- see fire_firm_package_purchase_automations'
+// context, which stores it under the key "payment_status").
+const PURCHASE_STATUS_OPTIONS = [
+  { value: "pending", label: "Pending" },
+  { value: "active", label: "Paid / active" },
+  { value: "past_due", label: "Past due" },
+  { value: "canceled", label: "Canceled" },
+];
 
 const CONDITION_FIELDS: FieldMeta[] = [
   { key: "client.lifecycle_status", label: "Lead / client status", group: "Lead & client", valueKind: "lead_stage", ops: LIST_OPS },
@@ -219,6 +241,25 @@ const CONDITION_FIELDS: FieldMeta[] = [
 
   { key: "firm_connection.relationship_type", label: "Relationship type", group: "Firm Connection", valueKind: "select", options: FIRM_CONNECTION_RELATIONSHIP_TYPE_OPTIONS, ops: LIST_OPS },
   { key: "firm_connection.package_id", label: "Package ID", group: "Firm Connection", valueKind: "text", ops: SELECT_OPS },
+
+  // Resolved from a "Product Purchased" (or any purchase-triggered) run's
+  // own context -- see fire_firm_package_purchase_automations' v_context.
+  // These keys have no special case in _evaluate_condition_list; they
+  // resolve through its generic context ->> field fallback, same as any
+  // other flat key.
+  { key: "product_id", label: "Product", group: "Purchase", valueKind: "product", ops: ID_OPS },
+  { key: "product_type", label: "Product type", group: "Purchase", valueKind: "select", options: PRODUCT_TYPE_OPTIONS.map((o) => o.value), ops: SELECT_OPS },
+  { key: "payment_status", label: "Purchase status", group: "Purchase", valueKind: "labeled_select", labeledOptions: PURCHASE_STATUS_OPTIONS, ops: LIST_OPS },
+  { key: "amount", label: "Purchase amount", group: "Purchase", valueKind: "number", ops: NUMBER_OPS },
+
+  // "Exists" / "does not exist" tells you what kind of buyer this purchase
+  // had, without needing a separate synthetic "buyer type" field -- a
+  // purchase has exactly one of these three set (client_id/connection_id/
+  // partner_prospect_id), per firm_package_purchases_buyer_chk.
+  { key: "client_id", label: "Buyer is an existing client", group: "Buyer", valueKind: "text", ops: EXISTENCE_OPS },
+  { key: "connection_id", label: "Buyer is a connected firm", group: "Buyer", valueKind: "text", ops: EXISTENCE_OPS },
+  { key: "partner_prospect_id", label: "Buyer is a new partner (no Verexa workspace)", group: "Buyer", valueKind: "text", ops: EXISTENCE_OPS },
+  { key: "purchaser_email", label: "Buyer email", group: "Buyer", valueKind: "text", ops: SELECT_OPS },
 ];
 
 function fieldMeta(key: string): FieldMeta {
@@ -231,6 +272,7 @@ function ConditionRow({
   onRemove,
   staffOptions,
   services,
+  products,
   serviceCategories,
   pipelines,
   organizerTemplates,
@@ -244,6 +286,7 @@ function ConditionRow({
   onRemove: () => void;
   staffOptions: StaffOption[];
   services: TemplateOption[];
+  products: TemplateOption[];
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
   organizerTemplates: TemplateOption[];
@@ -501,6 +544,19 @@ function ConditionRow({
             </select>
           )}
 
+          {meta.valueKind === "product" && (
+            <select disabled={disabled} value={condition.value} onChange={(e) => setValue(e.target.value)} className={inputClass}>
+              <option value="" disabled>
+                Choose a product
+              </option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
+
           {meta.valueKind === "category" && (
             <select disabled={disabled} value={condition.value} onChange={(e) => setValue(e.target.value)} className={inputClass}>
               <option value="" disabled>
@@ -595,6 +651,7 @@ export function ConditionsEditor({
   onChange,
   staffOptions,
   services,
+  products = [],
   serviceCategories,
   pipelines,
   organizerTemplates,
@@ -607,6 +664,7 @@ export function ConditionsEditor({
   onChange: (next: Condition[]) => void;
   staffOptions: StaffOption[];
   services: TemplateOption[];
+  products?: TemplateOption[];
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
   organizerTemplates: TemplateOption[];
@@ -664,6 +722,7 @@ export function ConditionsEditor({
                 onRemove={() => removeCondition(i)}
                 staffOptions={staffOptions}
                 services={services}
+                products={products}
                 serviceCategories={serviceCategories}
                 pipelines={pipelines}
                 organizerTemplates={organizerTemplates}
@@ -695,6 +754,7 @@ export function ConditionGroupsEditor({
   onChange,
   staffOptions,
   services,
+  products = [],
   serviceCategories,
   pipelines,
   organizerTemplates,
@@ -707,6 +767,7 @@ export function ConditionGroupsEditor({
   onChange: (next: ConditionGroup[]) => void;
   staffOptions: StaffOption[];
   services: TemplateOption[];
+  products?: TemplateOption[];
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
   organizerTemplates: TemplateOption[];
@@ -771,6 +832,7 @@ export function ConditionGroupsEditor({
               onChange={(next) => updateGroupConditions(i, next)}
               staffOptions={staffOptions}
               services={services}
+              products={products}
               serviceCategories={serviceCategories}
               pipelines={pipelines}
               organizerTemplates={organizerTemplates}

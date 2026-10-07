@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 
@@ -56,9 +56,17 @@ function ProductCard({ product }: { product: ProductRow }) {
         {product.price != null && <span className="rounded-lg bg-surfaceMuted px-2.5 py-1 font-medium">${product.price}</span>}
         {product.audience && <span className="rounded-lg bg-surfaceMuted px-2.5 py-1 font-medium">Audience: {product.audience.replace(/_/g, " ")}</span>}
       </div>
-      <div className="mt-3">
+      <div className="mt-3 flex items-center gap-3">
         <Link href={editHref} className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline">
           <Pencil size={13} /> Edit
+        </Link>
+        {/* No stored link to a specific automation -- "Product Purchased" is a
+            trigger any automation in /workflows can react to, scoped by its own
+            "Product is <this one>" condition, same relationship Firm Connections
+            has to its own automations. This is just a visible pointer to where
+            that happens, not a required per-product configuration. */}
+        <Link href="/workflows" className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-accent hover:underline">
+          <Zap size={13} /> After purchase: Automations
         </Link>
       </div>
     </div>

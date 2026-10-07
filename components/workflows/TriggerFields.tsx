@@ -32,6 +32,7 @@ export const ORGANIZER_REVIEW_STATUS_OPTIONS = [
 // verbatim as automations.trigger_type); category groupings here can be
 // freely renamed/reshuffled without any migration.
 export const TRIGGER_CATEGORIES: { key: string; label: string }[] = [
+  { key: "products_purchases", label: "Products & Purchases" },
   { key: "contacts_leads", label: "Contacts & Leads" },
   { key: "engagements", label: "Engagements" },
   { key: "ero_ptin", label: "ERO / PTIN Sharing" },
@@ -46,6 +47,8 @@ export const TRIGGER_CATEGORIES: { key: string; label: string }[] = [
 ];
 
 export const TRIGGER_TYPES = [
+  { value: "product.purchased", label: "A product is purchased", category: "products_purchases", description: "Fires when any Package, Digital Product, or Service is purchased -- add a condition on \"Product\" or \"Product type\" to scope this to a specific one.", keywords: "product purchase checkout buy sale package digital service stripe payment" },
+  { value: "product.canceled", label: "A product purchase is canceled", category: "products_purchases", description: "Fires when a recurring product purchase is canceled (a subscription ending, most commonly) -- add a condition on \"Product\" to scope this to a specific one.", keywords: "product purchase canceled subscription ended" },
   { value: "engagement.status_changed", label: "Engagement status changes to", category: "engagements", description: "Fires when an engagement's status is set to a specific value.", keywords: "status change engagement" },
   { value: "organizer.submitted", label: "A form is submitted", category: "forms_intake", description: "Fires when a client submits an intake form.", keywords: "intake form organizer submit" },
   { value: "client.tag_added", label: "A tag is added to a client", category: "contacts_leads", description: "Fires when a specific tag is added to a client.", keywords: "tag label contact" },
@@ -122,6 +125,12 @@ export function triggerSummary(
   serviceCategories: ServiceCategoryOption[] = [],
   pipelines: PipelineOption[] = []
 ) {
+  if (triggerType === "product.purchased") {
+    return "When a product is purchased";
+  }
+  if (triggerType === "product.canceled") {
+    return "When a product purchase is canceled";
+  }
   if (triggerType === "engagement.status_changed") {
     return `When engagement status changes to "${config.to_status ?? "?"}"`;
   }
