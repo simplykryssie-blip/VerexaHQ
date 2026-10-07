@@ -5,7 +5,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { isStripeConnectConfigured } from "@/lib/providerStatus";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { getAppUrl } from "@/lib/appUrl";
-import { hasAal2 } from "@/lib/auth/requireAal2";
+import { hasAal2, AAL2_REQUIRED_RESPONSE_BODY, AAL2_REQUIRED_CODE } from "@/lib/auth/requireAal2";
 
 // Standard Connect OAuth: sends the admin to Stripe's own "Connect with
 // Stripe" page, where they can link an already-existing Stripe account or
@@ -36,7 +36,12 @@ export async function GET(request: Request) {
   // workspace's future payouts go -- a password-only session must not be
   // sufficient on its own.
   if (!(await hasAal2(supabase))) {
-    settingsUrl.searchParams.set("stripe_error", "This action requires two-factor verification. Complete your authenticator challenge and try again.");
+    // Redirect-based flow (not JSON), so the aal2_required signal travels as
+    // its own query param instead of AAL2_REQUIRED_RESPONSE_BODY's `code`
+    // field -- app/(app)/settings/integrations/page.tsx reads it to render
+    // the "Set Up Two-Factor Authentication" CTA instead of a dead-end error.
+    settingsUrl.searchParams.set("stripe_error", AAL2_REQUIRED_RESPONSE_BODY.error);
+    settingsUrl.searchParams.set("aal2_required", AAL2_REQUIRED_CODE);
     return NextResponse.redirect(settingsUrl, 307);
   }
 
