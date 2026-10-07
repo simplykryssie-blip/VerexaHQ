@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2, Workflow, Plus } from "lucide-react";
+import { Trash2, Workflow, Plus, ExternalLink, Copy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
@@ -14,7 +14,7 @@ import { IconChip } from "@/components/ui/IconChip";
 
 const STATUS_TONE: Record<string, BadgeTone> = { draft: "neutral", published: "success", archived: "neutral" };
 
-export type FunnelCard = { id: string; name: string; status: string; page_count: number };
+export type FunnelCard = { id: string; name: string; status: string; page_count: number; entry_page_slug: string | null };
 
 export function FunnelLibrary({
   workspaceId,
@@ -34,7 +34,7 @@ export function FunnelLibrary({
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);\n\n  function getFunnelUrl(entryPageSlug: string | null) {\n    if (!entryPageSlug) return null;\n    if (domainVerified && customDomain) {\n      return `https://${customDomain}${entryPageSlug === "home" ? "/" : `/${entryPageSlug}`}`;\n    }\n    return `/site/${workspaceSlug}/${websiteSlug}/${entryPageSlug}`;\n  }\n\n  async function copyFunnelUrl(url: string) {\n    await navigator.clipboard.writeText(new URL(url, window.location.origin).toString());\n    toast.show("Funnel link copied.", "success");\n  }
 
   async function createFunnel(e: React.FormEvent) {
     e.preventDefault();
