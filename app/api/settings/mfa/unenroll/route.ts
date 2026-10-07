@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { hasAal2 } from "@/lib/auth/requireAal2";
+import { hasAal2, AAL2_REQUIRED_RESPONSE_BODY, AAL2_REQUIRED_STATUS } from "@/lib/auth/requireAal2";
 
 // VEREXA-AAL-001: MfaSetup.tsx used to call supabase.auth.mfa.unenroll()
 // directly from the browser, with nothing but a client-side confirm()
@@ -28,10 +28,7 @@ export async function POST(request: Request) {
   }
 
   if (!(await hasAal2(supabase))) {
-    return NextResponse.json(
-      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
-      { status: 403 }
-    );
+    return NextResponse.json(AAL2_REQUIRED_RESPONSE_BODY, { status: AAL2_REQUIRED_STATUS });
   }
 
   const { factorId } = (await request.json().catch(() => ({}))) as { factorId?: string };
