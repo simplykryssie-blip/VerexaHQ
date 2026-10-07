@@ -3,17 +3,17 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { isServiceBureauTier, isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { hasCapability } from "@/lib/capabilities";
 import { PackageOptionGroupsEditor, type OptionGroupRow } from "@/components/settings/PackageOptionGroupsEditor";
 import { PackageEditForm } from "@/components/settings/PackageEditForm";
 
 export const dynamic = "force-dynamic";
 
-// A "package" (software/banking resale) stays Service-Bureau-only, but a
-// "digital_product" row in this same table is ERO-tier-or-above territory
-// per the platform Product model (see platform_capability_model_v1) --
+// A "package" (software/banking resale) requires the third_party_product_distribution
+// capability, but a "digital_product" row in this same table requires
+// digital_product_sales instead (see finish_capability_model_products_v1) --
 // gated per-row on the fetched product_type instead of redirecting every
-// non-Service-Bureau workspace away before even knowing which type this is.
+// workspace away before even knowing which type this is.
 export default async function PackageDetailPage({ params }: { params: { id: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
@@ -34,8 +34,8 @@ export default async function PackageDetailPage({ params }: { params: { id: stri
 
   if (!pkg) notFound();
   const isPackageType = pkg.product_type === "package";
-  if (isPackageType && !isServiceBureauTier(workspace)) redirect("/settings/products");
-  if (!isPackageType && !isEroManagementTier(workspace)) redirect("/settings/products");
+  const requiredCapability = isPackageType ? "third_party_product_distribution" : "digital_product_sales";
+  if (!(await hasCapability(supabase, workspace.id, requiredCapability))) redirect("/settings/products");
 
   const { data: groups } = isPackageType
     ? await supabase

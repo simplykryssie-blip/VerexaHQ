@@ -8,6 +8,7 @@ export type CapabilityKey =
   | "firm_connections"
   | "partner_management"
   | "third_party_product_distribution"
+  | "digital_product_sales"
   | "provisioning"
   | (string & {});
 

@@ -2,23 +2,24 @@ import { redirect } from "next/navigation";
 import { Package } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { isServiceBureauTier } from "@/lib/workspaceCapabilities";
+import { hasCapability } from "@/lib/capabilities";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { PackagesManager, type PackageRow } from "@/components/settings/PackagesManager";
 
 export const dynamic = "force-dynamic";
 
 // Packages are what a Service Bureau sells to the EROs/PTINs connected to
-// it -- a priced software/banking bundle. An ERO or multi-office firm still
-// manages its own connected PTINs, but never resells a package, so this is
-// gated on the narrower Service Bureau tier, not the general
-// isEroManagementTier set.
+// it -- a priced software/banking bundle. Gated on the third_party_product_distribution
+// capability (Service Bureau tier by default, same check the underlying
+// firm_packages RLS enforces) rather than the tier directly, so a platform
+// override is reflected here too.
 export default async function PackagesPage() {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
-  if (!isServiceBureauTier(workspace)) redirect("/settings/products");
 
   const supabase = createClient();
+  if (!(await hasCapability(supabase, workspace.id, "third_party_product_distribution"))) redirect("/settings/products");
+
   const [{ data: packages }, { data: canManage }] = await Promise.all([
     supabase
       .from("firm_packages")
