@@ -5463,6 +5463,7 @@ export type Database = {
       }
       firm_packages: {
         Row: {
+          agreement_template_id: string | null
           billing_cadence: string | null
           created_at: string
           created_by: string | null
@@ -5482,6 +5483,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          agreement_template_id?: string | null
           billing_cadence?: string | null
           created_at?: string
           created_by?: string | null
@@ -5501,6 +5503,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          agreement_template_id?: string | null
           billing_cadence?: string | null
           created_at?: string
           created_by?: string | null
@@ -5520,6 +5523,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "firm_packages_agreement_template_id_fkey"
+            columns: ["agreement_template_id"]
+            isOneToOne: false
+            referencedRelation: "engagement_letter_templates"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "firm_packages_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -7609,7 +7619,11 @@ export type Database = {
       partner_onboardings: {
         Row: {
           agreement_required: boolean
+          agreement_signature_image_path: string | null
           agreement_signature_request_id: string | null
+          agreement_signed_at: string | null
+          agreement_signer_name: string | null
+          agreement_typed_name: string | null
           application_data: Json
           application_submitted_at: string | null
           assigned_staff_id: string | null
@@ -7625,6 +7639,7 @@ export type Database = {
           learning_course_id: string | null
           package_id: string | null
           partner_prospect_id: string | null
+          public_token: string
           rejected_at: string | null
           rejected_reason: string | null
           review_decision: string | null
@@ -7640,7 +7655,11 @@ export type Database = {
         }
         Insert: {
           agreement_required?: boolean
+          agreement_signature_image_path?: string | null
           agreement_signature_request_id?: string | null
+          agreement_signed_at?: string | null
+          agreement_signer_name?: string | null
+          agreement_typed_name?: string | null
           application_data?: Json
           application_submitted_at?: string | null
           assigned_staff_id?: string | null
@@ -7656,6 +7675,7 @@ export type Database = {
           learning_course_id?: string | null
           package_id?: string | null
           partner_prospect_id?: string | null
+          public_token?: string
           rejected_at?: string | null
           rejected_reason?: string | null
           review_decision?: string | null
@@ -7671,7 +7691,11 @@ export type Database = {
         }
         Update: {
           agreement_required?: boolean
+          agreement_signature_image_path?: string | null
           agreement_signature_request_id?: string | null
+          agreement_signed_at?: string | null
+          agreement_signer_name?: string | null
+          agreement_typed_name?: string | null
           application_data?: Json
           application_submitted_at?: string | null
           assigned_staff_id?: string | null
@@ -7687,6 +7711,7 @@ export type Database = {
           learning_course_id?: string | null
           package_id?: string | null
           partner_prospect_id?: string | null
+          public_token?: string
           rejected_at?: string | null
           rejected_reason?: string | null
           review_decision?: string | null
@@ -14344,6 +14369,10 @@ export type Database = {
         Args: { p_token: string }
         Returns: Json
       }
+      get_public_partner_onboarding: {
+        Args: { p_token: string }
+        Returns: Json
+      }
       get_public_platform_plans: {
         Args: never
         Returns: {
@@ -14584,6 +14613,10 @@ export type Database = {
         Returns: {
           workspace_id: string
         }[]
+      }
+      link_firm_connection_to_workspace: {
+        Args: { p_child_workspace_id: string; p_connection_id: string }
+        Returns: Json
       }
       link_public_portal_account: {
         Args: {
@@ -15267,6 +15300,10 @@ export type Database = {
         Args: { p_creator_user_id?: string; p_workspace_id: string }
         Returns: string
       }
+      resolve_firm_connection_identity: {
+        Args: { p_connection_id: string }
+        Returns: Json
+      }
       resolve_organizer_information_request: {
         Args: { p_request_id: string }
         Returns: undefined
@@ -15745,6 +15782,14 @@ export type Database = {
         }
         Returns: Json
       }
+      sign_public_partner_onboarding_agreement: {
+        Args: {
+          p_signature_image_path: string
+          p_token: string
+          p_typed_name: string
+        }
+        Returns: Json
+      }
       start_agent_run: {
         Args: {
           p_agent_key: string
@@ -15849,6 +15894,17 @@ export type Database = {
           p_first_name: string
           p_last_name: string
           p_phone: string
+          p_token: string
+        }
+        Returns: Json
+      }
+      submit_public_partner_onboarding_application: {
+        Args: {
+          p_business_name: string
+          p_contact_email: string
+          p_contact_name: string
+          p_contact_phone: string
+          p_notes?: string
           p_token: string
         }
         Returns: Json

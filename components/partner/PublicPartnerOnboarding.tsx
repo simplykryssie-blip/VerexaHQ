@@ -62,11 +62,11 @@ export function PublicPartnerOnboarding({ token, data }: { token: string; data: 
     setApplicationError(null);
     const { error } = await supabase.rpc("submit_public_partner_onboarding_application", {
       p_token: token,
-      p_business_name: businessName.trim() || null,
-      p_contact_name: contactName.trim() || null,
+      p_business_name: businessName.trim(),
+      p_contact_name: contactName.trim(),
       p_contact_email: contactEmail.trim(),
-      p_contact_phone: contactPhone.trim() || null,
-      p_notes: notes.trim() || null,
+      p_contact_phone: contactPhone.trim(),
+      p_notes: notes.trim(),
     });
     setSubmittingApplication(false);
     if (error) {
