@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { FunnelManager } from "@/components/websites/FunnelManager";
+import { getLiveUrl } from "@/lib/websites/liveUrl";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +12,9 @@ export default async function FunnelManagerRoute({ params }: { params: { id: str
   if (!workspace) return null;
 
   const supabase = createClient();
-  const [{ data: funnel }, { data: memberPages }, { data: availablePages }, { data: canManage }] = await Promise.all([
+  const [{ data: funnel }, { data: website }, { data: memberPages }, { data: availablePages }, { data: canManage }] = await Promise.all([
     supabase.from("site_funnels").select("id, workspace_id, website_id, name, status").eq("id", params.funnelId).maybeSingle(),
+    supabase.from("site_websites").select("id, workspace_id, slug, custom_domain, domain_verified").eq("id", params.id).maybeSingle(),
     supabase
       .from("site_pages")
       .select("id, title, slug, status, funnel_position")
@@ -22,7 +24,7 @@ export default async function FunnelManagerRoute({ params }: { params: { id: str
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "site_pages.manage" }),
   ]);
 
-  if (!funnel || funnel.workspace_id !== workspace.id || funnel.website_id !== params.id) notFound();
+  if (!funnel || !website || funnel.workspace_id !== workspace.id || funnel.website_id !== params.id || website.workspace_id !== workspace.id) notFound();
 
   return (
     <>
@@ -33,6 +35,18 @@ export default async function FunnelManagerRoute({ params }: { params: { id: str
           memberPages={memberPages ?? []}
           availablePages={availablePages ?? []}
           canManage={Boolean(canManage)}
+          liveUrl={(() => {
+            const firstPublished = (memberPages ?? []).find((p) => p.status === "published");
+            return firstPublished
+              ? getLiveUrl({
+                  pageSlug: firstPublished.slug,
+                  workspaceSlug: workspace.slug,
+                  websiteSlug: website.slug,
+                  customDomain: website.custom_domain,
+                  domainVerified: Boolean(website.domain_verified),
+                })
+              : null;
+          })()}
         />
       </div>
     </>
