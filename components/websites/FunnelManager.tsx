@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronUp, ChevronDown, X, Plus } from "lucide-react";
+import { ChevronUp, ChevronDown, X, Plus, ExternalLink, Copy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
@@ -13,7 +13,7 @@ const STATUS_TONE: Record<string, BadgeTone> = { draft: "neutral", published: "s
 
 type MemberPage = { id: string; title: string; slug: string; status: string; funnel_position: number | null };
 type AvailablePage = { id: string; title: string; slug: string };
-type Funnel = { id: string; workspace_id: string; website_id: string; name: string; status: string };
+type Funnel = { id: string; workspace_id: string; website_id: string; name: string; status: string };\ntype Website = { id: string; slug: string; custom_domain: string | null; domain_verified: boolean };
 
 function slugify(title: string) {
   return (
@@ -44,7 +44,7 @@ export function FunnelManager({
   const [available, setAvailable] = useState(availablePages);
   const [addingId, setAddingId] = useState("");
   const [creating, setCreating] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
+  const [newTitle, setNewTitle] = useState("");\n\n  const entryPage = pages.find((p) => p.status === "published") ?? pages[0] ?? null;\n  const liveUrl = entryPage\n    ? website.domain_verified && website.custom_domain\n      ? `https://${website.custom_domain}${entryPage.slug === "home" ? "/" : `/${entryPage.slug}`}`\n      : `/site/${workspaceSlug}/${website.slug}/${entryPage.slug}`\n    : null;\n\n  async function copyLiveUrl() {\n    if (!liveUrl) return;\n    await navigator.clipboard.writeText(new URL(liveUrl, window.location.origin).toString());\n    toast.show("Funnel link copied.", "success");\n  }
 
   async function commitName() {
     const trimmed = name.trim() || funnel.name;
