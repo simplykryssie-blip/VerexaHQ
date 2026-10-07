@@ -51,7 +51,6 @@ export function PublicPartnerOnboarding({ token, data }: { token: string; data: 
 
   const applicationSubmitted = Boolean(onboarding.application_submitted_at);
   const needsAgreement = onboarding.agreement_required && !onboarding.agreement_signed;
-  const accentColor = onboarding.branding.primary_color || onboarding.branding.secondary_color || undefined;
 
   async function submitApplication() {
     if (!contactEmail.trim()) {
@@ -192,7 +191,6 @@ export function PublicPartnerOnboarding({ token, data }: { token: string; data: 
             type="button"
             onClick={submitApplication}
             disabled={submittingApplication}
-            style={accentColor ? { background: accentColor } : undefined}
             className="mt-3 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"
           >
             {submittingApplication ? "Submitting..." : "Submit application"}
