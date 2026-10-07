@@ -19,11 +19,19 @@ export type FunnelCard = { id: string; name: string; status: string; page_count:
 export function FunnelLibrary({
   workspaceId,
   websiteId,
+  workspaceSlug,
+  websiteSlug,
+  customDomain,
+  domainVerified,
   funnels,
   canManage,
 }: {
   workspaceId: string;
   websiteId: string;
+  workspaceSlug: string;
+  websiteSlug: string;
+  customDomain: string | null;
+  domainVerified: boolean;
   funnels: FunnelCard[];
   canManage: boolean;
 }) {
