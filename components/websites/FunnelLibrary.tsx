@@ -34,7 +34,20 @@ export function FunnelLibrary({
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);\n\n  function getFunnelUrl(entryPageSlug: string | null) {\n    if (!entryPageSlug) return null;\n    if (domainVerified && customDomain) {\n      return `https://${customDomain}${entryPageSlug === "home" ? "/" : `/${entryPageSlug}`}`;\n    }\n    return `/site/${workspaceSlug}/${websiteSlug}/${entryPageSlug}`;\n  }\n\n  async function copyFunnelUrl(url: string) {\n    await navigator.clipboard.writeText(new URL(url, window.location.origin).toString());\n    toast.show("Funnel link copied.", "success");\n  }
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  function getFunnelUrl(entryPageSlug: string | null) {
+    if (!entryPageSlug) return null;
+    if (domainVerified && customDomain) {
+      return `https://${customDomain}${entryPageSlug === "home" ? "/" : `/${entryPageSlug}`}`;
+    }
+    return `/site/${workspaceSlug}/${websiteSlug}/${entryPageSlug}`;
+  }
+
+  async function copyFunnelUrl(url: string) {
+    await navigator.clipboard.writeText(new URL(url, window.location.origin).toString());
+    toast.show("Funnel link copied.", "success");
+  }
 
   async function createFunnel(e: React.FormEvent) {
     e.preventDefault();
