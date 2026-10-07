@@ -28,11 +28,15 @@ function slugify(title: string) {
 
 export function FunnelManager({
   funnel,
+  website,
+  workspaceSlug,
   memberPages,
   availablePages,
   canManage,
 }: {
   funnel: Funnel;
+  website: Website;
+  workspaceSlug: string;
   memberPages: MemberPage[];
   availablePages: AvailablePage[];
   canManage: boolean;
