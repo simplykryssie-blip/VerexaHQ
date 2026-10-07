@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { InlineAddForm } from "@/components/InlineAddForm";
+import { useAal2Gate } from "@/components/mfa/Aal2GateProvider";
 
 export function InviteStaffForm({ roles }: { roles: { id: string; name: string }[] }) {
   const router = useRouter();
+  const { handleAal2Response } = useAal2Gate();
   const [lastAcceptUrl, setLastAcceptUrl] = useState<string | null>(null);
   const [lastNote, setLastNote] = useState<string | null>(null);
 
@@ -34,7 +36,10 @@ export function InviteStaffForm({ roles }: { roles: { id: string; name: string }
           });
           const data = await res.json();
 
-          if (!res.ok) return data.error ?? "Could not send invitation.";
+          if (!res.ok) {
+            if (await handleAal2Response(res, data)) return;
+            return data.error ?? "Could not send invitation.";
+          }
 
           if (data.email?.sent) {
             setLastNote(`Invitation emailed to ${v.email}.`);

@@ -23,6 +23,7 @@ export default async function IntegrationsPage({
     calendar_connected?: string;
     stripe_error?: string;
     stripe_connected?: string;
+    aal2_required?: string;
   };
 }) {
   const workspace = await getCurrentWorkspace();
@@ -130,6 +131,7 @@ export default async function IntegrationsPage({
         <ConnectStripeButton
           connectStatus={workspaceRow?.stripe_connect_status ?? "not_connected"}
           error={searchParams.stripe_error ?? null}
+          aal2Required={searchParams.aal2_required === "aal2_required"}
         />
       </div>
 

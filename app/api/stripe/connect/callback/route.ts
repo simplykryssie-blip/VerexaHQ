@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { deriveConnectStatus, exchangeOAuthCode, fetchAccount } from "@/lib/stripe/client";
 import { getAppUrl } from "@/lib/appUrl";
-import { hasAal2 } from "@/lib/auth/requireAal2";
+import { hasAal2, AAL2_REQUIRED_RESPONSE_BODY, AAL2_REQUIRED_CODE } from "@/lib/auth/requireAal2";
 
 export async function GET(request: Request) {
   const appUrl = getAppUrl(request);
@@ -59,7 +59,8 @@ export async function GET(request: Request) {
   // reachable only via the state cookie /start itself set, but gated again
   // here in case that cookie/session's AAL state ever diverges.
   if (!(await hasAal2(supabase))) {
-    settingsUrl.searchParams.set("stripe_error", "This action requires two-factor verification. Complete your authenticator challenge and try again.");
+    settingsUrl.searchParams.set("stripe_error", AAL2_REQUIRED_RESPONSE_BODY.error);
+    settingsUrl.searchParams.set("aal2_required", AAL2_REQUIRED_CODE);
     return NextResponse.redirect(settingsUrl, 307);
   }
 

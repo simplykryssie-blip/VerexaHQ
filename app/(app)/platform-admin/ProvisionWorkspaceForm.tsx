@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
+import { useAal2Gate } from "@/components/mfa/Aal2GateProvider";
 
 const WORKSPACE_TYPES = [
   { value: "independent_ptin", label: "Independent PTIN" },
@@ -18,6 +19,7 @@ const WORKSPACE_TYPES = [
 export function ProvisionWorkspaceForm() {
   const router = useRouter();
   const toast = useToast();
+  const { handleAal2Response } = useAal2Gate();
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -38,6 +40,7 @@ export function ProvisionWorkspaceForm() {
     const result = await res.json().catch(() => null);
     setSaving(false);
     if (!res.ok) {
+      if (await handleAal2Response(res, result)) return;
       setError(result?.error ?? "Could not provision this workspace.");
       return;
     }

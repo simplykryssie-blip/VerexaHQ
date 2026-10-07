@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { deriveConnectStatus, fetchAccount } from "@/lib/stripe/client";
-import { hasAal2 } from "@/lib/auth/requireAal2";
+import { hasAal2, AAL2_REQUIRED_RESPONSE_BODY, AAL2_REQUIRED_STATUS } from "@/lib/auth/requireAal2";
 
 // account.updated is the only thing that flips stripe_charges_enabled/
 // stripe_payouts_enabled after the initial connect -- if that webhook isn't
@@ -26,10 +26,7 @@ export async function POST() {
   // consistently with start/disconnect even though this one only re-reads
   // status.
   if (!(await hasAal2(supabase))) {
-    return NextResponse.json(
-      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
-      { status: 403 }
-    );
+    return NextResponse.json(AAL2_REQUIRED_RESPONSE_BODY, { status: AAL2_REQUIRED_STATUS });
   }
 
   const { data: workspaceRow } = await supabase.from("workspaces").select("stripe_connected_account_id").eq("id", workspace.id).single();

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Mail, Phone, Pencil, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { useAal2Gate } from "@/components/mfa/Aal2GateProvider";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { WORKSPACE_STATUS_TONE } from "@/lib/workspaceStatus";
 
@@ -50,6 +51,7 @@ export function AccountHolderCard({ row }: { row: AccountHolderRow }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
+  const { handleAal2Response } = useAal2Gate();
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -87,6 +89,7 @@ export function AccountHolderCard({ row }: { row: AccountHolderRow }) {
       if (!res.ok) {
         const data = await res.json().catch(() => null);
         setSaving(false);
+        if (await handleAal2Response(res, data)) return;
         toast.show(data?.error ?? "Could not update email", "error");
         return;
       }

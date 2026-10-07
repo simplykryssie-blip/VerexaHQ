@@ -1,14 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { useAal2Gate } from "@/components/mfa/Aal2GateProvider";
 
 type Factor = { id: string; friendly_name: string | null; factor_type: string; status: string };
 
 export function MfaSetup() {
   const supabase = createClient();
   const toast = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { handleAal2Response } = useAal2Gate();
   const [factors, setFactors] = useState<Factor[]>([]);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
@@ -70,6 +75,16 @@ export function MfaSetup() {
     setFactorId(null);
     setCode("");
     loadFactors();
+
+    // Mirrors app/mfa-challenge/page.tsx's own ?next= handling -- lets the
+    // Aal2GateProvider dialog (and the persistent MfaSetupBanner) send an
+    // unenrolled user here and land them back on the exact page/action they
+    // started from once they've enrolled, instead of leaving them to guess
+    // where to go next. Only a same-origin relative path is honored.
+    const next = searchParams.get("next");
+    if (next && next.startsWith("/") && !next.startsWith("//")) {
+      router.push(next);
+    }
   }
 
   async function removeFactor(id: string) {
@@ -93,6 +108,7 @@ export function MfaSetup() {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
+      if (await handleAal2Response(response, result)) return;
       toast.show(result.error ?? "Could not remove this authenticator.", "error");
       return;
     }

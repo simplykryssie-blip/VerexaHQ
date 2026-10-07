@@ -136,7 +136,7 @@ export default async function DashboardPage() {
       { count: automationCount },
       { count: customRoleCount },
       { count: connectionCount },
-      { count: securityPolicyCount },
+      mfaFactorsResult,
     ] = await Promise.all([
       supabase.from("organizer_templates").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
       supabase.from("processes").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
@@ -157,8 +157,16 @@ export default async function DashboardPage() {
       showEroSteps
         ? supabase.from("firm_connections").select("id", { count: "exact", head: true }).eq("parent_workspace_id", workspace.id)
         : Promise.resolve({ count: null }),
-      supabase.from("workspace_security_policies").select("workspace_id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+      // The "security" step used to check for a workspace_security_policies
+      // row's mere existence -- that row can exist for reasons unrelated to
+      // MFA (password/session policy), so a workspace that touched any of
+      // those would show this step "complete" even for a user with zero
+      // MFA factors enrolled. Checking the user's own verified TOTP factor
+      // is the real signal this step is meant to represent (see Session
+      // 2026-10-07's MFA enrollment/UX remediation).
+      supabase.auth.mfa.listFactors(),
     ]);
+    const hasVerifiedMfaFactor = Boolean(mfaFactorsResult?.data?.totp?.some((f) => f.status === "verified"));
 
     // A photo is nice-to-have, not a gate -- a name is enough to call the profile "done".
     // Check first_name, not display_name -- display_name silently defaults to the user's
@@ -194,10 +202,10 @@ export default async function DashboardPage() {
       },
       {
         key: "security",
-        label: "Review your security setup",
-        description: "Set a password policy and turn on two-factor authentication for your own account.",
+        label: "Set up two-factor authentication",
+        description: "Required for sensitive actions like connecting Stripe, managing sending domains, and issuing refunds.",
         href: "/settings/security",
-        complete: (securityPolicyCount ?? 0) > 0,
+        complete: hasVerifiedMfaFactor,
       },
       ...(showEroSteps
         ? [

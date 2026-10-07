@@ -5,7 +5,7 @@ import { sendEmailViaResend } from "@/lib/email/resend";
 import { renderEmail } from "@/lib/email/template";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { canInviteStaff } from "@/lib/workspaceCapabilities";
-import { hasAal2 } from "@/lib/auth/requireAal2";
+import { hasAal2, AAL2_REQUIRED_RESPONSE_BODY, AAL2_REQUIRED_STATUS } from "@/lib/auth/requireAal2";
 
 export async function POST(request: Request) {
   const appUrl = new URL(request.url).origin;
@@ -39,10 +39,7 @@ export async function POST(request: Request) {
   // VEREXA-AAL-001: inviting new staff is a privilege-provisioning action
   // -- a password-only session must not be sufficient on its own.
   if (!(await hasAal2(supabase))) {
-    return NextResponse.json(
-      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
-      { status: 403 }
-    );
+    return NextResponse.json(AAL2_REQUIRED_RESPONSE_BODY, { status: AAL2_REQUIRED_STATUS });
   }
 
   const { data: invitation, error } = await supabase.rpc("create_workspace_invitation", {
