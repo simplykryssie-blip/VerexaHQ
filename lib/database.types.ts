@@ -5018,6 +5018,7 @@ export type Database = {
           id: string
           is_core: boolean
           key: string
+          min_workspace_tier: string | null
           module: string
           name: string
         }
@@ -5028,6 +5029,7 @@ export type Database = {
           id?: string
           is_core?: boolean
           key: string
+          min_workspace_tier?: string | null
           module: string
           name: string
         }
@@ -5038,6 +5040,7 @@ export type Database = {
           id?: string
           is_core?: boolean
           key?: string
+          min_workspace_tier?: string | null
           module?: string
           name?: string
         }
@@ -5463,6 +5466,8 @@ export type Database = {
       }
       firm_packages: {
         Row: {
+          agreement_template_id: string | null
+          audience: string | null
           billing_cadence: string | null
           created_at: string
           created_by: string | null
@@ -5470,7 +5475,10 @@ export type Database = {
           flat_price: number | null
           id: string
           name: string
+          product_type: string
+          provider_workspace_id: string | null
           purchase_purpose: string
+          relationship_type: string | null
           revenue_share_percent: number | null
           revenue_share_scope: string | null
           status: string
@@ -5482,6 +5490,8 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          agreement_template_id?: string | null
+          audience?: string | null
           billing_cadence?: string | null
           created_at?: string
           created_by?: string | null
@@ -5489,7 +5499,10 @@ export type Database = {
           flat_price?: number | null
           id?: string
           name: string
+          product_type?: string
+          provider_workspace_id?: string | null
           purchase_purpose?: string
+          relationship_type?: string | null
           revenue_share_percent?: number | null
           revenue_share_scope?: string | null
           status?: string
@@ -5501,6 +5514,8 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          agreement_template_id?: string | null
+          audience?: string | null
           billing_cadence?: string | null
           created_at?: string
           created_by?: string | null
@@ -5508,7 +5523,10 @@ export type Database = {
           flat_price?: number | null
           id?: string
           name?: string
+          product_type?: string
+          provider_workspace_id?: string | null
           purchase_purpose?: string
+          relationship_type?: string | null
           revenue_share_percent?: number | null
           revenue_share_scope?: string | null
           status?: string
@@ -5520,6 +5538,20 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "firm_packages_agreement_template_id_fkey"
+            columns: ["agreement_template_id"]
+            isOneToOne: false
+            referencedRelation: "engagement_letter_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firm_packages_provider_workspace_id_fkey"
+            columns: ["provider_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "firm_packages_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -12522,6 +12554,22 @@ export type Database = {
           },
         ]
       }
+      platform_products: {
+        Row: {
+          audience: string | null
+          created_at: string | null
+          description: string | null
+          id: string | null
+          name: string | null
+          price: number | null
+          product_type: string | null
+          provider_workspace_id: string | null
+          status: string | null
+          updated_at: string | null
+          workspace_id: string | null
+        }
+        Relationships: []
+      }
       v_engagement_progress: {
         Row: {
           document_progress_pct: number | null
@@ -16039,9 +16087,17 @@ export type Database = {
         }
         Returns: undefined
       }
+      workspace_has_capability: {
+        Args: { p_capability_key: string; p_workspace_id: string }
+        Returns: boolean
+      }
       workspace_is_active: {
         Args: { p_workspace_id: string }
         Returns: boolean
+      }
+      workspace_tier_rank: {
+        Args: { p_workspace_type: string }
+        Returns: number
       }
     }
     Enums: {

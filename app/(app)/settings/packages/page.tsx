@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function PackagesPage() {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
-  if (!isServiceBureauTier(workspace)) redirect("/settings/services");
+  if (!isServiceBureauTier(workspace)) redirect("/settings/products");
 
   const supabase = createClient();
   const [{ data: packages }, { data: canManage }] = await Promise.all([
@@ -24,6 +24,7 @@ export default async function PackagesPage() {
       .from("firm_packages")
       .select("id, name, description, status, flat_price, billing_cadence, revenue_share_percent, revenue_share_scope")
       .eq("workspace_id", workspace.id)
+      .eq("product_type", "package")
       .order("created_at"),
     supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
   ]);
