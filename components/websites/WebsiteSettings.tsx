@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { SectionImageUpload } from "@/components/pages/section-editors/SectionImageUpload";
 import { Button } from "@/components/ui/Button";
+import { hasVerifiedMfaFactorClient, aal2RecoveryPath, isAal2RequiredError } from "@/lib/auth/aal2Client";
 
 const inputClass = "mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
 const labelClass = "block text-xs font-medium uppercase tracking-wide text-muted";
@@ -74,13 +75,21 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
   const [ownershipChallenge, setOwnershipChallenge] = useState<OwnershipChallenge[] | null>(null);
   const mfaResumeStarted = useRef(false);
 
-  const redirectToMfaChallenge = useCallback((action: "connect" | "disconnect") => {
+  const redirectToMfaChallenge = useCallback(async (action: "connect" | "disconnect") => {
     const params = new URLSearchParams(window.location.search);
     params.set("tab", "settings");
     params.set("domainMfa", action);
     const returnPath = window.location.pathname + "?" + params.toString();
-    router.push("/mfa-challenge?next=" + encodeURIComponent(returnPath));
-  }, [router]);
+    // Previously always sent here to /mfa-challenge, which dead-ends with
+    // "No authenticator found on this account" for a user who has never
+    // enrolled MFA at all -- that page can only challenge an EXISTING
+    // factor. aal2RecoveryPath checks first and routes a zero-factor
+    // account to /settings/security (the actual enrollment flow) instead,
+    // same distinction components/mfa/Aal2GateProvider.tsx makes everywhere
+    // else this error can occur.
+    const hasFactor = await hasVerifiedMfaFactorClient(supabase);
+    router.push(aal2RecoveryPath(hasFactor, returnPath));
+  }, [router, supabase]);
 
   // Idempotent -- safe to call on every Connect/Verify click. Attaching a
   // domain that's already attached to this project just returns its
@@ -92,10 +101,7 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
     setAutomated(result.automated);
     setOwnershipChallenge(result.verification && result.verification.length > 0 ? result.verification : null);
     if (!res.ok && result.error) {
-      if (
-        res.status === 403 &&
-        result.error === "This action requires two-factor verification. Complete your authenticator challenge and try again."
-      ) {
+      if (isAal2RequiredError(result)) {
         return { ...result, requiresMfa: true };
       }
       toast.show(result.error, "error");
@@ -124,7 +130,7 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
     const attach = await attachDomain();
     if (attach.requiresMfa) {
       setSavingDomain(false);
-      redirectToMfaChallenge("connect");
+      void redirectToMfaChallenge("connect");
       return;
     }
     setSavingDomain(false);
@@ -136,8 +142,8 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
     if (!confirm(`Disconnect ${savedDomain}? Visitors on that domain will stop reaching this website.`)) return;
     const response = await fetch(`/api/websites/${website.id}/attach-domain`, { method: "DELETE" }).catch(() => null);
     const result = response ? ((await response.json().catch(() => null)) as AttachResult | null) : null;
-    if (response?.status === 403 && result?.error === "This action requires two-factor verification. Complete your authenticator challenge and try again.") {
-      redirectToMfaChallenge("disconnect");
+    if (response?.status === 403 && isAal2RequiredError(result)) {
+      void redirectToMfaChallenge("disconnect");
       return;
     }
     if (response && !response.ok) {
@@ -167,7 +173,7 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
       const attach = await attachDomain();
       if (attach.requiresMfa) {
         setVerifying(false);
-        redirectToMfaChallenge("connect");
+        void redirectToMfaChallenge("connect");
         return;
       }
     }

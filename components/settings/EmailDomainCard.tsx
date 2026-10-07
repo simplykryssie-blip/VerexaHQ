@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
+import { useAal2Gate } from "@/components/mfa/Aal2GateProvider";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { CopyIconButton, CopyRecordButton } from "@/components/CopyIconButton";
 import { formatDnsRecordForCopy } from "@/lib/dns/formatDnsRecordForCopy";
@@ -72,6 +73,7 @@ export function EmailDomainCard({ emailDomains, canAddAnother }: { emailDomains:
 
 function AddDomainForm({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
+  const { handleAal2Response } = useAal2Gate();
   const [domainInput, setDomainInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +90,10 @@ function AddDomainForm({ compact = false }: { compact?: boolean }) {
         body: JSON.stringify({ domain: domainInput.trim() }),
       });
       const data = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Could not add domain.");
+      if (!res.ok) {
+        if (await handleAal2Response(res, data)) return;
+        throw new Error(data.error ?? "Could not add domain.");
+      }
       setDomainInput("");
       router.refresh();
     } catch (err) {
@@ -134,6 +139,7 @@ function AddDomainForm({ compact = false }: { compact?: boolean }) {
 function SendingDomainCard({ domain, showPrimaryControls }: { domain: EmailDomain; showPrimaryControls: boolean }) {
   const router = useRouter();
   const toast = useToast();
+  const { handleAal2Response } = useAal2Gate();
   const [verifying, setVerifying] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [settingPrimary, setSettingPrimary] = useState(false);
@@ -171,7 +177,11 @@ function SendingDomainCard({ domain, showPrimaryControls }: { domain: EmailDomai
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ domainId: domain.id }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (await handleAal2Response(res, data)) return;
+        throw new Error();
+      }
       toast.show("Sending domain removed.", "success");
       router.refresh();
     } catch {
@@ -190,7 +200,10 @@ function SendingDomainCard({ domain, showPrimaryControls }: { domain: EmailDomai
         body: JSON.stringify({ domainId: domain.id }),
       });
       const data = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Could not set primary domain.");
+      if (!res.ok) {
+        if (await handleAal2Response(res, data)) return;
+        throw new Error(data.error ?? "Could not set primary domain.");
+      }
       toast.show(`${domain.domain} is now the primary sending domain.`, "success");
       router.refresh();
     } catch (err) {

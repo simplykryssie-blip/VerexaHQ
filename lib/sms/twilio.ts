@@ -1,5 +1,6 @@
 import { isSmsConfigured } from "@/lib/providerStatus";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getTwilioApiAuthHeader, getTwilioApiCredentials } from "@/lib/sms/twilioAuth";
 
 export type SendSmsResult = { sent: boolean; reason?: string; error?: string; id?: string };
 
@@ -37,7 +38,13 @@ export async function resolveSmsFromNumber(workspaceId: string, clientId?: strin
     return { ok: true, from: freeNumber.phone_number };
   }
 
-  return { ok: true, from: process.env.TWILIO_FROM_NUMBER! };
+  const fallback = process.env.TWILIO_FROM_NUMBER;
+  if (fallback) return { ok: true, from: fallback };
+
+  return {
+    ok: false,
+    reason: "This workspace does not have a provisioned SMS number yet.",
+  };
 }
 
 export async function sendSmsViaTwilio({
@@ -57,13 +64,17 @@ export async function sendSmsViaTwilio({
 
   // A paused number (balance couldn't cover its monthly fee) blocks the
   // send outright -- it never silently falls back to a different number.
-  let from = process.env.TWILIO_FROM_NUMBER!;
+  let from = process.env.TWILIO_FROM_NUMBER;
   if (workspaceId) {
     const resolved = await resolveSmsFromNumber(workspaceId, clientId);
     if (!resolved.ok) {
       return { sent: false, reason: resolved.reason };
     }
     from = resolved.from;
+  }
+
+  if (!from) {
+    return { sent: false, reason: "No SMS sending number is configured for this workspace." };
   }
 
   // Same free-bucket-then-prepaid-balance draw as sendEmailViaResend --
@@ -79,13 +90,16 @@ export async function sendSmsViaTwilio({
     reservedSource = reservation.source;
   }
 
-  const accountSid = process.env.TWILIO_ACCOUNT_SID!;
-  const authToken = process.env.TWILIO_AUTH_TOKEN!;
+  const credentials = getTwilioApiCredentials();
+  const authHeader = getTwilioApiAuthHeader();
+  if (!credentials || !authHeader) {
+    return { sent: false, reason: "SMS provider credentials are incomplete for this environment." };
+  }
 
-  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${credentials.accountSid}/Messages.json`, {
     method: "POST",
     headers: {
-      Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`,
+      Authorization: authHeader,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams({ To: to, From: from, Body: body }),

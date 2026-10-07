@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { deauthorizeOAuthAccount } from "@/lib/stripe/client";
-import { hasAal2 } from "@/lib/auth/requireAal2";
+import { hasAal2, AAL2_REQUIRED_RESPONSE_BODY, AAL2_REQUIRED_STATUS } from "@/lib/auth/requireAal2";
 
 export async function POST() {
   const workspace = await getCurrentWorkspace();
@@ -19,10 +19,7 @@ export async function POST() {
   // VEREXA-AAL-001: disconnecting Stripe disrupts this workspace's payouts
   // -- a password-only session must not be sufficient on its own.
   if (!(await hasAal2(supabase))) {
-    return NextResponse.json(
-      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
-      { status: 403 }
-    );
+    return NextResponse.json(AAL2_REQUIRED_RESPONSE_BODY, { status: AAL2_REQUIRED_STATUS });
   }
 
   const { data: workspaceRow } = await supabase.from("workspaces").select("stripe_connected_account_id").eq("id", workspace.id).single();

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace, workspaceOperationalError, isWorkspaceStatusOperational } from "@/lib/workspace";
 import { getSubscriptionPrimaryItemId, updateSubscriptionItemQuantity } from "@/lib/stripe/client";
-import { hasAal2 } from "@/lib/auth/requireAal2";
+import { hasAal2, AAL2_REQUIRED_RESPONSE_BODY, AAL2_REQUIRED_STATUS } from "@/lib/auth/requireAal2";
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const workspace = await getCurrentWorkspace();
@@ -19,10 +19,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   // connected firm -- a password-only session must not be sufficient on
   // its own.
   if (!(await hasAal2(supabase))) {
-    return NextResponse.json(
-      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
-      { status: 403 }
-    );
+    return NextResponse.json(AAL2_REQUIRED_RESPONSE_BODY, { status: AAL2_REQUIRED_STATUS });
   }
 
   const { data: connection, error } = await supabase.rpc("release_firm_connection_billing", { p_connection_id: params.id });

@@ -201,9 +201,8 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "ERO Profile", href: "/settings/firm-profile", icon: Building2 },
   { label: "Plan & Usage", href: "/settings/plan-usage", icon: CreditCard },
   { label: "Branding", href: "/settings/brand-center", icon: Palette },
-  { label: "Services", href: "/settings/services", icon: Package },
+  { label: "Products", href: "/settings/products", icon: Package },
   { label: "Locations", href: "/settings/locations", icon: MapPin },
-  { label: "Packages", href: "/settings/packages", icon: Handshake },
   { label: "Banks & Software", href: "/settings/bank-partners", icon: Wallet },
   { label: "Users & Staff", href: "/settings/users", icon: Users },
   { label: "Roles & Permissions", href: "/settings/roles", icon: KeyRound },
@@ -222,7 +221,7 @@ const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Personal", itemLabels: ["Profile"] },
   {
     label: "Firm",
-    itemLabels: ["ERO Profile", "Plan & Usage", "Branding", "Services", "Packages", "Banks & Software", "Users & Staff", "Roles & Permissions"],
+    itemLabels: ["ERO Profile", "Plan & Usage", "Branding", "Products", "Banks & Software", "Users & Staff", "Roles & Permissions"],
   },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];
@@ -239,5 +238,5 @@ export const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = SETTINGS_SECTION_MEMB
 // sub-pages instead of going dark.
 export const SETTINGS_GROUPED_HREFS: Record<string, string[]> = {
   "/settings/profile": ["/settings/profile", "/settings/security", "/settings/availability", "/settings/notifications"],
-  "/settings/services": ["/settings/services", "/settings/locations", "/settings/tags"],
+  "/settings/products": ["/settings/products", "/settings/services", "/settings/packages", "/settings/locations", "/settings/tags"],
 };

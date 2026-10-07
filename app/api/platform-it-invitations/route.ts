@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendEmailViaResend } from "@/lib/email/resend";
 import { renderEmail } from "@/lib/email/template";
-import { hasAal2 } from "@/lib/auth/requireAal2";
+import { hasAal2, AAL2_REQUIRED_RESPONSE_BODY, AAL2_REQUIRED_STATUS } from "@/lib/auth/requireAal2";
 
 export async function POST(request: Request) {
   const appUrl = new URL(request.url).origin;
@@ -16,10 +16,7 @@ export async function POST(request: Request) {
   // VEREXA-AAL-001: granting platform IT access is a privilege-provisioning
   // action -- a password-only session must not be sufficient on its own.
   if (!(await hasAal2(supabase))) {
-    return NextResponse.json(
-      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
-      { status: 403 }
-    );
+    return NextResponse.json(AAL2_REQUIRED_RESPONSE_BODY, { status: AAL2_REQUIRED_STATUS });
   }
 
   const { email } = (await request.json().catch(() => null)) as { email?: string } | null ?? {};

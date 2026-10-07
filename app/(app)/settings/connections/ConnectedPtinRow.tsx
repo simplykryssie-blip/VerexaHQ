@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { useAal2Gate } from "@/components/mfa/Aal2GateProvider";
 
 export type ReviewerOption = { id: string; display_name: string | null };
 
@@ -37,6 +38,7 @@ export function ConnectedPtinRow({
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
+  const { handleAal2Response } = useAal2Gate();
   const [busy, setBusy] = useState<string | null>(null);
 
   async function toggleComms() {
@@ -116,6 +118,7 @@ export function ConnectedPtinRow({
     const data = await res.json();
     setBusy(null);
     if (!res.ok) {
+      if (await handleAal2Response(res, data)) return;
       toast.show(data.error ?? "Could not update billing.", "error");
       return;
     }
@@ -134,6 +137,7 @@ export function ConnectedPtinRow({
     const data = await res.json();
     setBusy(null);
     if (!res.ok) {
+      if (await handleAal2Response(res, data)) return;
       toast.show(data.error ?? "Could not disconnect.", "error");
       return;
     }

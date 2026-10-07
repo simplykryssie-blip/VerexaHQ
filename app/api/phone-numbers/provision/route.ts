@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { isSmsConfigured } from "@/lib/providerStatus";
+import { getTwilioApiAuthHeader, getTwilioApiCredentials } from "@/lib/sms/twilioAuth";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { getCurrentWorkspace, workspaceOperationalError, isWorkspaceStatusOperational } from "@/lib/workspace";
 
@@ -42,9 +43,15 @@ export async function POST(request: Request) {
 
   const { areaCode } = (await request.json().catch(() => ({}))) as { areaCode?: string };
 
-  const accountSid = process.env.TWILIO_ACCOUNT_SID!;
-  const authToken = process.env.TWILIO_AUTH_TOKEN!;
-  const authHeader = `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`;
+  const credentials = getTwilioApiCredentials();
+  const authHeader = getTwilioApiAuthHeader();
+  if (!credentials || !authHeader) {
+    return NextResponse.json(
+      { configured: false, reason: "Twilio API credentials are incomplete for this environment." },
+      { status: 200 }
+    );
+  }
+  const accountSid = credentials.accountSid;
 
   const searchParams = new URLSearchParams({ SmsEnabled: "true", VoiceEnabled: "true" });
   if (areaCode) searchParams.set("AreaCode", areaCode);

@@ -332,6 +332,7 @@ export function StepCard({
   engagementLetterTemplates,
   documentRequestTemplates,
   services,
+  products = [],
   serviceCategories,
   pipelines,
   staffOptions,
@@ -354,6 +355,7 @@ export function StepCard({
   engagementLetterTemplates: TemplateOption[];
   documentRequestTemplates: TemplateOption[];
   services: TemplateOption[];
+  products?: TemplateOption[];
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
   staffOptions: StaffOption[];
@@ -760,6 +762,7 @@ export function StepCard({
                 }}
                 staffOptions={staffOptions}
                 services={services}
+                products={products}
                 serviceCategories={serviceCategories}
                 pipelines={pipelines}
                 organizerTemplates={organizerTemplates}
@@ -1971,6 +1974,7 @@ export function WorkflowBuilder({
   engagementLetterTemplates,
   documentRequestTemplates,
   services = [],
+  products = [],
   serviceCategories = [],
   pipelines = [],
   staffOptions = [],
@@ -2000,6 +2004,7 @@ export function WorkflowBuilder({
   engagementLetterTemplates: TemplateOption[];
   documentRequestTemplates: TemplateOption[];
   services?: TemplateOption[];
+  products?: TemplateOption[];
   serviceCategories?: TemplateOption[];
   pipelines?: PipelineOption[];
   staffOptions?: StaffOption[];
@@ -2278,6 +2283,7 @@ export function WorkflowBuilder({
             engagementLetterTemplates={engagementLetterTemplates}
             documentRequestTemplates={documentRequestTemplates}
             services={services}
+            products={products}
             serviceCategories={serviceCategories}
             pipelines={pipelines}
             staffOptions={staffOptions}
@@ -2359,6 +2365,7 @@ export function WorkflowBuilder({
                 onChange={setConditions}
                 staffOptions={staffOptions}
                 services={services}
+                products={products}
                 serviceCategories={serviceCategories}
                 pipelines={pipelines}
                 organizerTemplates={organizerTemplates}

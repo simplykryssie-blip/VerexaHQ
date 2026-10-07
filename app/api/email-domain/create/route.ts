@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace, workspaceOperationalError, isWorkspaceStatusOperational } from "@/lib/workspace";
 import { createResendDomain } from "@/lib/email/domains";
 import { canUseMultipleSendingDomains } from "@/lib/workspaceCapabilities";
-import { hasAal2 } from "@/lib/auth/requireAal2";
+import { hasAal2, AAL2_REQUIRED_RESPONSE_BODY, AAL2_REQUIRED_STATUS } from "@/lib/auth/requireAal2";
 
 export async function POST(request: Request) {
   const workspace = await getCurrentWorkspace();
@@ -25,10 +25,7 @@ export async function POST(request: Request) {
   // if taken over, so a password-only session must not be sufficient on
   // its own.
   if (!(await hasAal2(supabase))) {
-    return NextResponse.json(
-      { error: "This action requires two-factor verification. Complete your authenticator challenge and try again." },
-      { status: 403 }
-    );
+    return NextResponse.json(AAL2_REQUIRED_RESPONSE_BODY, { status: AAL2_REQUIRED_STATUS });
   }
 
   const { domain } = (await request.json()) as { domain?: string };

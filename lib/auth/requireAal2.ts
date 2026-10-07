@@ -45,3 +45,19 @@ export async function hasAal2(supabase: SupabaseClient): Promise<boolean> {
   if (!accessToken) return false;
   return decodeAalClaim(accessToken) === "aal2";
 }
+
+// Machine-readable companion to the human error string every hasAal2() call
+// site returns on a 403 -- added so the client can distinguish "blocked on
+// AAL2" from any other 403 (a permission denial, a validation error) without
+// matching on the exact wording, which is fragile and not meant to be an
+// API contract. Every hasAal2() call site should return this exact object
+// (see AAL2_REQUIRED_STATUS for the status code), so a single client-side
+// handler (useAal2Gate(), components/mfa/Aal2GateProvider.tsx) can catch
+// all of them instead of each caller re-implementing its own dead-end error
+// message. See Session 2026-10-07's MFA enrollment/UX remediation.
+export const AAL2_REQUIRED_CODE = "aal2_required" as const;
+export const AAL2_REQUIRED_STATUS = 403;
+export const AAL2_REQUIRED_RESPONSE_BODY = {
+  error: "This action requires two-factor verification. Complete your authenticator challenge and try again.",
+  code: AAL2_REQUIRED_CODE,
+} as const;

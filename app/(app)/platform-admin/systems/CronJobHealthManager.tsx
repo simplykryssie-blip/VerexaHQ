@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Play } from "lucide-react";
 import { useToast } from "@/components/Toast";
 import { Badge } from "@/components/ui/Badge";
+import { useAal2Gate } from "@/components/mfa/Aal2GateProvider";
 
 export type CronJobHealthRow = {
   jobKey: string;
@@ -24,6 +25,7 @@ function formatInterval(minutes: number) {
 export function CronJobHealthManager({ jobs }: { jobs: CronJobHealthRow[] }) {
   const router = useRouter();
   const toast = useToast();
+  const { handleAal2Response } = useAal2Gate();
   const [running, setRunning] = useState<string | null>(null);
 
   async function runNow(jobKey: string) {
@@ -36,6 +38,7 @@ export function CronJobHealthManager({ jobs }: { jobs: CronJobHealthRow[] }) {
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
+        if (await handleAal2Response(res, data)) return;
         toast.show(data.error ?? "Could not run this job.", "error");
         return;
       }

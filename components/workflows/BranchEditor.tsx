@@ -64,6 +64,7 @@ export function BranchEditor({
   targetLabels,
   staffOptions,
   services,
+  products = [],
   serviceCategories,
   pipelines,
   organizerTemplates,
@@ -82,6 +83,7 @@ export function BranchEditor({
   targetLabels: Record<string, string>;
   staffOptions: StaffOption[];
   services: TemplateOption[];
+  products?: TemplateOption[];
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
   organizerTemplates: TemplateOption[];
@@ -319,6 +321,7 @@ export function BranchEditor({
               onChange={(next) => updateBranch(b.clientKey, { conditions: next })}
               staffOptions={staffOptions}
               services={services}
+              products={products}
               serviceCategories={serviceCategories}
               pipelines={pipelines}
               organizerTemplates={organizerTemplates}

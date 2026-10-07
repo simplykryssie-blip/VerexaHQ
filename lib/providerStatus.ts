@@ -11,18 +11,18 @@
 // path, never sends a real signature request either).
 
 import { liveSendsAllowed } from "@/lib/env";
+import { getTwilioApiCredentials } from "@/lib/sms/twilioAuth";
 
 export function isEmailConfigured() {
   return liveSendsAllowed() && !!process.env.RESEND_API_KEY;
 }
 
 export function isSmsConfigured() {
-  return (
-    liveSendsAllowed() &&
-    !!process.env.TWILIO_ACCOUNT_SID &&
-    !!process.env.TWILIO_AUTH_TOKEN &&
-    !!process.env.TWILIO_FROM_NUMBER
-  );
+  // Verexa owns the master Twilio account. Outbound REST authentication
+  // requires the server-side Account SID + API Key SID + API Key Secret.
+  // A global TWILIO_FROM_NUMBER is not required because sends normally
+  // resolve a workspace/client-specific number.
+  return liveSendsAllowed() && !!getTwilioApiCredentials();
 }
 
 export function isStripeConfigured() {
