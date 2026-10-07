@@ -94,7 +94,15 @@ export async function handleExternalPartnerPurchaseCheckoutCompleted(
       // Optional per package: only populated when the Payment Link has a
       // custom field keyed "business_name" configured and the purchaser
       // filled it in.
-      p_business_name: customFieldValue(session.custom_fields, BUSINESS_NAME_CUSTOM_FIELD_KEY),
+      // The `as unknown as string | undefined` below is a type-only cast,
+      // not a behavior change -- Supabase's generated Args type marks a
+      // DEFAULT NULL param as optional but never nullable (a known
+      // generator limitation, consistent across every such param in
+      // lib/database.types.ts), so the real `null` this intentionally
+      // sends (see the contract test in
+      // partner-purchase-external-webhook.test.ts) doesn't type-check
+      // against it even though it's exactly what the RPC expects.
+      p_business_name: customFieldValue(session.custom_fields, BUSINESS_NAME_CUSTOM_FIELD_KEY) as unknown as string | undefined,
     })
     .maybeSingle();
 
