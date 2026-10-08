@@ -17,7 +17,7 @@ type ClientRow = {
   last_name: string | null;
   business_name: string | null;
   client_type: string;
-  lifecycle_status: string | null;
+  tags: string[] | null;
 };
 
 type EngagementRow = {
@@ -74,7 +74,7 @@ export default async function PipelinesPage({ searchParams }: { searchParams: { 
 
     const [{ data: clientsData }, { data: engagementsData }] = await Promise.all([
       clientRunIds.length > 0
-        ? supabase.from("clients").select("id, first_name, last_name, business_name, client_type, lifecycle_status").in("id", clientRunIds)
+        ? supabase.from("clients").select("id, first_name, last_name, business_name, client_type, tags").in("id", clientRunIds)
         : Promise.resolve({ data: [] as ClientRow[] }),
       engagementRunIds.length > 0
         ? supabase
@@ -100,7 +100,7 @@ export default async function PipelinesPage({ searchParams }: { searchParams: { 
           entityId: c.id,
           processStageId,
           title: clientLabel(c),
-          subtitle: c.lifecycle_status,
+          subtitle: (c.tags ?? []).join(", ") || null,
           badge: null,
           href: `/clients/${c.id}`,
         });
