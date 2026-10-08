@@ -73,6 +73,17 @@ export async function POST(request: Request) {
   }
 
   const providerWorkspaceId = product.provider_workspace_id ?? product.workspace_id;
+
+  // The purchasing workspace's own suspension is already checked above; this
+  // covers the other half (Phase 4A) -- the selling (or reselling) firm's own
+  // workspace can be suspended independently, and nothing else in this route
+  // ever looks at it, so a suspended firm could otherwise keep collecting
+  // product sales. Mirrors /api/firm-packages/checkout's same check.
+  const { data: sellerOperational } = await supabase.rpc("is_workspace_operational", { p_workspace_id: providerWorkspaceId });
+  if (!sellerOperational) {
+    return NextResponse.json({ error: "This product is temporarily unavailable for purchase." }, { status: 403 });
+  }
+
   const connectAccount = await getWorkspaceConnectAccount(supabase, providerWorkspaceId);
   if (!connectAccount.ok) {
     return NextResponse.json({ configured: false, reason: connectAccount.reason }, { status: 200 });
@@ -94,7 +105,10 @@ export async function POST(request: Request) {
     .select("id")
     .single();
   if (purchaseError || !purchase) {
-    return NextResponse.json({ error: purchaseError?.message ?? "Could not start checkout." }, { status: 400 });
+    const message = purchaseError?.message.includes("firm_package_purchases_active_per_client")
+      ? "This client already has a purchase in progress or active for this product."
+      : (purchaseError?.message ?? "Could not start checkout.");
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   const appUrl = getAppUrl(request);

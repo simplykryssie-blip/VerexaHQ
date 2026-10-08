@@ -293,6 +293,25 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
     .eq("status", "published")
     .order("name");
 
+  // Purchase + Payment V1: this workspace's own sellable catalog items
+  // (digital_product/service -- "package" is sold to connected firms via
+  // /settings/firm-profile's PackageCheckoutCard, not here) plus this
+  // client's own purchase history against them, so the Billing tab can
+  // offer a direct "sell to this client" checkout.
+  const { data: sellableProducts } = await supabase
+    .from("firm_packages")
+    .select("id, name, description, product_type, flat_price, billing_cadence")
+    .eq("workspace_id", workspace.id)
+    .eq("status", "published")
+    .in("product_type", ["digital_product", "service"])
+    .order("name");
+
+  const { data: clientProductPurchases } = await supabase
+    .from("firm_package_purchases")
+    .select("id, package_id, status, billing_cadence, amount, current_period_end")
+    .eq("client_id", client.id)
+    .order("created_at", { ascending: false });
+
   const pendingOrganizerTemplateIds = Array.from(
     new Set(
       (organizerResponses ?? [])
@@ -672,6 +691,8 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
       review_note: o.review_note,
     })),
     workspaceServices: workspaceServices ?? [],
+    sellableProducts: sellableProducts ?? [],
+    clientProductPurchases: clientProductPurchases ?? [],
     documentRequestTemplates: documentRequestTemplates ?? [],
     engagementLetterTemplates: engagementLetterTemplates ?? [],
     paymentPlansByInvoice,

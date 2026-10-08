@@ -113,6 +113,22 @@ export type ClientWorkspaceProps = {
   pendingOrganizerTemplateIds: string[];
   organizerResponses: OrganizerResponseRow[];
   workspaceServices: { id: string; name: string }[];
+  sellableProducts: {
+    id: string;
+    name: string;
+    description: string | null;
+    product_type: string;
+    flat_price: number | null;
+    billing_cadence: string | null;
+  }[];
+  clientProductPurchases: {
+    id: string;
+    package_id: string;
+    status: string;
+    billing_cadence: string | null;
+    amount: number | null;
+    current_period_end: string | null;
+  }[];
   engagementLetterTemplates: { id: string; name: string; body_html: string }[];
   appointments: AppointmentRow[];
   staffOptions: StaffOption[];

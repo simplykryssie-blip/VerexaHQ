@@ -60,6 +60,8 @@ export function ClientTabsBody({
     outstandingBalance,
     organizerResponses,
     workspaceServices,
+    sellableProducts,
+    clientProductPurchases,
     interestedServiceIds,
     documentFolders,
     documents,
@@ -173,6 +175,8 @@ export function ClientTabsBody({
             canManageBilling={permissions.billingManage}
             workspaceServices={workspaceServices}
             bankProductTransactions={bankProductTransactions}
+            sellableProducts={sellableProducts}
+            clientProductPurchases={clientProductPurchases}
           />
         )}
         {tab === "Notes" && <NotesTab clientId={client.id} workspaceId={workspace.id} notes={notes} />}
