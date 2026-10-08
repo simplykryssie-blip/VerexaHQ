@@ -51,7 +51,7 @@ export default async function PreparerProfilePage({ params }: { params: { userId
     supabase.from("user_profiles").select("display_name, avatar_url, phone, ptin_last4, last_seen_at").eq("id", member.user_id).maybeSingle(),
     supabase
       .from("clients")
-      .select("id, first_name, last_name, business_name, client_type, lifecycle_status")
+      .select("id, first_name, last_name, business_name, client_type, tags")
       .eq("workspace_id", workspace.id)
       .eq("relationship_manager_id", member.user_id)
       .limit(200),
@@ -60,7 +60,7 @@ export default async function PreparerProfilePage({ params }: { params: { userId
     // two lists get merged and de-duplicated by client id below.
     supabase
       .from("engagements")
-      .select("client_id, clients(id, first_name, last_name, business_name, client_type, lifecycle_status)")
+      .select("client_id, clients(id, first_name, last_name, business_name, client_type, tags)")
       .eq("workspace_id", workspace.id)
       .eq("assigned_staff_id", member.user_id)
       .limit(200),
