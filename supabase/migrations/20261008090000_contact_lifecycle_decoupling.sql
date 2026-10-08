@@ -600,10 +600,11 @@ begin
     $$          v_step.action_config->>'primary_phone',
           coalesce(nullif(v_step.action_config->>'lifecycle_status', ''), 'lead')$$,
     $$          v_step.action_config->>'primary_phone',
-          coalesce(
-            nullif(v_step.action_config->>'tag', ''),
-            nullif(v_step.action_config->>'tags', '')
-          )::text[]$$
+          case
+            when nullif(v_step.action_config->>'tag', '') is not null
+              then array[v_step.action_config->>'tag']::text[]
+            else '{}'::text[]
+          end$$
   );
 
   if position('lifecycle_status' in v_def) > 0
