@@ -566,11 +566,12 @@ begin
     'elsif v_step.action_type = ''mark_contact_lost'' then');
   v_def := replace(v_def,
     'update public.clients set lifecycle_status = ''lost'', lost_reason = v_step.action_config->>''reason'', lost_at = now() where id = v_run.client_id;',
-    $update public.clients
+    $update$
+update public.clients
       set lost_reason = v_step.action_config->>'reason',
           lost_at = now(),
           tags = array_remove(array(select distinct unnest(coalesce(tags, '{}'::text[]) || array['Lost']::text[])), 'Lead')
-      where id = v_run.client_id;$);
+      where id = v_run.client_id;$update$);
   v_def := replace(v_def,
     'elsif v_step.action_type = ''convert_lead_to_client'' then',
     'elsif false then');
