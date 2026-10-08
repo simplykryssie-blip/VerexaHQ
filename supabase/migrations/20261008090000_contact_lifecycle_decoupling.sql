@@ -560,6 +560,7 @@ begin
 
   -- Genericize the service-pipeline action name.
   v_def := replace(v_def, 'move_lead_to_service_pipeline', 'move_to_service_pipeline');
+  v_def := replace(v_def, 'mark_lead_lost', 'mark_contact_lost');
 
   -- Lost is an operational disposition, not Contact identity.
   v_def := replace(
