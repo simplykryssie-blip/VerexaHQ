@@ -365,7 +365,7 @@ export function TriggerFields({
             className="rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
           <span className="mt-1 text-[11px] normal-case text-muted">
-            POST JSON to this URL. An <code>email</code> or <code>phone</code> field finds or creates a matching lead; every
+            POST JSON to this URL. An <code>email</code> or <code>phone</code> field finds or creates a matching contact; every
             field in the body becomes available to this run&apos;s conditions and merge fields.
           </span>
         </div>
