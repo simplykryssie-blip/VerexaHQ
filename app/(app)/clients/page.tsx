@@ -245,7 +245,6 @@ export default async function ClientsPage({
   // drops the others.
   const activeParams = (
     [
-      ["status", status],
       ["tag", tag],
       ["q", q],
       ["service", serviceFilter],
@@ -324,8 +323,6 @@ export default async function ClientsPage({
             emptyMessage={
               q || serviceFilter || staffFilter || stageFilter || missingDocuments || outstandingBalance || clientType || hasEmail !== undefined || hasPhone !== undefined
                 ? "No contacts match this search."
-                : status
-                ? `No clients with status "${STATUS_FILTERS.find((f) => f.value === status)?.label}".`
                 : "No clients yet. Add your first client to get started."
             }
             emptyAction={
