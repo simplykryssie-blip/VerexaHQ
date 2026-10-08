@@ -107,7 +107,7 @@ async function sendEmail(to: string, code: string) {
 }
 
 async function sendVerification(email: string) {
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(email) || email.length > 254) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || email.length > 254) {
     throw new Error("Please enter a valid email address.");
   }
 

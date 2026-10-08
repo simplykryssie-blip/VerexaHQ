@@ -31,7 +31,15 @@ function isAppHostname(hostname: string): boolean {
 // booking page. Mirrors the client-facing subset of ALWAYS_PUBLIC_PATHS in
 // lib/supabase/middleware.ts (auth/reset-password/etc. aren't included --
 // those are staff-facing app URLs, not links meant to be shared externally).
-const CROSS_DOMAIN_SAFE_PATH_PREFIXES = ["/o/", "/e/", "/sign/", "/book/", "/api/o/", "/api/e/"];
+// /api/wisp/ covers any custom_html funnel section's calls into the WISP
+// Builder's verification/capture API (app/api/wisp/verify) -- without this,
+// a POST from a published site on its own custom domain (the normal case;
+// see the WISP Generator page) gets caught by the rewrite below, which only
+// ever looks at the first path segment as a page slug ("api", here) and
+// 404s. Platform-wide fix: this isn't specific to any one funnel/workspace,
+// it's what makes this whole class of client-facing API call work on any
+// custom domain, the same way /api/o/ and /api/e/ already do.
+const CROSS_DOMAIN_SAFE_PATH_PREFIXES = ["/o/", "/e/", "/sign/", "/book/", "/api/o/", "/api/e/", "/api/wisp/"];
 
 export async function middleware(request: NextRequest) {
   // The raw Host header, not request.nextUrl.hostname -- in local dev,
