@@ -409,6 +409,8 @@ end;
 $function$;
 
 -- Remove the old Lead-specific trigger functions before the Contact column is dropped.
+drop trigger if exists trg_validate_client_lifecycle_status on public.clients;
+drop function if exists public.validate_client_lifecycle_status();
 drop trigger if exists trg_fire_lead_assigned_automations on public.clients;
 drop trigger if exists trg_fire_lead_created_automations on public.clients;
 drop trigger if exists trg_fire_lead_status_changed_automations on public.clients;
