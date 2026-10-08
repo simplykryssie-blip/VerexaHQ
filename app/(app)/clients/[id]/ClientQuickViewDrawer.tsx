@@ -76,7 +76,7 @@ export function fullRecordHref(clientId: string, tab?: ClientTab): string {
  * the exact same ClientTabsBody the full page renders (Details/Tasks/
  * Documents/Messages/Billing/Notes, fully editable) inline in the drawer --
  * not a quick view at all, just the complete record in a slide-over. Now a
- * true snapshot: identity, status, the same "attention required" banner,
+ * true snapshot: identity, tags, the same "attention required" banner,
  * one stat grid whose tiles link to the relevant tab on the full page
  * instead of rendering it inline, the health/risk/cross-sell insight cards,
  * and a short recent-activity list. Every one of those was already
@@ -172,7 +172,7 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
             
             
             
-            <ArchiveClientButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
+            <ArchiveClientButton clientId={client.id} archivedAt={client.archived_at} lostAt={client.lost_at} />
             <QuickActions
               clientId={client.id}
               workspaceId={workspace.id}
