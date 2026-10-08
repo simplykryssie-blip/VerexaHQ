@@ -75,10 +75,14 @@ export async function getCurrentWorkspace(): Promise<CurrentWorkspace | null> {
 // feature that suspension/archive correctly blocks) -- plus the
 // released-staff "Set Up My Billing" flow, which briefly loads pages in the
 // suspended personal workspace's own context before redirecting to Stripe
-// Checkout. Used identically for suspended/archived/permanently_archived --
-// none of them invent a narrower or wider recovery surface than what
-// already exists for suspension.
-const SUSPENSION_ALLOWED_PATH_PREFIXES = ["/settings/plan-usage", "/settings/profile", "/support"];
+// Checkout, and /settings/domains -- a customer-owned domain must stay
+// self-service releasable even when this workspace can't pay, or leaving
+// Verexa requires contacting support to get it released (see
+// release_workspace_email_domain/release_website_custom_domain). Used
+// identically for suspended/archived/permanently_archived -- none of them
+// invent a narrower or wider recovery surface than what already exists for
+// suspension.
+const SUSPENSION_ALLOWED_PATH_PREFIXES = ["/settings/plan-usage", "/settings/profile", "/settings/domains", "/support"];
 
 export function isSuspensionRecoveryPath(pathname: string): boolean {
   return SUSPENSION_ALLOWED_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"));

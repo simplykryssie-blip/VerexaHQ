@@ -110,6 +110,7 @@ export default async function IntegrationsPage({
     .from("workspace_email_domains")
     .select("id, domain, status, dns_records, from_local_part, is_primary")
     .eq("workspace_id", workspace!.id)
+    .is("released_at", null)
     .order("is_primary", { ascending: false })
     .order("created_at", { ascending: true });
 

@@ -15336,6 +15336,14 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      release_website_custom_domain: {
+        Args: { p_website_id: string };
+        Returns: undefined;
+      };
+      release_workspace_email_domain: {
+        Args: { p_domain_id: string };
+        Returns: undefined;
+      };
       rename_process_stage: {
         Args: { p_new_name: string; p_stage_id: string };
         Returns: undefined;
