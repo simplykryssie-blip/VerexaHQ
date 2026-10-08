@@ -6,8 +6,8 @@
 // the dedicated mark_client_lost RPC because it cascades engagements,
 // invoices, and document requests.
 export type ContactDispositionRow = {
-  archived_at: string | null;
-  lost_at: string | null;
+  archived_at?: string | null;
+  lost_at?: string | null;
 };
 
 export function isEligibleForBulkArchive(row: ContactDispositionRow): boolean {
