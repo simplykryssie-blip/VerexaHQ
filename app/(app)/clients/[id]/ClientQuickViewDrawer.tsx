@@ -7,11 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatTile } from "@/components/ui/StatTile";
 import { QuickActions } from "./QuickActions";
-import { ConvertLeadButton } from "./ConvertLeadButton";
-import { RevertToLeadButton } from "./RevertToLeadButton";
-import { MarkLeadLostButton } from "./MarkLeadLostButton";
 import { ArchiveClientButton } from "./ArchiveClientButton";
-import { clientStatusTone } from "@/lib/clientStatus";
 import { formatPhone } from "@/lib/phone";
 import { displayName, type ClientTab } from "./ClientTabsBody";
 import { ClientInsightWidgets } from "./ClientInsightWidgets";
@@ -167,17 +163,15 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <Badge tone={clientStatusTone(client.lifecycle_status)} className="capitalize">
-              {client.lifecycle_status}
-            </Badge>
+            
             {portalStatus && <Badge tone="accent">{portalStatus}</Badge>}
             <span className="text-xs capitalize text-muted">{client.client_type}</span>
           </div>
 
           <div className="mt-3 flex items-center gap-2">
-            <ConvertLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
-            <RevertToLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
-            <MarkLeadLostButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
+            
+            
+            
             <ArchiveClientButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
             <QuickActions
               clientId={client.id}
