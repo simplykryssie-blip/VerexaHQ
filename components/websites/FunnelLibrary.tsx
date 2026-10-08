@@ -176,9 +176,33 @@ export function FunnelLibrary({
                     </Badge>
                   )}
                 </div>
-                <Link href={`/websites/${websiteId}/funnels/${f.id}`} className={buttonClasses("secondary", "sm", "mt-4")}>
-                  {canManage ? "Manage" : "View"}
-                </Link>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <Link href={`/websites/${websiteId}/funnels/${f.id}`} className={buttonClasses("secondary", "sm")}>
+                    {canManage ? "Manage" : "View"}
+                  </Link>
+                  {f.entry_page_slug && (
+                    <a
+                      href={getFunnelUrl(f.entry_page_slug) ?? "#"}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={buttonClasses("secondary", "sm")}
+                    >
+                      <ExternalLink size={14} aria-hidden="true" /> View Live
+                    </a>
+                  )}
+                </div>
+                {f.entry_page_slug && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = getFunnelUrl(f.entry_page_slug);
+                      if (url) void copyFunnelUrl(url);
+                    }}
+                    className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted transition hover:border-accent hover:text-accent"
+                  >
+                    <Copy size={13} aria-hidden="true" /> Copy funnel link
+                  </button>
+                )}
               </div>
             ))}
           </div>
