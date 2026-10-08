@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Tag, Download, X, UserCog, Tags as TagsIcon, Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import { Tag, Download, X, UserCog, Tags as TagsIcon, ChevronDown, Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/Confirm";
