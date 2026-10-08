@@ -549,42 +549,43 @@ begin
     and p.proname = 'execute_automation_step'
   limit 1;
 
-  v_def := replace(
-    v_def,
+  v_def := replace(v_def,
     'where c2.relationship_manager_id = wu.user_id and c2.lifecycle_status not in (''archived'', ''lost'')',
-    'where c2.relationship_manager_id = wu.user_id and c2.archived_at is null and c2.lost_at is null'
-  );
-  v_def := replace(
-    v_def,
-    'select 1 from public.processes where id = (v_step.action_config->>''process_id'')::uuid and is_lead_funnel',
-    'select 1 from public.processes where id = (v_step.action_config->>''process_id'')::uuid'
-  );
-  v_def := replace(v_def, 'and pr.id <> v_pipeline_run_id and proc.is_lead_funnel', 'and pr.id <> v_pipeline_run_id and false');
-  v_def := replace(v_def, 'elsif v_step.action_type = ''move_lead_to_service_pipeline'' then', 'elsif v_step.action_type = ''move_to_service_pipeline'' then');
-  v_def := replace(v_def, 'if not exists (select 1 from public.processes where id = v_target_process_id and is_lead_funnel) then', 'if false then');
-  v_def := replace(v_def, 'and pr.process_id <> v_target_process_id and proc.is_lead_funnel', 'and pr.process_id <> v_target_process_id and false');
-  v_def := replace(v_def, 'elsif v_step.action_type = ''mark_lead_lost'' then', 'elsif v_step.action_type = ''mark_contact_lost'' then');
-  v_def := replace(
-    v_def,
+    'where c2.relationship_manager_id = wu.user_id and c2.archived_at is null and c2.lost_at is null');
+  v_def := replace(v_def,
+    ' and is_lead_funnel',
+    ' and false');
+  v_def := replace(v_def,
+    ' proc.is_lead_funnel',
+    ' false');
+  v_def := replace(v_def,
+    'move_lead_to_service_pipeline',
+    'move_to_service_pipeline');
+  v_def := replace(v_def,
+    'elsif v_step.action_type = ''mark_lead_lost'' then',
+    'elsif v_step.action_type = ''mark_contact_lost'' then');
+  v_def := replace(v_def,
     'update public.clients set lifecycle_status = ''lost'', lost_reason = v_step.action_config->>''reason'', lost_at = now() where id = v_run.client_id;',
-    $$update public.clients
+    $update public.clients
       set lost_reason = v_step.action_config->>'reason',
           lost_at = now(),
           tags = array_remove(array(select distinct unnest(coalesce(tags, '{}'::text[]) || array['Lost']::text[])), 'Lead')
-      where id = v_run.client_id;$$
-  );
-  v_def := replace(v_def, 'elsif v_step.action_type = ''convert_lead_to_client'' then', 'elsif false then');
-  v_def := replace(
-    v_def,
+      where id = v_run.client_id;$);
+  v_def := replace(v_def,
+    'elsif v_step.action_type = ''convert_lead_to_client'' then',
+    'elsif false then');
+  v_def := replace(v_def,
     'insert into public.clients (workspace_id, client_type, first_name, last_name, primary_email, primary_phone, normalized_email, normalized_phone, lifecycle_status)',
-    'insert into public.clients (workspace_id, client_type, first_name, last_name, primary_email, primary_phone, normalized_email, normalized_phone)'
-  );
-  v_def := replace(
-    v_def,
+    'insert into public.clients (workspace_id, client_type, first_name, last_name, primary_email, primary_phone, normalized_email, normalized_phone, tags)');
+  v_def := replace(v_def,
     '          v_step.action_config->>''primary_phone'',
           coalesce(nullif(v_step.action_config->>''lifecycle_status'', ''''), ''lead'')',
-    '          v_step.action_config->>''primary_phone'''
-  );
+    '          v_step.action_config->>''primary_phone'',
+          array[''Lead'']::text[]');
+  v_def := replace(v_def,
+    'v_step.action_config->>''lifecycle_status''',
+    '''Lead''');
+  v_def := replace(v_def, 'v_step.action_config->>''lead''', 'v_step.action_config->>''tag''');
 
   if position('lifecycle_status' in v_def) > 0 or position('is_lead_funnel' in v_def) > 0 or position('move_lead_to_service_pipeline' in v_def) > 0 or position('mark_lead_lost' in v_def) > 0 or position('convert_lead_to_client' in v_def) > 0 then
     raise exception 'Automation executor still contains removed Contact lifecycle/Lead dependencies';
