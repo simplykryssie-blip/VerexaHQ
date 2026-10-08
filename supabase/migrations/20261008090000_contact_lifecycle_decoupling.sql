@@ -627,36 +627,40 @@ create index clients_workspace_idx on public.clients (workspace_id, created_at d
 -- The Contact lifecycle column is now removed for real.
 alter table public.clients drop column lifecycle_status;
 
--- Final database assertions: no function, trigger, automation, or process
--- definition may retain the removed Contact lifecycle machinery.
-if exists (
-  select 1
-  from pg_proc p
-  join pg_namespace n on n.oid = p.pronamespace
-  where n.nspname = 'public'
-    and pg_get_functiondef(p.oid) ilike '%lifecycle_status%'
-) then
-  raise exception 'Migration incomplete: a public function still references lifecycle_status';
-end if;
+-- Final database assertions are evaluated inside a DO block because these
+-- are procedural checks after the DDL has completed.
+do $assert$
+begin
+  if exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and pg_get_functiondef(p.oid) ilike '%lifecycle_status%'
+  ) then
+    raise exception 'Migration incomplete: a public function still references lifecycle_status';
+  end if;
 
-if exists (
-  select 1
-  from public.automations
-  where trigger_type like 'lead.%'
-) then
-  raise exception 'Migration incomplete: a Lead-specific automation trigger remains';
-end if;
+  if exists (
+    select 1
+    from public.automations
+    where trigger_type like 'lead.%'
+  ) then
+    raise exception 'Migration incomplete: a Lead-specific automation trigger remains';
+  end if;
 
-if exists (
-  select 1
-  from pg_trigger t
-  join pg_class c on c.oid = t.tgrelid
-  join pg_namespace n on n.oid = c.relnamespace
-  where n.nspname = 'public'
-    and not t.tgisinternal
-    and pg_get_triggerdef(t.oid) ilike '%lifecycle_status%'
-) then
-  raise exception 'Migration incomplete: a trigger still references lifecycle_status';
-end if;
+  if exists (
+    select 1
+    from pg_trigger t
+    join pg_class c on c.oid = t.tgrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and not t.tgisinternal
+      and pg_get_triggerdef(t.oid) ilike '%lifecycle_status%'
+  ) then
+    raise exception 'Migration incomplete: a trigger still references lifecycle_status';
+  end if;
+end;
+$assert$;
 
 commit;
