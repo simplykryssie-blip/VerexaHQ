@@ -33,7 +33,13 @@ export async function POST(request: Request) {
   // client calling this with no body still removes the same domain it
   // always did (the only one, in the single-domain case).
   const { domainId } = (await request.json().catch(() => ({}))) as { domainId?: string };
-  const query = supabase.from("workspace_email_domains").select("id, resend_domain_id").eq("workspace_id", workspace.id);
+  // Scoped to released_at is null -- unlike the old hard-delete, a released
+  // row still exists afterward, so a retried/double-clicked disconnect for
+  // the same domainId must find nothing here (and return the same clean
+  // {ok:true} as "already gone") rather than re-running deleteResendDomain
+  // against an id Resend no longer has, which would fail and surface a
+  // confusing error for a domain that's actually already released.
+  const query = supabase.from("workspace_email_domains").select("id, resend_domain_id").eq("workspace_id", workspace.id).is("released_at", null);
   const { data: existing } = await (domainId ? query.eq("id", domainId) : query.eq("is_primary", true)).maybeSingle();
   if (!existing) {
     return NextResponse.json({ ok: true });

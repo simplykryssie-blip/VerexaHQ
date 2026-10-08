@@ -16,7 +16,7 @@ const state = vi.hoisted(() => ({
   workspace: { id: "ws-1", status: "active" } as { id: string; status: string } | null,
   canManageSettings: true,
   aal2Ok: true,
-  existingDomainRow: null as { id: string; resend_domain_id: string } | null,
+  existingDomainRow: null as { id: string; resend_domain_id: string; released_at?: string | null } | null,
   rpcError: null as { message: string } | null,
   rpcCalls: [] as { name: string; args: unknown }[],
   deleteResendCalls: [] as string[],
@@ -32,16 +32,29 @@ const state = vi.hoisted(() => ({
   removeProjectDomainCalls: 0,
   removeProjectDomainOk: true,
   vercelConfigured: true,
+  syncResendCalls: [] as string[],
 }));
 
-function builder(result: { data: unknown; error?: unknown }) {
+// A real .is("released_at", null) call must actually exclude an
+// already-released row -- the whole point of the regression tests below --
+// so this tracks that filter rather than always returning the configured
+// row regardless of what was asked for.
+function builder(result: { data: { released_at?: string | null } | null; error?: unknown }) {
+  let releasedAtFilterApplied = false;
   const b: Record<string, unknown> = {
     select: () => b,
     eq: () => b,
-    is: () => b,
-    maybeSingle: () => Promise.resolve({ data: result.data, error: result.error ?? null }),
-    then: (resolve: (v: { data: unknown; error: unknown }) => unknown) => resolve({ data: result.data, error: result.error ?? null }),
+    is: (column: string, value: null) => {
+      if (column === "released_at" && value === null) releasedAtFilterApplied = true;
+      return b;
+    },
+    maybeSingle: () => Promise.resolve(resolved()),
+    then: (resolve: (v: { data: unknown; error: unknown }) => unknown) => resolve(resolved()),
   };
+  function resolved() {
+    if (releasedAtFilterApplied && result.data?.released_at) return { data: null, error: result.error ?? null };
+    return { data: result.data, error: result.error ?? null };
+  }
   return b;
 }
 
@@ -66,6 +79,13 @@ vi.mock("@/lib/supabase/server", () => ({
                 if (state.insertError) return Promise.resolve({ data: null, error: state.insertError });
                 return Promise.resolve({ data: { id: "domain-new", ...row }, error: null });
               },
+            }),
+          }),
+          update: () => ({
+            eq: () => ({
+              select: () => ({
+                single: () => Promise.resolve({ data: { id: "domain-1" }, error: null }),
+              }),
             }),
           }),
         };
@@ -93,6 +113,10 @@ vi.mock("@/lib/email/domains", () => ({
     return Promise.resolve(state.deleteResendOk ? { ok: true, data: { deleted: true } } : { ok: false, reason: "resend error" });
   },
   createResendDomain: () => Promise.resolve(state.createResendResult),
+  syncResendDomainStatus: (id: string) => {
+    state.syncResendCalls.push(id);
+    return Promise.resolve({ ok: true, data: { domain: "domain.test", status: "verified", dns_records: [] } });
+  },
 }));
 
 vi.mock("@/lib/workspaceCapabilities", () => ({
@@ -134,6 +158,7 @@ beforeEach(() => {
   state.removeProjectDomainCalls = 0;
   state.removeProjectDomainOk = true;
   state.vercelConfigured = true;
+  state.syncResendCalls = [];
 });
 
 function disconnectRequest(body: unknown = {}) {
@@ -184,6 +209,23 @@ describe("POST /api/email-domain/disconnect -- release, not delete (domain porta
     const { POST } = await import("@/app/api/email-domain/disconnect/route");
     const res = await POST(disconnectRequest({ domainId: "domain-1" }));
     expect(res.status).toBe(403);
+  });
+
+  // Regression: unlike the old hard-delete, a released row still exists
+  // afterward. A retried/double-clicked disconnect for the same domainId
+  // must find nothing (clean {ok:true}, matching "already gone" behavior)
+  // instead of re-running deleteResendDomain against an id Resend no
+  // longer has and surfacing a confusing 502 for a domain that's actually
+  // already released.
+  it("treats a domainId that's already released the same as one that never existed -- no repeat Resend call, no error", async () => {
+    state.existingDomainRow = { id: "domain-1", resend_domain_id: "rd_1", released_at: "2026-10-08T00:00:00Z" };
+    const { POST } = await import("@/app/api/email-domain/disconnect/route");
+    const res = await POST(disconnectRequest({ domainId: "domain-1" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(state.deleteResendCalls).toHaveLength(0);
+    expect(state.rpcCalls.find((c) => c.name === "release_workspace_email_domain")).toBeUndefined();
   });
 });
 
@@ -263,5 +305,35 @@ describe("DELETE /api/websites/[id]/attach-domain -- persists the release server
     expect(res.status).toBe(403);
     expect(state.removeProjectDomainCalls).toBe(0);
     expect(state.rpcCalls.find((c) => c.name === "release_website_custom_domain")).toBeUndefined();
+  });
+});
+
+function verifyRequest(body: unknown = {}) {
+  return new Request("https://app.example.test/api/email-domain/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("POST /api/email-domain/verify -- scoped to active claims (domain portability)", () => {
+  it("checks verification for an active domain normally", async () => {
+    state.existingDomainRow = { id: "domain-1", resend_domain_id: "rd_1" };
+    const { POST } = await import("@/app/api/email-domain/verify/route");
+    const res = await POST(verifyRequest({ domainId: "domain-1" }));
+    expect(res.status).toBe(200);
+    expect(state.syncResendCalls).toEqual(["rd_1"]);
+  });
+
+  // Regression: same category as the disconnect fix above -- a released
+  // row still exists, so without the released_at is null scope this would
+  // sync against a Resend id that's already gone and surface a confusing
+  // 502 instead of the clean 404 a caller gets for a truly nonexistent id.
+  it("treats a domainId that's already released as not found -- no Resend call against a deleted id", async () => {
+    state.existingDomainRow = { id: "domain-1", resend_domain_id: "rd_1", released_at: "2026-10-08T00:00:00Z" };
+    const { POST } = await import("@/app/api/email-domain/verify/route");
+    const res = await POST(verifyRequest({ domainId: "domain-1" }));
+    expect(res.status).toBe(404);
+    expect(state.syncResendCalls).toHaveLength(0);
   });
 });
