@@ -8,28 +8,35 @@
 // invoices too) -- a bare status update would silently skip all of that.
 // Selected contacts already in either of those two statuses are skipped by
 // bulk status, never silently mutated by it.
-export const BULK_STATUS_OPTIONS = [
-  { value: "lead", label: "Lead" },
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
-] as const;
+// Bulk archive/restore are operational actions. Lost contacts are handled by
+// the dedicated mark_client_lost RPC because it cascades engagements,
+// invoices, and document requests.
+export type ContactDispositionRow = {
+  archived_at: string | null;
+  lost_at: string | null;
+};
 
-export type BulkStatusValue = (typeof BULK_STATUS_OPTIONS)[number]["value"];
-
-const BULK_ELIGIBLE_STATUSES: readonly string[] = BULK_STATUS_OPTIONS.map((o) => o.value);
-
-export function isEligibleForBulkStatus(currentStatus: string): boolean {
-  return BULK_ELIGIBLE_STATUSES.includes(currentStatus);
+export function isEligibleForBulkArchive(row: ContactDispositionRow): boolean {
+  return !row.archived_at && !row.lost_at;
 }
 
-/** Splits selected rows into those a bulk status change may touch and those
- * it must leave alone, so the caller can apply the mutation only to
- * `eligible` and report `skipped` rather than mutating everything blindly. */
-export function partitionForBulkStatus<T extends { lifecycle_status: string }>(
+export function partitionForBulkArchive<T extends ContactDispositionRow>(
   rows: T[]
 ): { eligible: T[]; skipped: T[] } {
-  const eligible = rows.filter((r) => isEligibleForBulkStatus(r.lifecycle_status));
-  const skipped = rows.filter((r) => !isEligibleForBulkStatus(r.lifecycle_status));
+  const eligible = rows.filter(isEligibleForBulkArchive);
+  const skipped = rows.filter((r) => !isEligibleForBulkArchive(r));
+  return { eligible, skipped };
+}
+
+export function isEligibleForBulkRestore(row: ContactDispositionRow): boolean {
+  return Boolean(row.archived_at) && !row.lost_at;
+}
+
+export function partitionForBulkRestore<T extends ContactDispositionRow>(
+  rows: T[]
+): { eligible: T[]; skipped: T[] } {
+  const eligible = rows.filter(isEligibleForBulkRestore);
+  const skipped = rows.filter((r) => !isEligibleForBulkRestore(r));
   return { eligible, skipped };
 }
 
@@ -117,8 +124,7 @@ export function summarizeDeleteClientsResult(rows: DeleteClientsResultRow[]): De
  * with each other or with the RPC's actual parameter names. */
 export type SearchClientsFilters = {
   p_query?: string;
-  p_lifecycle_statuses?: string[];
-  p_tag?: string;
+    p_tag?: string;
   p_service_id?: string;
   p_assigned_staff_id?: string;
   p_pipeline_stage_name?: string;
