@@ -12,6 +12,7 @@ import { FieldCanvas } from "./FieldCanvas";
 import { FieldPropertiesPanel } from "./FieldPropertiesPanel";
 import { OrganizerPreviewPanel } from "./OrganizerPreviewPanel";
 import { PublicLinkToggle } from "@/components/settings/PublicLinkToggle";
+import { SendingDomainSelect } from "@/components/settings/SendingDomainSelect";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { BannerImageUpload } from "@/components/settings/BannerImageUpload";
 import type { BuilderField, BuilderTemplate } from "./types";
@@ -25,7 +26,17 @@ function flattenOrder(topLevelIds: string[], childOrderByParent: Map<string, str
   return topLevelIds.flatMap((id) => [id, ...(childOrderByParent.get(id) ?? [])]);
 }
 
-export function OrganizerBuilder({ template, initialFields, readOnly }: { template: BuilderTemplate; initialFields: BuilderField[]; readOnly: boolean }) {
+export function OrganizerBuilder({
+  template,
+  initialFields,
+  readOnly,
+  sendingDomains,
+}: {
+  template: BuilderTemplate;
+  initialFields: BuilderField[];
+  readOnly: boolean;
+  sendingDomains: { id: string; domain: string }[];
+}) {
   const supabase = createClient();
   const router = useRouter();
   const toast = useToast();
@@ -296,6 +307,9 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
               initialIsPublic={template.is_public}
               initialRequiresPortalSignup={template.requires_portal_signup}
             />
+          )}
+          {!readOnly && (
+            <SendingDomainSelect table="organizer_templates" id={template.id} domains={sendingDomains} initialDomainId={template.sending_domain_id} />
           )}
           {!readOnly && <TemplateStatusCycle table="organizer_templates" id={template.id} status={template.status} />}
           <button

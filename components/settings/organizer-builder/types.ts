@@ -38,4 +38,5 @@ export type BuilderTemplate = {
   requires_portal_signup: boolean;
   banner_image_url: string | null;
   custom_css: string | null;
+  sending_domain_id: string | null;
 };

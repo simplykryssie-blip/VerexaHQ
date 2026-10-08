@@ -14,7 +14,9 @@ export default async function OrganizerBuilderPage({ params }: { params: { id: s
   const [{ data: template }, { data: fields }] = await Promise.all([
     supabase
       .from("organizer_templates")
-      .select("id, name, slug, description, status, workspace_id, public_token, is_public, requires_portal_signup, banner_image_url, custom_css")
+      .select(
+        "id, name, slug, description, status, workspace_id, public_token, is_public, requires_portal_signup, banner_image_url, custom_css, sending_domain_id"
+      )
       .eq("id", params.id)
       .maybeSingle(),
     supabase
@@ -30,5 +32,15 @@ export default async function OrganizerBuilderPage({ params }: { params: { id: s
 
   const readOnly = !template.workspace_id;
 
-  return <OrganizerBuilder template={template} initialFields={(fields ?? []) as BuilderField[]} readOnly={readOnly} />;
+  const { data: domains } = template.workspace_id
+    ? await supabase
+        .from("workspace_email_domains")
+        .select("id, domain")
+        .eq("workspace_id", template.workspace_id)
+        .eq("status", "verified")
+    : { data: [] as { id: string; domain: string }[] };
+
+  return (
+    <OrganizerBuilder template={template} initialFields={(fields ?? []) as BuilderField[]} readOnly={readOnly} sendingDomains={domains ?? []} />
+  );
 }
