@@ -597,8 +597,10 @@ begin
   );
   v_def := replace(
     v_def,
-    $$          v_step.action_config->>'primary_phone',
-          coalesce(nullif(v_step.action_config->>'lifecycle_status', ''), 'lead')$$,
+    $          v_step.action_config->>'primary_phone',
+          v_normalized_email,
+          v_normalized_phone,
+          coalesce(nullif(v_step.action_config->>'lifecycle_status', ''), 'lead')$,
     $$          v_step.action_config->>'primary_phone',
           case
             when nullif(v_step.action_config->>'tag', '') is not null
