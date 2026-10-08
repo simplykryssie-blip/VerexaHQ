@@ -91,9 +91,7 @@ export default async function ClientsReportPage({ searchParams }: { searchParams
     {
       key: "tags",
       label: "Tags",
-      render: (r) => (
-        
-      ),
+      render: (r) => <span className="text-xs text-muted">{r.tags.length ? r.tags.join(", ") : "--"}</span>,
       sortValue: (r) => r.tags.join(", "),
     },
     { key: "created", label: "Added", render: (r) => new Date(r.created_at).toLocaleDateString(), sortValue: (r) => r.created_at },
