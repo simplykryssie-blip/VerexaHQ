@@ -2523,7 +2523,6 @@ export type Database = {
           itin_hash: string | null;
           itin_last4: string | null;
           last_name: string | null;
-          lifecycle_status: string;
           lost_at: string | null;
           lost_reason: string | null;
           merged_into_client_id: string | null;
@@ -2575,7 +2574,6 @@ export type Database = {
           itin_hash?: string | null;
           itin_last4?: string | null;
           last_name?: string | null;
-          lifecycle_status?: string;
           lost_at?: string | null;
           lost_reason?: string | null;
           merged_into_client_id?: string | null;
@@ -8909,7 +8907,6 @@ export type Database = {
           description: string | null;
           folder_id: string | null;
           id: string;
-          is_lead_funnel: boolean;
           name: string;
           slug: string;
           status: string;
@@ -8922,7 +8919,6 @@ export type Database = {
           description?: string | null;
           folder_id?: string | null;
           id?: string;
-          is_lead_funnel?: boolean;
           name: string;
           slug: string;
           status?: string;
@@ -12172,6 +12168,7 @@ export type Database = {
         Row: {
           allow_connected_ptin_messaging: boolean;
           archived_at: string | null;
+          archived_reason: string | null;
           client_assignment_mode: string;
           client_assignment_staff_pool: string[];
           created_at: string;
@@ -12210,6 +12207,7 @@ export type Database = {
         Insert: {
           allow_connected_ptin_messaging?: boolean;
           archived_at?: string | null;
+          archived_reason?: string | null;
           client_assignment_mode?: string;
           client_assignment_staff_pool?: string[];
           created_at?: string;
@@ -15577,7 +15575,6 @@ export type Database = {
           p_client_type?: string;
           p_has_email?: boolean;
           p_has_phone?: boolean;
-          p_lifecycle_statuses?: string[];
           p_limit?: number;
           p_missing_documents?: boolean;
           p_offset?: number;
@@ -15595,7 +15592,6 @@ export type Database = {
           first_name: string;
           id: string;
           last_name: string;
-          lifecycle_status: string;
           primary_email: string;
           primary_phone: string;
           tags: string[];
