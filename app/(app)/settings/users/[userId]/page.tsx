@@ -18,7 +18,7 @@ type ClientRef = {
   last_name: string | null;
   business_name: string | null;
   client_type: string;
-  lifecycle_status: string;
+  tags: string[] | null;
 };
 
 function clientDisplayName(c: ClientRef) {
@@ -187,7 +187,6 @@ export default async function PreparerProfilePage({ params }: { params: { userId
                   <Link href={`/clients/${c.id}`} className="text-slate hover:text-accent hover:underline">
                     {clientDisplayName(c)}
                   </Link>
-                  <span className="text-xs capitalize text-muted">{c.lifecycle_status}</span>
                 </li>
               ))}
             </ul>

@@ -64,7 +64,6 @@ describe("Contacts list -- Phone column applies formatPhone at display time", ()
       business_name: null,
       primary_email: null,
       primary_phone: null,
-      lifecycle_status: "active",
       tags: [],
       ...overrides,
     };
