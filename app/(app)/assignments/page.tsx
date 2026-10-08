@@ -77,7 +77,7 @@ export default async function AssignmentsPage({ searchParams }: { searchParams: 
     rows = (data ?? []).map((c) => ({
       id: c.id,
       label: clientLabelFor(c),
-      sublabel: (c.tags ?? []).join(", ") || undefined,
+      sublabel: (c.tags ?? []).join(", ") || null,
       href: `/clients/${c.id}`,
       currentAssigneeName: c.relationship_manager_id ? (staffNameById.get(c.relationship_manager_id) ?? "Unknown") : null,
     }));
