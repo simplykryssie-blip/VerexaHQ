@@ -1,9 +1,50 @@
-# Verexa HQ CRM — Zoom Marketplace Beta Security Evidence Index
+# Verexa HQ CRM — Zoom Marketplace Security Evidence Index
 
-Purpose: submission index for Zoom Marketplace Beta security evidence.
+Purpose: submission index for Zoom Marketplace security evidence.
 
 Application: Verexa HQ CRM
 Repository: simplykryssie-blip/VerexaHQ
+
+## Target distribution type: Published (Unlisted)
+
+Verexa's Zoom integration is for authenticated Verexa customers only, connected
+from inside the Verexa application (Verexa login -> Connect Zoom -> Zoom OAuth
+-> return to the authenticated Verexa account -> Zoom features available
+inside Verexa). It is not intended to be discoverable by the general public
+browsing the Zoom Marketplace.
+
+Published (Unlisted), with the app's install entry point set to "From your
+site" pointed at the Verexa login/app, matches this model: hidden from
+Marketplace search, usable by external customers, and installable only
+through an authenticated Verexa session. Zoom itself does not enforce
+"Verexa customers only" at the Marketplace level for an Unlisted app -- that
+boundary is enforced by Verexa's own application, by only ever starting the
+OAuth connection from inside an authenticated Verexa session.
+
+The prior Beta submission's "App Beta - Insufficient Evidence" status does
+not need to be resolved to proceed -- Beta is a temporary, capped sharing
+path (per Zoom's own "Sharing Private and Beta Apps" documentation), not a
+prerequisite for Published (Unlisted).
+
+## Question to ask Zoom before any further spend
+
+Per Zoom's own documentation (Sharing Private and Beta Apps; Security
+requirements for Zoom Marketplace apps; App Review Guidelines and
+Principles), a third-party penetration test is described as preferred/
+encouraged evidence, not a documented mandatory requirement -- SAST and/or
+DAST evidence is explicitly listed as acceptable. Before purchasing a
+third-party penetration test, ask Zoom's reviewer (or
+marketplace.security@zoom.us) directly:
+
+> "We are requesting Published Unlisted distribution for an OAuth
+> integration used exclusively by authenticated customers of our SaaS
+> platform. We have SAST, DAST, TLS, and security remediation evidence. Is
+> a third-party penetration test a mandatory blocker for this Unlisted
+> application, or is the existing evidence sufficient?"
+
+Do not represent the existing DAST evidence as a penetration test when
+asking this question or submitting this package -- see Evidence
+qualification below.
 
 ## Zoom-required evidence
 
