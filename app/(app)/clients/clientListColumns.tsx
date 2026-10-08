@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { DataTableColumn } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/Avatar";
-import { clientStatusTone } from "@/lib/clientStatus";
 import { normalizeName } from "@/lib/name";
 import { formatPhone } from "@/lib/phone";
 
@@ -45,7 +44,6 @@ export type ClientRow = {
   business_name: string | null;
   primary_email: string | null;
   primary_phone: string | null;
-  lifecycle_status: string;
   tags: string[] | null;
   requestedService?: string | null;
   needsReview?: boolean;
@@ -83,15 +81,6 @@ export const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
   { key: "type", header: "Type", render: (c) => <span className="capitalize text-slate">{c.client_type}</span> },
   { key: "email", header: "Email", render: (c) => <span className="text-slate">{c.primary_email ?? "--"}</span> },
   { key: "phone", header: "Phone", render: (c) => <span className="text-slate">{c.primary_phone ? formatPhone(c.primary_phone) : "--"}</span> },
-  {
-    key: "status",
-    header: "Status",
-    render: (c) => (
-      <Badge tone={clientStatusTone(c.lifecycle_status)} className="capitalize">
-        {c.lifecycle_status.replace(/_/g, " ")}
-      </Badge>
-    ),
-  },
   {
     key: "assignedStaff",
     header: "Assigned Staff",
