@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/Confirm";
 import { LibraryFolderPane } from "@/components/library/LibraryFolderPane";
 import { FolderMoveSelect } from "@/components/library/FolderMoveSelect";
 import { StarButton } from "@/components/library/StarButton";
@@ -78,6 +79,7 @@ export function WorkflowList({
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
+  const confirm = useConfirm();
   const [name, setName] = useState("");
   const [triggerType, setTriggerType] = useState("engagement.status_changed");
   const [triggerConfig, setTriggerConfig] = useState<Record<string, unknown>>(defaultTriggerConfig("engagement.status_changed"));
@@ -162,7 +164,7 @@ export function WorkflowList({
       }
       if (issues && issues.length > 0) {
         const lines = issues.map((i) => (i.step_order > 0 ? `Step ${i.step_order} (${i.display_name}): ${i.issue}` : i.issue));
-        window.alert(`Can't activate this workflow yet -- fix these first:\n\n${lines.map((l) => `- ${l}`).join("\n")}`);
+        toast.show(`Can't activate this workflow yet -- fix these first:\n${lines.map((l) => `- ${l}`).join("\n")}`, "error");
         return;
       }
     }
@@ -188,7 +190,7 @@ export function WorkflowList({
     }
     if (issues && issues.length > 0) {
       const lines = issues.map((i) => (i.step_order > 0 ? `Step ${i.step_order} (${i.display_name}): ${i.issue}` : i.issue));
-      window.alert(`Can't publish this workflow yet -- fix these first:\n\n${lines.map((l) => `- ${l}`).join("\n")}`);
+      toast.show(`Can't publish this workflow yet -- fix these first:\n${lines.map((l) => `- ${l}`).join("\n")}`, "error");
       return;
     }
     const { error } = await supabase.from("automations").update({ status: "published", is_enabled: true }).eq("id", id);
@@ -201,7 +203,14 @@ export function WorkflowList({
   }
 
   async function retire(id: string) {
-    if (!window.confirm("Retire this workflow? It stops firing and moves out of the active list. You can bring it back as a draft later.")) return;
+    if (
+      !(await confirm({
+        title: "Retire this workflow?",
+        body: "It stops firing and moves out of the active list. You can bring it back as a draft later.",
+        confirmLabel: "Retire",
+      }))
+    )
+      return;
     const { error } = await supabase.from("automations").update({ status: "archived", is_enabled: false }).eq("id", id);
     if (error) {
       toast.show(error.message, "error");
@@ -222,7 +231,14 @@ export function WorkflowList({
   }
 
   async function remove(id: string) {
-    if (!window.confirm("Delete this workflow? Its run history will be removed too. This can't be undone.")) return;
+    if (
+      !(await confirm({
+        title: "Delete this workflow?",
+        body: "Its run history will be removed too. This can't be undone.",
+        confirmLabel: "Delete",
+      }))
+    )
+      return;
     setDeleteError(null);
     setDeletingId(id);
     const { error: deleteErr } = await supabase.from("automations").delete().eq("id", id);
