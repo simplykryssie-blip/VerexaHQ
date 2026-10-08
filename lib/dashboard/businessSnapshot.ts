@@ -33,7 +33,12 @@ export async function getBusinessSnapshot(workspaceId: string, range: DashboardR
     { data: upcomingRenewals },
     { data: failedPayments },
   ] = await Promise.all([
-    supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).eq("lifecycle_status", "active"),
+    supabase
+      .from("clients")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("lost_at", null),
     supabase
       .from("payments")
       .select("amount")

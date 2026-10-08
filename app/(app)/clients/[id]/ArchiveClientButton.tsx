@@ -12,9 +12,9 @@ import { useToast } from "@/components/Toast";
 // closes open engagements and cancels open document requests, but never
 // touches invoices, tasks, documents, messages, appointments, or portal
 // access. "Lost" is a separate, stronger terminal state (voids invoices)
-// and isn't archivable from here, matching the same lead/active/inactive
+// and isn't archivable from here, matching the same open
 // eligibility set Fix #3's bulk status action already uses.
-export function ArchiveClientButton({ clientId, lifecycleStatus }: { clientId: string; lifecycleStatus: string }) {
+export function ArchiveClientButton({ clientId, archivedAt, lostAt }: { clientId: string; archivedAt: string | null; lostAt: string | null }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
@@ -22,9 +22,9 @@ export function ArchiveClientButton({ clientId, lifecycleStatus }: { clientId: s
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (lifecycleStatus === "lost") return null;
+  if (lostAt) return null;
 
-  if (lifecycleStatus === "archived") {
+  if (archivedAt) {
     async function restore() {
       setSaving(true);
       const { error: rpcError } = await supabase.rpc("restore_client", { p_client_id: clientId });

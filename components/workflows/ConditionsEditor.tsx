@@ -56,7 +56,6 @@ export function conditionGroupsAreEmpty(groups: ConditionGroup[]): boolean {
 type ValueKind =
   | "select"
   | "labeled_select"
-  | "lead_stage"
   | "staff"
   | "service"
   | "product"
@@ -155,13 +154,7 @@ const ENGAGEMENT_CASE_TYPE_OPTIONS = ["tax_return", "bookkeeping", "payroll", "b
 const QUOTE_STATUS_OPTIONS = ["draft", "sent", "accepted", "declined"];
 const TASK_STATUS_OPTIONS = ["pending", "in_progress", "completed", "blocked"];
 const DOCUMENT_REQUEST_STATUS_OPTIONS = ["open", "completed", "cancelled"];
-const LEAD_STAGE_OPTIONS = [
-  { value: "lead", label: "Lead" },
-  { value: "active", label: "Active client" },
-  { value: "inactive", label: "Inactive" },
-  { value: "archived", label: "Archived" },
-  { value: "lost", label: "Lost" },
-];
+
 const PARTNER_ONBOARDING_STATUS_OPTIONS = [
   "pending",
   "in_progress",
@@ -192,16 +185,15 @@ const PURCHASE_STATUS_OPTIONS = [
 ];
 
 const CONDITION_FIELDS: FieldMeta[] = [
-  { key: "client.lifecycle_status", label: "Lead / client status", group: "Lead & client", valueKind: "lead_stage", ops: LIST_OPS },
-  { key: "client.client_type", label: "Client type", group: "Lead & client", valueKind: "select", options: CLIENT_TYPE_OPTIONS, ops: LIST_OPS },
-  { key: "client.relationship_manager_id", label: "Assigned staff (lead/client)", group: "Lead & client", valueKind: "staff", ops: ID_OPS },
+  { key: "client.client_type", label: "Client type", group: "Contact", valueKind: "select", options: CLIENT_TYPE_OPTIONS, ops: LIST_OPS },
+  { key: "client.relationship_manager_id", label: "Assigned staff", group: "Lead & client", valueKind: "staff", ops: ID_OPS },
   { key: "client.tags", label: "Has tag", group: "Lead & client", valueKind: "tag", ops: SELECT_OPS },
   { key: "client.service_category_id", label: "Requested category", group: "Lead & client", valueKind: "category", ops: SELECT_OPS },
   { key: "client.service_id", label: "Requested service", group: "Lead & client", valueKind: "service", ops: SELECT_OPS },
   { key: "client.source", label: "Lead source", group: "Lead & client", valueKind: "select", options: CLIENT_SOURCE_OPTIONS, ops: SELECT_OPS },
   { key: "client.portal_status", label: "Portal status", group: "Lead & client", valueKind: "labeled_select", labeledOptions: PORTAL_STATUS_OPTIONS, ops: SELECT_OPS },
   { key: "client.organizer_status", label: "Form status", group: "Lead & client", valueKind: "organizer_status", labeledOptions: ORGANIZER_STATUS_OPTIONS, ops: SELECT_OPS },
-  { key: "lead.process_stage_id", label: "Lead pipeline stage", group: "Lead & client", valueKind: "pipeline_stage", ops: ID_OPS },
+  { key: "pipeline.process_stage_id", label: "Pipeline stage", group: "Lead & client", valueKind: "pipeline_stage", ops: ID_OPS },
 
   { key: "engagement.status", label: "Engagement status", group: "Engagement", valueKind: "select", options: ENGAGEMENT_STATUS_OPTIONS, ops: LIST_OPS },
   { key: "engagement.priority", label: "Engagement priority", group: "Engagement", valueKind: "select", options: ENGAGEMENT_PRIORITY_OPTIONS, ops: LIST_OPS },
@@ -503,19 +495,6 @@ function ConditionRow({
                 <span className="text-[11px] text-warning">No Review Queue Decision step in this workflow yet -- add one first.</span>
               )}
             </>
-          )}
-
-          {meta.valueKind === "lead_stage" && (
-            <select disabled={disabled} value={condition.value} onChange={(e) => setValue(e.target.value)} className={inputClass}>
-              <option value="" disabled>
-                Choose a status
-              </option>
-              {LEAD_STAGE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
           )}
 
           {meta.valueKind === "staff" && (

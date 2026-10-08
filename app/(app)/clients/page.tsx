@@ -13,21 +13,8 @@ export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 50;
 
-// Every lifecycle status in one combined list -- leads, lost leads, and
-// active/inactive/archived clients all live together with no sub-tabs by
-// status or type. Individual vs business is already visible via the Type
-// column, so no separate filter for that either.
-const ALL_LIFECYCLE_STATUSES = ["lead", "active", "inactive", "lost", "archived"];
-
-const STATUS_FILTERS = [
-  { value: "", label: "All" },
-  { value: "lead", label: "Lead" },
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
-  { value: "lost", label: "Lost" },
-  { value: "archived", label: "Archived" },
-];
-
+// Contacts are permanent identities. Classification is tag-based and
+// operational disposition (Lost/Archived) is handled separately.
 // Mirrors clients_client_type_check exactly -- the Type column already
 // shows this, this just makes it filterable too (Contacts Reconciliation
 // Audit, Product Decision #12: "Account Type" was found to be a duplicate
@@ -45,7 +32,6 @@ export default async function ClientsPage({
 }: {
   searchParams: {
     page?: string;
-    status?: string;
     tag?: string;
     q?: string;
     service?: string;
@@ -62,8 +48,6 @@ export default async function ClientsPage({
   if (!workspace) return null;
 
   const supabase = createClient();
-
-  const status = searchParams.status && STATUS_FILTERS.some((f) => f.value === searchParams.status) ? searchParams.status : "";
 
   const page = Math.max(Number(searchParams.page) || 1, 1);
   const from = (page - 1) * PAGE_SIZE;
@@ -92,7 +76,6 @@ export default async function ClientsPage({
   // parameter names.
   const searchFilters: SearchClientsFilters = {
     p_query: q || undefined,
-    p_lifecycle_statuses: status ? [status] : ALL_LIFECYCLE_STATUSES,
     p_tag: tag || undefined,
     p_service_id: serviceFilter || undefined,
     p_assigned_staff_id: staffFilter && !unassignedOnly ? staffFilter : undefined,
@@ -262,7 +245,6 @@ export default async function ClientsPage({
   // drops the others.
   const activeParams = (
     [
-      ["status", status],
       ["tag", tag],
       ["q", q],
       ["service", serviceFilter],
@@ -276,9 +258,6 @@ export default async function ClientsPage({
     ] as [string, string][]
   ).filter(([, v]) => v);
   const extraQuery = activeParams.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
-  const statusQuery = activeParams.filter(([k]) => k !== "status").length > 0
-    ? `&${activeParams.filter(([k]) => k !== "status").map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&")}`
-    : "";
   const tagQueryBase = `/clients?${activeParams.filter(([k]) => k !== "tag").map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&")}`;
 
   return (
@@ -319,19 +298,6 @@ export default async function ClientsPage({
       />
       <div className="flex-1 px-8 py-6">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap gap-2">
-            {STATUS_FILTERS.map((f) => (
-              <Link
-                key={f.value}
-                href={f.value ? `/clients?status=${f.value}${statusQuery}` : `/clients?${statusQuery.replace(/^&/, "")}`}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                  status === f.value ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
-                }`}
-              >
-                {f.label}
-              </Link>
-            ))}
-          </div>
           {/* Client assignment lives here now (bulk "Assign to" above), but
               task/engagement bulk reassignment has no Contacts-shaped
               equivalent (different tables, different role columns -- see
@@ -357,12 +323,10 @@ export default async function ClientsPage({
             emptyMessage={
               q || serviceFilter || staffFilter || stageFilter || missingDocuments || outstandingBalance || clientType || hasEmail !== undefined || hasPhone !== undefined
                 ? "No contacts match this search."
-                : status
-                ? `No clients with status "${STATUS_FILTERS.find((f) => f.value === status)?.label}".`
                 : "No clients yet. Add your first client to get started."
             }
             emptyAction={
-              !status &&
+              
               !q &&
               !serviceFilter &&
               !staffFilter &&

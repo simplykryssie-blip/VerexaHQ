@@ -10,15 +10,12 @@ import { EmptyState } from "@/components/EmptyState";
 import { ensureTagConfirmed } from "@/lib/ensureTag";
 import { CLIENT_COLUMNS, clientDisplayName, resolveAssignedStaff, type ClientRow } from "./clientListColumns";
 import {
-  BULK_STATUS_OPTIONS,
-  partitionForBulkStatus,
   partitionForBulkArchive,
   partitionForBulkRestore,
   tagsAfterBulkRemove,
   rowsHavingTag,
   MAX_BULK_SELECT_ALL,
   summarizeDeleteClientsResult,
-  type BulkStatusValue,
   type SearchClientsFilters,
   type DeleteClientsResultRow,
 } from "./bulkContactActions";
@@ -41,14 +38,13 @@ export function assignedStaffCsvValue(assignedStaff: ClientRow["assignedStaff"])
 }
 
 function downloadCsv(rows: ClientRow[]) {
-  const header = ["Name", "Type", "Email", "Phone", "Status", "Assigned Staff", "Tags"];
+  const header = ["Name", "Type", "Email", "Phone", "Assigned Staff", "Tags"];
   const lines = rows.map((c) =>
     [
       clientDisplayName(c),
       c.client_type,
       c.primary_email ?? "",
       c.primary_phone ?? "",
-      c.lifecycle_status,
       assignedStaffCsvValue(c.assignedStaff),
       (c.tags ?? []).join("; "),
     ]
@@ -121,7 +117,7 @@ export function ContactsBulkTable({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Non-null only while "select all matching" is active: full row data (not
   // just ids) for every contact matching the current filters, fetched
-  // client-side because bulk actions need lifecycle_status/tags to partition
+  // client-side because bulk actions need disposition timestamps/tags to partition
   // eligibility and CSV export needs the same display fields the visible
   // page already has. null means "selection is scoped to the current page",
   // which is the normal/default case.
@@ -133,8 +129,6 @@ export function ContactsBulkTable({
   const [removeTagInput, setRemoveTagInput] = useState("");
   const [removingTag, setRemovingTag] = useState(false);
   const [removeTagOpen, setRemoveTagOpen] = useState(false);
-  const [statusOpen, setStatusOpen] = useState(false);
-  const [applyingStatus, setApplyingStatus] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [applyingAssign, setApplyingAssign] = useState(false);
   const [applyingArchive, setApplyingArchive] = useState(false);
@@ -274,29 +268,6 @@ export function ContactsBulkTable({
     router.refresh();
   }
 
-  async function applyStatus(target: BulkStatusValue) {
-    const { eligible, skipped } = partitionForBulkStatus(selectedRows);
-    setStatusOpen(false);
-    if (eligible.length === 0) {
-      toast.show("None of the selected contacts can have their status changed here (already Lost or Archived)", "error");
-      return;
-    }
-
-    setApplyingStatus(true);
-    const results = await Promise.all(
-      eligible.map((row) => supabase.from("clients").update({ lifecycle_status: target }).eq("id", row.id))
-    );
-    setApplyingStatus(false);
-    const failed = results.filter((r) => r.error).length;
-    const label = BULK_STATUS_OPTIONS.find((o) => o.value === target)?.label ?? target;
-    const skippedNote = skipped.length > 0 ? ` (${skipped.length} skipped -- Lost/Archived contacts aren't changed here)` : "";
-    if (failed > 0) toast.show(`Set ${eligible.length - failed} of ${eligible.length} to ${label} -- ${failed} failed${skippedNote}`, "error");
-    else toast.show(`Set ${eligible.length} contact${eligible.length === 1 ? "" : "s"} to ${label}${skippedNote}`, "success");
-
-    clearSelection();
-    router.refresh();
-  }
-
   async function applyAssignment(staffId: string | null) {
     setAssignOpen(false);
     setApplyingAssign(true);
@@ -393,7 +364,7 @@ export function ContactsBulkTable({
     return <EmptyState message={emptyMessage} action={emptyAction} />;
   }
 
-  const hasArchivedSelected = selectedRows.some((r) => r.lifecycle_status === "archived");
+  const hasArchivedSelected = selectedRows.some((r) => Boolean(r.archived_at) && !r.lost_at);
 
   return (
     <div>
@@ -474,32 +445,6 @@ export function ContactsBulkTable({
                   >
                     {removingTag ? "..." : "Remove"}
                   </button>
-                </div>
-              )}
-            </div>
-          )}
-          {canEdit && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setStatusOpen((o) => !o)}
-                disabled={applyingStatus}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-surface px-2.5 py-1 text-xs font-medium text-accent hover:bg-accent/10 disabled:opacity-60"
-              >
-                {applyingStatus ? "..." : "Set status"} <ChevronDown size={12} />
-              </button>
-              {statusOpen && (
-                <div className="absolute left-0 top-full z-10 mt-1 w-40 rounded-lg border border-border bg-surface p-1 shadow-lg">
-                  {BULK_STATUS_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => void applyStatus(opt.value)}
-                      className="block w-full rounded-lg px-2.5 py-1.5 text-left text-xs text-slate hover:bg-surfaceMuted"
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
                 </div>
               )}
             </div>

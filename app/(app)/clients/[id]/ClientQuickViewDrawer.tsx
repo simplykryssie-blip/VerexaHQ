@@ -7,11 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { StatTile } from "@/components/ui/StatTile";
 import { QuickActions } from "./QuickActions";
-import { ConvertLeadButton } from "./ConvertLeadButton";
-import { RevertToLeadButton } from "./RevertToLeadButton";
-import { MarkLeadLostButton } from "./MarkLeadLostButton";
 import { ArchiveClientButton } from "./ArchiveClientButton";
-import { clientStatusTone } from "@/lib/clientStatus";
 import { formatPhone } from "@/lib/phone";
 import { displayName, type ClientTab } from "./ClientTabsBody";
 import { ClientInsightWidgets } from "./ClientInsightWidgets";
@@ -80,7 +76,7 @@ export function fullRecordHref(clientId: string, tab?: ClientTab): string {
  * the exact same ClientTabsBody the full page renders (Details/Tasks/
  * Documents/Messages/Billing/Notes, fully editable) inline in the drawer --
  * not a quick view at all, just the complete record in a slide-over. Now a
- * true snapshot: identity, status, the same "attention required" banner,
+ * true snapshot: identity, tags, the same "attention required" banner,
  * one stat grid whose tiles link to the relevant tab on the full page
  * instead of rendering it inline, the health/risk/cross-sell insight cards,
  * and a short recent-activity list. Every one of those was already
@@ -167,18 +163,16 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <Badge tone={clientStatusTone(client.lifecycle_status)} className="capitalize">
-              {client.lifecycle_status}
-            </Badge>
+            
             {portalStatus && <Badge tone="accent">{portalStatus}</Badge>}
             <span className="text-xs capitalize text-muted">{client.client_type}</span>
           </div>
 
           <div className="mt-3 flex items-center gap-2">
-            <ConvertLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
-            <RevertToLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
-            <MarkLeadLostButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
-            <ArchiveClientButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
+            
+            
+            
+            <ArchiveClientButton clientId={client.id} archivedAt={client.archived_at} lostAt={client.lost_at} />
             <QuickActions
               clientId={client.id}
               workspaceId={workspace.id}

@@ -33,7 +33,7 @@ export const ORGANIZER_REVIEW_STATUS_OPTIONS = [
 // freely renamed/reshuffled without any migration.
 export const TRIGGER_CATEGORIES: { key: string; label: string }[] = [
   { key: "products_purchases", label: "Products & Purchases" },
-  { key: "contacts_leads", label: "Contacts & Leads" },
+  { key: "contacts_leads", label: "Contacts" },
   { key: "engagements", label: "Engagements" },
   { key: "ero_ptin", label: "ERO / PTIN Sharing" },
   { key: "forms_intake", label: "Forms & Intake" },
@@ -53,7 +53,7 @@ export const TRIGGER_TYPES = [
   { value: "organizer.submitted", label: "A form is submitted", category: "forms_intake", description: "Fires when a client submits an intake form.", keywords: "intake form organizer submit" },
   { value: "client.tag_added", label: "A tag is added to a client", category: "contacts_leads", description: "Fires when a specific tag is added to a client.", keywords: "tag label contact" },
   { value: "client.portal_created", label: "A client creates a portal account", category: "contacts_leads", description: "Fires when a client accepts their portal invite and creates an account.", keywords: "portal account signup" },
-  { value: "client.service_interest_selected", label: "A client selects a service", category: "contacts_leads", description: "Fires when a client (or lead) selects a service they're interested in.", keywords: "service interest lead" },
+  { value: "client.service_interest_selected", label: "A client selects a service", category: "contacts_leads", description: "Fires when a client selects a service they're interested in.", keywords: "service interest" },
   { value: "engagement.created", label: "A new engagement is created for a service", category: "engagements", description: "Fires when a new engagement is created for a specific service.", keywords: "engagement created new" },
   { value: "appointment.status_changed", label: "An appointment's status changes to", category: "appointments", description: "Fires when an appointment's status changes (booked, confirmed, completed, cancelled, no-show).", keywords: "appointment booked cancelled rescheduled no-show completed status" },
   { value: "appointment.booked", label: "A client books themselves an appointment", category: "appointments", description: "Fires when a client books an appointment through a public or portal booking link -- not when staff create one manually.", keywords: "appointment booking link self-service booked online" },
@@ -62,13 +62,7 @@ export const TRIGGER_TYPES = [
   { value: "organizer_information_request.resolved", label: "A form information request is resolved", category: "forms_intake", description: "Fires once every flagged question on an information request has been answered, corrected, or rejected.", keywords: "information request needs info resolved organizer" },
   { value: "organizer_response.review_decided", label: "A reviewed form is approved, denied, or needs info", category: "forms_intake", description: "Fires when a staff reviewer sets a form's review decision to a specific status.", keywords: "organizer review approved denied rejected needs info decision" },
   { value: "engagement.stage_entered", label: "An engagement enters a pipeline stage", category: "engagements", description: "Fires when an engagement enters a specific stage of its pipeline.", keywords: "pipeline stage engagement" },
-  { value: "lead.created", label: "A new lead is created", category: "contacts_leads", description: "Fires when a new lead is created (staff entry, public form, portal, referral, etc).", keywords: "contact created lead new" },
-  { value: "lead.updated", label: "A lead's info is updated", category: "contacts_leads", description: "Fires when a lead's information is changed.", keywords: "contact changed lead updated" },
-  { value: "lead.assigned", label: "A lead is assigned to staff", category: "contacts_leads", description: "Fires when a lead is assigned to a staff member.", keywords: "lead assign staff" },
-  { value: "lead.stage_entered", label: "A lead enters a pipeline stage", category: "contacts_leads", description: "Fires when a lead enters a specific stage of its pipeline.", keywords: "pipeline stage lead opportunity" },
-  { value: "lead.status_changed", label: "A lead's status changes to", category: "contacts_leads", description: "Fires when a lead's status changes (e.g. converted or lost).", keywords: "lead status opportunity" },
-  { value: "lead.converted_to_client", label: "A lead is converted to a client", category: "contacts_leads", description: "Fires when a lead becomes an active client.", keywords: "lead convert client" },
-  { value: "lead.marked_lost", label: "A lead is marked lost", category: "contacts_leads", description: "Fires when a lead is marked lost.", keywords: "lead lost close" },
+  { value: "pipeline.stage_entered", label: "A contact enters a pipeline stage", category: "contacts_leads", description: "Fires when a Contact enters a specific stage of a pipeline.", keywords: "pipeline stage contact process" },
   { value: "quote.created", label: "A quote is created", category: "billing", description: "Fires when a quote is created.", keywords: "quote billing estimate" },
   { value: "quote.sent", label: "A quote is sent", category: "billing", description: "Fires when a quote is sent to the client.", keywords: "quote billing sent" },
   { value: "quote.accepted", label: "A quote is accepted", category: "billing", description: "Fires when a client accepts a quote.", keywords: "quote billing accepted" },
@@ -194,32 +188,12 @@ export function triggerSummary(
     const template = templateId ? organizerTemplates.find((t) => t.id === templateId) : undefined;
     return `When "${template?.name ?? "a form"}" is reviewed and marked "${label}"`;
   }
-  if (triggerType === "lead.created") {
-    return "When a new lead is created";
-  }
-  if (triggerType === "lead.updated") {
-    return "When a lead's info is updated";
-  }
-  if (triggerType === "lead.assigned") {
-    return "When a lead is assigned to staff";
-  }
-  if (triggerType === "lead.stage_entered") {
+  if (triggerType === "pipeline.stage_entered") {
     const processId = config.process_id as string | undefined;
     const stageId = config.process_stage_id as string | undefined;
     const pipeline = pipelines.find((p) => p.id === processId);
     const stage = pipeline?.stages.find((s) => s.id === stageId);
-    return `When a lead enters "${stage?.name ?? "a stage"}" in "${pipeline?.name ?? "a pipeline"}"`;
-  }
-  if (triggerType === "lead.status_changed") {
-    const stageKey = config.to_status as string | undefined;
-    const label = stageKey === "active" ? "Active" : stageKey === "lost" ? "Lost" : (stageKey ?? "?");
-    return `When a lead's status changes to "${label}"`;
-  }
-  if (triggerType === "lead.converted_to_client") {
-    return "When a lead is converted to a client";
-  }
-  if (triggerType === "lead.marked_lost") {
-    return "When a lead is marked lost";
+    return `When a contact enters "${stage?.name ?? "a stage"}" in "${pipeline?.name ?? "a pipeline"}"`;
   }
   if (QUOTE_TRIGGER_TYPES.has(triggerType)) {
     const verb = { "quote.created": "is created", "quote.sent": "is sent", "quote.accepted": "is accepted", "quote.declined": "is declined" }[
@@ -391,7 +365,7 @@ export function TriggerFields({
             className="rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
           <span className="mt-1 text-[11px] normal-case text-muted">
-            POST JSON to this URL. An <code>email</code> or <code>phone</code> field finds or creates a matching lead; every
+            POST JSON to this URL. An <code>email</code> or <code>phone</code> field finds or creates a matching contact; every
             field in the body becomes available to this run&apos;s conditions and merge fields.
           </span>
         </div>
@@ -647,7 +621,7 @@ export function TriggerFields({
         </>
       )}
 
-      {triggerType === "lead.stage_entered" && (
+      {triggerType === "pipeline.stage_entered" && (
         <>
           <label className="flex flex-col gap-1 text-xs text-muted">
             Pipeline
@@ -686,24 +660,6 @@ export function TriggerFields({
             </select>
           </label>
         </>
-      )}
-
-      {triggerType === "lead.status_changed" && (
-        <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-          Status
-          <select
-            disabled={disabled}
-            value={(config.to_status as string) ?? ""}
-            onChange={(e) => onConfigChange({ to_status: e.target.value })}
-            className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-          >
-            <option value="" disabled>
-              Choose a status
-            </option>
-            <option value="active">Active (converted)</option>
-            <option value="lost">Lost</option>
-          </select>
-        </label>
       )}
 
       {QUOTE_TRIGGER_TYPES.has(triggerType) && (

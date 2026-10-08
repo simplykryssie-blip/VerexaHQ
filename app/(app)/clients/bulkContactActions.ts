@@ -2,34 +2,35 @@
 // ContactsBulkTable.tsx so it's directly unit-testable without mocking
 // Supabase or next/navigation.
 //
-// Bulk status intentionally excludes "lost" and "archived": both go through
-// their own dedicated RPCs (mark_client_lost, archive_client/restore_client)
-// because both cascade to engagements/document requests (and, for lost,
-// invoices too) -- a bare status update would silently skip all of that.
-// Selected contacts already in either of those two statuses are skipped by
-// bulk status, never silently mutated by it.
-export const BULK_STATUS_OPTIONS = [
-  { value: "lead", label: "Lead" },
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
-] as const;
+// Bulk archive/restore are operational actions. Lost contacts are handled by
+// the dedicated mark_client_lost RPC because it cascades engagements,
+// invoices, and document requests.
+export type ContactDispositionRow = {
+  archived_at?: string | null;
+  lost_at?: string | null;
+};
 
-export type BulkStatusValue = (typeof BULK_STATUS_OPTIONS)[number]["value"];
-
-const BULK_ELIGIBLE_STATUSES: readonly string[] = BULK_STATUS_OPTIONS.map((o) => o.value);
-
-export function isEligibleForBulkStatus(currentStatus: string): boolean {
-  return BULK_ELIGIBLE_STATUSES.includes(currentStatus);
+export function isEligibleForBulkArchive(row: ContactDispositionRow): boolean {
+  return !row.archived_at && !row.lost_at;
 }
 
-/** Splits selected rows into those a bulk status change may touch and those
- * it must leave alone, so the caller can apply the mutation only to
- * `eligible` and report `skipped` rather than mutating everything blindly. */
-export function partitionForBulkStatus<T extends { lifecycle_status: string }>(
+export function partitionForBulkArchive<T extends ContactDispositionRow>(
   rows: T[]
 ): { eligible: T[]; skipped: T[] } {
-  const eligible = rows.filter((r) => isEligibleForBulkStatus(r.lifecycle_status));
-  const skipped = rows.filter((r) => !isEligibleForBulkStatus(r.lifecycle_status));
+  const eligible = rows.filter(isEligibleForBulkArchive);
+  const skipped = rows.filter((r) => !isEligibleForBulkArchive(r));
+  return { eligible, skipped };
+}
+
+export function isEligibleForBulkRestore(row: ContactDispositionRow): boolean {
+  return Boolean(row.archived_at) && !row.lost_at;
+}
+
+export function partitionForBulkRestore<T extends ContactDispositionRow>(
+  rows: T[]
+): { eligible: T[]; skipped: T[] } {
+  const eligible = rows.filter(isEligibleForBulkRestore);
+  const skipped = rows.filter((r) => !isEligibleForBulkRestore(r));
   return { eligible, skipped };
 }
 
@@ -44,32 +45,6 @@ export function tagsAfterBulkRemove(tags: string[] | null, tag: string): string[
  * selection doesn't fire a no-op update against every row. */
 export function rowsHavingTag<T extends { tags: string[] | null }>(rows: T[], tag: string): T[] {
   return rows.filter((r) => (r.tags ?? []).includes(tag));
-}
-
-/** Bulk archive shares its eligible set with bulk status (lead/active/
- * inactive) -- "lost" and already-"archived" contacts are skipped, not
- * re-archived or silently converted. A named wrapper around
- * partitionForBulkStatus for call-site clarity, since archive is a distinct
- * action (goes through archive_client, not a bare status write) even though
- * the eligibility set happens to match. */
-export function partitionForBulkArchive<T extends { lifecycle_status: string }>(
-  rows: T[]
-): { eligible: T[]; skipped: T[] } {
-  return partitionForBulkStatus(rows);
-}
-
-export function isEligibleForBulkRestore(currentStatus: string): boolean {
-  return currentStatus === "archived";
-}
-
-/** Bulk restore's eligible set is the mirror image of archive's -- only
- * already-archived contacts can be restored; everything else is skipped. */
-export function partitionForBulkRestore<T extends { lifecycle_status: string }>(
-  rows: T[]
-): { eligible: T[]; skipped: T[] } {
-  const eligible = rows.filter((r) => isEligibleForBulkRestore(r.lifecycle_status));
-  const skipped = rows.filter((r) => !isEligibleForBulkRestore(r.lifecycle_status));
-  return { eligible, skipped };
 }
 
 // Contacts Reconciliation Audit -- Phase 3 (cross-page selection). "Select
@@ -117,8 +92,7 @@ export function summarizeDeleteClientsResult(rows: DeleteClientsResultRow[]): De
  * with each other or with the RPC's actual parameter names. */
 export type SearchClientsFilters = {
   p_query?: string;
-  p_lifecycle_statuses?: string[];
-  p_tag?: string;
+    p_tag?: string;
   p_service_id?: string;
   p_assigned_staff_id?: string;
   p_pipeline_stage_name?: string;
