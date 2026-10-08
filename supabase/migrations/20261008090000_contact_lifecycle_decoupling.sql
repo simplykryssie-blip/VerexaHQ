@@ -597,16 +597,8 @@ begin
   );
   v_def := replace(
     v_def,
-    $          v_step.action_config->>'primary_phone',
-          v_normalized_email,
-          v_normalized_phone,
-          coalesce(nullif(v_step.action_config->>'lifecycle_status', ''), 'lead')$,
-    $$          v_step.action_config->>'primary_phone',
-          case
-            when nullif(v_step.action_config->>'tag', '') is not null
-              then array[v_step.action_config->>'tag']::text[]
-            else '{}'::text[]
-          end$$
+    'coalesce(nullif(v_step.action_config->>''lifecycle_status'', ''''), ''lead'')',
+    'case when nullif(v_step.action_config->>''tag'', '''') is not null then array[v_step.action_config->>''tag'']::text[] else ''{}''::text[] end'
   );
 
   if position('lifecycle_status' in v_def) > 0
