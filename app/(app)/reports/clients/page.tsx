@@ -17,7 +17,7 @@ type ClientRow = {
   id: string;
   clientLabel: string;
   client_type: string;
-  tags: string;
+  tags: string[];
   created_at: string;
 };
 
@@ -51,7 +51,7 @@ export default async function ClientsReportPage({ searchParams }: { searchParams
     id: c.id,
     clientLabel: clientLabel(c),
     client_type: c.client_type,
-    tags: c.tags,
+    tags: c.tags ?? [],
     created_at: c.created_at,
   }));
 
@@ -71,8 +71,10 @@ export default async function ClientsReportPage({ searchParams }: { searchParams
     .slice(-6)
     .map(([label, value]) => ({ label, value }));
 
-  const byStatus = new Map<string, number>();
-  for (const r of rows) byStatus.set(r.tags, (byStatus.get(r.tags) ?? 0) + 1);
+  const byTag = new Map<string, number>();
+  for (const r of rows) {
+    for (const tag of r.tags) byTag.set(tag, (byTag.get(tag) ?? 0) + 1);
+  }
 
   const columnDefs: ReportColumnDef<ClientRow>[] = [
     {
@@ -87,24 +89,24 @@ export default async function ClientsReportPage({ searchParams }: { searchParams
     },
     { key: "type", label: "Type", render: (r) => <span className="capitalize">{r.client_type}</span>, sortValue: (r) => r.client_type },
     {
-      key: "status",
-      label: "Lifecycle status",
+      key: "tags",
+      label: "Tags",
       render: (r) => (
         
       ),
-      sortValue: (r) => r.tags,
+      sortValue: (r) => r.tags.join(", "),
     },
     { key: "created", label: "Added", render: (r) => new Date(r.created_at).toLocaleDateString(), sortValue: (r) => r.created_at },
   ];
 
   const { columns, tableRows } = buildReportTable(rows, columnDefs);
 
-  const csvRows = rows.map((r) => ({ Client: r.clientLabel, Type: r.client_type, "Lifecycle status": r.tags, Added: r.created_at }));
+  const csvRows = rows.map((r) => ({ Client: r.clientLabel, Type: r.client_type, Tags: r.tags.join(", "), Added: r.created_at }));
 
   return (
     <ReportLayout
       title="Clients"
-      description="Client growth and lifecycle status breakdown."
+      description="Contact growth and tag breakdown."
       filters={<FilterBar reportKey="clients" searchPlaceholder="Search client..." />}
       actions={<ExportButtons rows={csvRows} filename="clients-report" />}
     >
@@ -118,9 +120,9 @@ export default async function ClientsReportPage({ searchParams }: { searchParams
           </div>
         )}
         <div className="rounded-2xl border border-border bg-surface shadow-soft p-5">
-          <h2 className="text-sm font-semibold text-ink">By lifecycle status</h2>
+          <h2 className="text-sm font-semibold text-ink">By tag</h2>
           <ul className="mt-3 space-y-1.5 text-sm">
-            {Array.from(byStatus.entries()).map(([status, count]) => (
+            {Array.from(byTag.entries()).map(([status, count]) => (
               <li key={status} className="flex items-center justify-between">
                 
                 <span className="font-medium text-ink">{count}</span>
