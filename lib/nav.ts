@@ -210,6 +210,7 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Security", href: "/settings/security", icon: ShieldCheck },
   { label: "Availability", href: "/settings/availability", icon: CalendarOff },
   { label: "Integrations", href: "/settings/integrations", icon: Plug },
+  { label: "Domains", href: "/settings/domains", icon: Globe },
   { label: "Notifications", href: "/settings/notifications", icon: Bell },
   { label: "Feature Flags", href: "/settings/feature-flags", icon: Flag },
   { label: "Audit Logs", href: "/settings/audit-logs", icon: ScrollText },
@@ -223,7 +224,7 @@ const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
     label: "Firm",
     itemLabels: ["ERO Profile", "Plan & Usage", "Branding", "Products", "Banks & Software", "Users & Staff", "Roles & Permissions"],
   },
-  { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
+  { label: "System", itemLabels: ["Integrations", "Domains", "Feature Flags", "Audit Logs"] },
 ];
 
 export const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = SETTINGS_SECTION_MEMBERS.map((section) => ({

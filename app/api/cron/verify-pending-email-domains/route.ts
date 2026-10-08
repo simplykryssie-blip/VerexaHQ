@@ -32,8 +32,12 @@ async function handleGET(request: Request) {
   }
 
   const supabase = createServiceClient();
+  // released_at is null -- a released domain's resend_domain_id was already
+  // deleted from Resend by the disconnect route, so polling it would just
+  // waste calls against a record that no longer exists (and could crowd a
+  // genuinely-pending domain out of this 200-row sweep).
   const { data: pending, error } = await withSupabaseRetry(() =>
-    supabase.from("workspace_email_domains").select("id, resend_domain_id").neq("status", "verified").limit(200)
+    supabase.from("workspace_email_domains").select("id, resend_domain_id").neq("status", "verified").is("released_at", null).limit(200)
   );
 
   if (error) {

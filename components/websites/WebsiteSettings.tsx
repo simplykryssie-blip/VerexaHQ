@@ -150,14 +150,9 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
       toast.show(result?.error ?? "Couldn't disconnect the domain.", "error");
       return;
     }
-    const { error } = await supabase
-      .from("site_websites")
-      .update({ custom_domain: null, domain_verified: false, domain_verified_at: null })
-      .eq("id", website.id);
-    if (error) {
-      toast.show(error.message, "error");
-      return;
-    }
+    // The DELETE route now persists the release itself (via the
+    // release_website_custom_domain RPC), so there's no DB write to repeat
+    // here -- just reflect it in local state.
     setSavedDomain(null);
     setDomainInput("");
     setDomainVerified(false);
@@ -214,15 +209,9 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
             return;
           }
 
-          const { error } = await supabase
-            .from("site_websites")
-            .update({ custom_domain: null, domain_verified: false, domain_verified_at: null })
-            .eq("id", website.id);
-          if (error) {
-            toast.show(error.message, "error");
-            return;
-          }
-
+          // The DELETE route now persists the release itself -- same as
+          // the non-MFA-resume removeDomain() path above, no DB write to
+          // repeat here.
           setSavedDomain(null);
           setDomainInput("");
           setDomainVerified(false);
@@ -240,7 +229,7 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
     }
 
     void resumeDomainAction();
-  }, [searchParams, supabase, toast, router, website.id, attachDomain, verifyDomain]);
+  }, [searchParams, toast, router, website.id, attachDomain, verifyDomain]);
 
   async function save() {
     setSaving(true);
@@ -267,6 +256,27 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
 
   async function deleteWebsite() {
     if (!confirm("Delete this website? All its pages and funnels will be deleted too. This can't be undone.")) return;
+
+    // A connected custom domain must be released from Vercel before the
+    // website row disappears -- otherwise the Vercel-side project-domain
+    // attachment leaks (the domain itself never blocks the customer, who
+    // controls DNS, but it would block THIS workspace, or another one,
+    // from reattaching the same domain to a new website later). Reuses the
+    // same DELETE route removeDomain() uses, so it's the one place that
+    // does this release.
+    if (savedDomain) {
+      const response = await fetch(`/api/websites/${website.id}/attach-domain`, { method: "DELETE" }).catch(() => null);
+      const result = response ? ((await response.json().catch(() => null)) as AttachResult | null) : null;
+      if (response?.status === 403 && isAal2RequiredError(result)) {
+        toast.show("Disconnect the custom domain under Domain settings first -- two-factor verification is required for that step.", "error");
+        return;
+      }
+      if (response && !response.ok) {
+        toast.show(result?.error ?? "Couldn't release the connected domain. Disconnect it first, then delete the website.", "error");
+        return;
+      }
+    }
+
     const { error } = await supabase.from("site_websites").delete().eq("id", website.id);
     if (error) {
       toast.show(error.message, "error");
