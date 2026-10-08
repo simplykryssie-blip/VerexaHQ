@@ -117,7 +117,7 @@ export function ContactsBulkTable({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Non-null only while "select all matching" is active: full row data (not
   // just ids) for every contact matching the current filters, fetched
-  // client-side because bulk actions need lifecycle_status/tags to partition
+  // client-side because bulk actions need disposition timestamps/tags to partition
   // eligibility and CSV export needs the same display fields the visible
   // page already has. null means "selection is scoped to the current page",
   // which is the normal/default case.
