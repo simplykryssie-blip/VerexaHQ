@@ -259,7 +259,7 @@ begin
   end if;
 
   v_normalized_email := nullif(lower(btrim(coalesce(p_email, ''))), '');
-  v_normalized_phone := nullif(regexp_replace(coalesce(p_phone, ''), '\\D', '', 'g'), '');
+  v_normalized_phone := nullif(regexp_replace(coalesce(p_phone, ''), '\D', '', 'g'), '');
 
   select id into v_client_id
   from public.clients
