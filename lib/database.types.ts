@@ -15650,6 +15650,10 @@ export type Database = {
         Args: { p_due_date: string; p_item_status_id: string };
         Returns: undefined;
       };
+      set_ero_capability_enabled: {
+        Args: { p_enabled: boolean; p_workspace_id: string };
+        Returns: boolean;
+      };
       set_feature_flag: {
         Args: {
           p_config?: Json;

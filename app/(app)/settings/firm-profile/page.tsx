@@ -4,11 +4,12 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { Building2 } from "lucide-react";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { SettingsCard } from "@/components/settings/SettingsCard";
-import { isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { isEroManagementTier, isServiceBureauTier } from "@/lib/workspaceCapabilities";
 import { getMyEroConnection } from "@/lib/firmConnection";
 import { PackageCheckoutCard, type PackagePurchaseRow } from "@/components/settings/PackageCheckoutCard";
 import type { OptionGroupRow } from "@/components/settings/PackageOptionGroupsEditor";
 import { SoftwareLinksManager } from "@/components/settings/SoftwareLinksManager";
+import { EroCapabilityToggle } from "@/components/settings/EroCapabilityToggle";
 import { FirmProfileForm } from "./FirmProfileForm";
 
 export const dynamic = "force-dynamic";
@@ -108,7 +109,11 @@ export default async function FirmProfilePage() {
 
   const [{ data: profile }, { data: contact }, { data: branding }, { data: isAdmin }, { data: softwareLinks }] = await Promise.all([
     supabase.from("firm_tax_profile").select("ein_last4, efin_last4, ptin_last4, caf_last4, updated_at").eq("workspace_id", workspace.id).maybeSingle(),
-    supabase.from("workspaces").select("name, owner_name, phone, website, mailing_address, primary_contact_email").eq("id", workspace.id).single(),
+    supabase
+      .from("workspaces")
+      .select("name, owner_name, phone, website, mailing_address, primary_contact_email, ero_capability_enabled")
+      .eq("id", workspace.id)
+      .single(),
     supabase.from("branding").select("support_email, support_phone").eq("workspace_id", workspace.id).maybeSingle(),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "workspace.manage" }),
     supabase.from("workspace_software_links").select("id, name, url").eq("workspace_id", workspace.id).order("display_order"),
@@ -138,6 +143,28 @@ export default async function FirmProfilePage() {
       <div className="mt-6">
         <SoftwareLinksManager workspaceId={workspace.id} initialLinks={softwareLinks ?? []} />
       </div>
+
+      {isServiceBureauTier(workspace) && (
+        <div className="mt-6">
+          <SettingsCard
+            title="Client/Engagement Book"
+            description={
+              workspace.is_owner
+                ? "Operate your own clients and engagements directly from this workspace, in addition to managing the firms connected under you. Only the workspace owner can change this."
+                : "Whether this workspace operates its own clients and engagements directly, in addition to managing the firms connected under it. Only the workspace owner can change this."
+            }
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-slate">{contact?.ero_capability_enabled ? "Enabled" : "Disabled"}</p>
+              <EroCapabilityToggle
+                workspaceId={workspace.id}
+                enabled={Boolean(contact?.ero_capability_enabled)}
+                canToggle={workspace.is_owner}
+              />
+            </div>
+          </SettingsCard>
+        </div>
+      )}
     </div>
   );
 }
