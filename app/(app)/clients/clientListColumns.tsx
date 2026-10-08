@@ -45,6 +45,8 @@ export type ClientRow = {
   primary_email: string | null;
   primary_phone: string | null;
   tags: string[] | null;
+  archived_at: string | null;
+  lost_at: string | null;
   requestedService?: string | null;
   needsReview?: boolean;
   /** clients.relationship_manager_id -- the canonical "assigned staff"
