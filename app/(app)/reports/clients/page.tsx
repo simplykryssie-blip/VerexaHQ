@@ -10,7 +10,6 @@ import { SimpleBarChart } from "@/components/reports/SimpleBarChart";
 import { EmptyState } from "@/components/EmptyState";
 import { Lock } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
-import { clientStatusTone } from "@/lib/clientStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +17,7 @@ type ClientRow = {
   id: string;
   clientLabel: string;
   client_type: string;
-  lifecycle_status: string;
+  tags: string;
   created_at: string;
 };
 
@@ -43,7 +42,7 @@ export default async function ClientsReportPage({ searchParams }: { searchParams
 
   const { data: clients } = await supabase
     .from("clients")
-    .select("id, client_type, first_name, last_name, business_name, lifecycle_status, created_at")
+    .select("id, client_type, first_name, last_name, business_name, tags, created_at")
     .eq("workspace_id", workspace.id)
     .is("merged_into_client_id", null)
     .order("created_at", { ascending: false });
@@ -52,7 +51,7 @@ export default async function ClientsReportPage({ searchParams }: { searchParams
     id: c.id,
     clientLabel: clientLabel(c),
     client_type: c.client_type,
-    lifecycle_status: c.lifecycle_status,
+    tags: c.tags,
     created_at: c.created_at,
   }));
 
@@ -73,7 +72,7 @@ export default async function ClientsReportPage({ searchParams }: { searchParams
     .map(([label, value]) => ({ label, value }));
 
   const byStatus = new Map<string, number>();
-  for (const r of rows) byStatus.set(r.lifecycle_status, (byStatus.get(r.lifecycle_status) ?? 0) + 1);
+  for (const r of rows) byStatus.set(r.tags, (byStatus.get(r.tags) ?? 0) + 1);
 
   const columnDefs: ReportColumnDef<ClientRow>[] = [
     {
@@ -91,18 +90,16 @@ export default async function ClientsReportPage({ searchParams }: { searchParams
       key: "status",
       label: "Lifecycle status",
       render: (r) => (
-        <Badge tone={clientStatusTone(r.lifecycle_status)} className="capitalize">
-          {r.lifecycle_status}
-        </Badge>
+        
       ),
-      sortValue: (r) => r.lifecycle_status,
+      sortValue: (r) => r.tags,
     },
     { key: "created", label: "Added", render: (r) => new Date(r.created_at).toLocaleDateString(), sortValue: (r) => r.created_at },
   ];
 
   const { columns, tableRows } = buildReportTable(rows, columnDefs);
 
-  const csvRows = rows.map((r) => ({ Client: r.clientLabel, Type: r.client_type, "Lifecycle status": r.lifecycle_status, Added: r.created_at }));
+  const csvRows = rows.map((r) => ({ Client: r.clientLabel, Type: r.client_type, "Lifecycle status": r.tags, Added: r.created_at }));
 
   return (
     <ReportLayout
@@ -125,9 +122,7 @@ export default async function ClientsReportPage({ searchParams }: { searchParams
           <ul className="mt-3 space-y-1.5 text-sm">
             {Array.from(byStatus.entries()).map(([status, count]) => (
               <li key={status} className="flex items-center justify-between">
-                <Badge tone={clientStatusTone(status)} className="capitalize">
-                  {status}
-                </Badge>
+                
                 <span className="font-medium text-ink">{count}</span>
               </li>
             ))}
