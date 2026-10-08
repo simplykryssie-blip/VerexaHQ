@@ -2499,6 +2499,8 @@ export type Database = {
       clients: {
         Row: {
           address_line1: string | null;
+          archived_at: string | null;
+          archived_reason: string | null;
           address_line2: string | null;
           business_name: string | null;
           city: string | null;
@@ -2550,6 +2552,8 @@ export type Database = {
         };
         Insert: {
           address_line1?: string | null;
+          archived_at?: string | null;
+          archived_reason?: string | null;
           address_line2?: string | null;
           business_name?: string | null;
           city?: string | null;
@@ -2625,7 +2629,6 @@ export type Database = {
           itin_hash?: string | null;
           itin_last4?: string | null;
           last_name?: string | null;
-          lifecycle_status?: string;
           lost_at?: string | null;
           lost_reason?: string | null;
           merged_into_client_id?: string | null;
