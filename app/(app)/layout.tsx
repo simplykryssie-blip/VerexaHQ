@@ -11,6 +11,8 @@ import { MfaSetupBanner } from "@/components/MfaSetupBanner";
 import { BillingCardPrompt } from "@/components/BillingCardPrompt";
 import { SponsorshipTransitionBanner } from "@/components/SponsorshipTransitionBanner";
 import { SuspendedWorkspaceScreen } from "@/components/SuspendedWorkspaceScreen";
+import { RequiredCardSetupScreen } from "@/components/billing/RequiredCardSetupScreen";
+import { isForcedLegacySetupWorkspace } from "@/lib/billing/legacyMigrationWorkspaces";
 import { AppHeader } from "@/components/AppHeader";
 import { IdleLogout } from "@/components/IdleLogout";
 import { getCurrentWorkspace, isSuspensionRecoveryPath, isWorkspaceStatusOperational } from "@/lib/workspace";
@@ -71,6 +73,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
     { data: myEroConnection },
     { data: sponsorshipTransitionRows },
     mfaFactorsResult,
+    { data: legacySetupSubscription },
   ] = await Promise.all([
     supabase
       .from("workspace_security_policies")
@@ -141,6 +144,12 @@ export default async function AppLayout({ children, modal }: { children: React.R
     // remediation). Drives MfaSetupBanner below; the actual AAL2 enforcement
     // stays entirely in hasAal2()/requireAal2.ts, this is UI-only.
     user ? supabase.auth.mfa.listFactors() : Promise.resolve({ data: null }),
+    // Only ever non-null for the one named legacy workspace this gate
+    // applies to (see lib/billing/legacyMigrationWorkspaces.ts) -- everyone
+    // else pays this no extra query at all.
+    workspace.is_owner && isForcedLegacySetupWorkspace(workspace.id)
+      ? supabase.from("workspace_subscriptions").select("stripe_subscription_id").eq("workspace_id", workspace.id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
   const hasVerifiedMfaFactor = Boolean(mfaFactorsResult?.data?.totp?.some((f) => f.status === "verified"));
 
@@ -166,6 +175,16 @@ export default async function AppLayout({ children, modal }: { children: React.R
   const pathname = headers().get("x-pathname") ?? "";
   if (!isWorkspaceStatusOperational(workspace.status) && !isPlatformAdmin && !isSuspensionRecoveryPath(pathname)) {
     return <SuspendedWorkspaceScreen status={workspace.status} suspensionReason={workspace.suspension_reason} />;
+  }
+
+  // Forced legacy billing setup: this workspace is active (not suspended --
+  // that's the check above) but has never had a real Stripe Subscription.
+  // Blocks the whole shell for its owner, same precedent as
+  // SuspendedWorkspaceScreen, until RequiredCardSetupScreen's own redirect
+  // to Stripe's hosted card-collection page completes. Platform admins
+  // bypass this too, same reasoning as the suspension gate above.
+  if (workspace.is_owner && !isPlatformAdmin && isForcedLegacySetupWorkspace(workspace.id) && !legacySetupSubscription?.stripe_subscription_id) {
+    return <RequiredCardSetupScreen />;
   }
 
   // Messages is relevant either for cross-firm network messaging (ERO/SB or
