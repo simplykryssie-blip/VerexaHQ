@@ -26,6 +26,28 @@ set tags = array(
 where lifecycle_status = 'lead'
   and not ('Lead' = any(coalesce(tags, '{}'::text[])));
 
+-- Remove the obsolete Lead trigger vocabulary from saved automations.
+-- Creation is represented by the Lead tag; pipeline stage entry is generic.
+update public.automations
+set trigger_type = 'client.tag_added',
+    trigger_config = jsonb_build_object('tag', 'Lead')
+where trigger_type = 'lead.created';
+
+update public.automations
+set trigger_type = 'pipeline.stage_entered'
+where trigger_type = 'lead.stage_entered';
+
+-- These trigger types depended directly on the removed lifecycle/Lead identity
+-- model and have no generic equivalent that preserves their old semantics.
+delete from public.automations
+where trigger_type in (
+  'lead.updated',
+  'lead.assigned',
+  'lead.status_changed',
+  'lead.converted_to_client',
+  'lead.marked_lost'
+);
+
 -- The live Lead-stage automation is now a generic pipeline-stage automation.
 update public.automations
 set trigger_type = 'pipeline.stage_entered'
