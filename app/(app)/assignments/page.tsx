@@ -68,7 +68,7 @@ export default async function AssignmentsPage({ searchParams }: { searchParams: 
   if (tab === "clients") {
     const { data } = await supabase
       .from("clients")
-      .select("id, first_name, last_name, business_name, client_type, lifecycle_status, relationship_manager_id")
+      .select("id, first_name, last_name, business_name, client_type, tags, relationship_manager_id")
       .eq("workspace_id", workspace.id)
       .order("created_at", { ascending: false })
       .limit(200);
@@ -77,7 +77,7 @@ export default async function AssignmentsPage({ searchParams }: { searchParams: 
     rows = (data ?? []).map((c) => ({
       id: c.id,
       label: clientLabelFor(c),
-      sublabel: c.lifecycle_status,
+      sublabel: (c.tags ?? []).join(", ") || null,
       href: `/clients/${c.id}`,
       currentAssigneeName: c.relationship_manager_id ? (staffNameById.get(c.relationship_manager_id) ?? "Unknown") : null,
     }));

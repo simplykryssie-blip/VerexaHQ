@@ -59,11 +59,10 @@ describe("/clients page -- Unassigned filter", () => {
   it("combines the unassigned filter with other existing filters in one call", async () => {
     const fake = setSupabase({}, { search_clients: { data: [] } });
     const { default: ClientsPage } = await import("@/app/(app)/clients/page");
-    await ClientsPage({ searchParams: { staff: "unassigned", clientType: "business", status: "active" } });
+    await ClientsPage({ searchParams: { staff: "unassigned", clientType: "business" } });
     const call = fake.rpcCalls.find((c) => c.name === "search_clients");
     expect(call?.args?.p_unassigned_only).toBe(true);
     expect(call?.args?.p_client_type).toBe("business");
-    expect(call?.args?.p_lifecycle_statuses).toEqual(["active"]);
   });
 
   it("loads without throwing when the unassigned filter matches nothing", async () => {

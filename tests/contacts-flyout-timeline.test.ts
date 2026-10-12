@@ -21,13 +21,10 @@ describe("ClientQuickViewDrawer -- no longer embeds the full Contact tab system"
     expect(drawerSource).not.toContain("useState<ClientTab>");
   });
 
-  it("keeps identity, status, quick stats, insights, recent activity, and the existing actions", () => {
+  it("keeps identity, quick stats, insights, recent activity, and the existing actions", () => {
     expect(drawerSource).toContain("Avatar");
-    expect(drawerSource).toContain("clientStatusTone");
     expect(drawerSource).toContain("<ClientInsightWidgets");
     expect(drawerSource).toContain("Recent activity");
-    expect(drawerSource).toContain("<ConvertLeadButton");
-    expect(drawerSource).toContain("<MarkLeadLostButton");
     expect(drawerSource).toContain("<ArchiveClientButton");
     expect(drawerSource).toContain("<QuickActions");
   });

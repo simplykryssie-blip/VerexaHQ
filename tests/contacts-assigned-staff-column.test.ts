@@ -99,11 +99,11 @@ describe("/clients page -- Assigned Staff enrichment", () => {
     await expect(ClientsPage({ searchParams: {} })).resolves.toBeTruthy();
   });
 
-  it("handles a no-results search (existing staff filter combined with status and free-text query)", async () => {
+  it("handles a no-results search (existing staff filter combined with tag and free-text query)", async () => {
     setSupabase({}, { search_clients: { data: [] } });
     const { default: ClientsPage } = await import("@/app/(app)/clients/page");
     await expect(
-      ClientsPage({ searchParams: { staff: "staff-1", status: "active", q: "nobody-matches-this" } })
+      ClientsPage({ searchParams: { staff: "staff-1", tag: "Hot Lead", q: "nobody-matches-this" } })
     ).resolves.toBeTruthy();
   });
 

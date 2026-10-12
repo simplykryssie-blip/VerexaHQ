@@ -1,19 +1,20 @@
-// Regression coverage for VEREXAHQ -- CONTACTS EASY FIX #3 (bulk status,
-// bulk tag remove, bulk assignment). The audit found:
-//   - "lost" must never be bulk-set directly -- it has real cascading side
-//     effects only mark_client_lost applies (voids invoices, archives
-//     engagements, cancels document requests).
-//   - "archived" has no existing single-client mechanism anywhere in the
-//     app (confirmed by a full-repo search), so this task does not invent
-//     bulk archive/restore -- both remain unimplemented on purpose.
+// Regression coverage for VEREXAHQ -- CONTACTS EASY FIX #3 (bulk archive/
+// restore, bulk tag remove, bulk assignment). Contact Lifecycle Status
+// removal replaced the old single bulk-status dropdown (lead/active/
+// inactive, with lost/archived excluded as terminal) with the disposition
+// model: archive/restore are their own explicit actions gated on
+// archived_at/lost_at, and "lost" still only ever happens through the
+// dedicated mark_client_lost RPC because of its cascading side effects
+// (voids invoices, archives engagements, cancels document requests).
 //   - Bulk assignment uses clients.relationship_manager_id, the same field
 //     the Assigned Staff column (Fix #2) and ClientAssignmentForm already
 //     use, never engagements.assigned_staff_id.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
-  BULK_STATUS_OPTIONS,
-  isEligibleForBulkStatus,
-  partitionForBulkStatus,
+  isEligibleForBulkArchive,
+  partitionForBulkArchive,
+  isEligibleForBulkRestore,
+  partitionForBulkRestore,
   tagsAfterBulkRemove,
   rowsHavingTag,
   summarizeDeleteClientsResult,
@@ -21,60 +22,73 @@ import {
 import { createFakeSupabase, type FixtureResult } from "./helpers/fakeSupabase";
 import { WORKSPACE_FIXTURE } from "./fixtures/clientRecords";
 
-describe("BULK_STATUS_OPTIONS", () => {
-  it("only exposes Lead, Active, and Inactive -- never Lost or Archived", () => {
-    const values = BULK_STATUS_OPTIONS.map((o) => o.value);
-    expect(values).toEqual(["lead", "active", "inactive"]);
-    expect(values).not.toContain("lost");
-    expect(values).not.toContain("archived");
+describe("isEligibleForBulkArchive", () => {
+  it("allows a contact with no disposition set", () => {
+    expect(isEligibleForBulkArchive({ archived_at: null, lost_at: null })).toBe(true);
+  });
+
+  it("rejects an already-archived or already-lost contact", () => {
+    expect(isEligibleForBulkArchive({ archived_at: "2026-01-01", lost_at: null })).toBe(false);
+    expect(isEligibleForBulkArchive({ archived_at: null, lost_at: "2026-01-01" })).toBe(false);
   });
 });
 
-describe("isEligibleForBulkStatus", () => {
-  it("allows lead, active, and inactive", () => {
-    expect(isEligibleForBulkStatus("lead")).toBe(true);
-    expect(isEligibleForBulkStatus("active")).toBe(true);
-    expect(isEligibleForBulkStatus("inactive")).toBe(true);
-  });
-
-  it("rejects lost and archived -- these must go through their own dedicated mechanisms", () => {
-    expect(isEligibleForBulkStatus("lost")).toBe(false);
-    expect(isEligibleForBulkStatus("archived")).toBe(false);
-  });
-});
-
-describe("partitionForBulkStatus", () => {
+describe("partitionForBulkArchive", () => {
   it("A (single selection): an eligible contact goes to eligible, none skipped", () => {
-    const { eligible, skipped } = partitionForBulkStatus([{ id: "c1", lifecycle_status: "lead" }]);
+    const { eligible, skipped } = partitionForBulkArchive([{ id: "c1", archived_at: null, lost_at: null }]);
     expect(eligible).toHaveLength(1);
     expect(skipped).toHaveLength(0);
   });
 
-  it("B (multiple selection): a mix of eligible and terminal statuses splits correctly", () => {
+  it("B (multiple selection): a mix of eligible and already-dispositioned rows splits correctly", () => {
     const rows = [
-      { id: "c1", lifecycle_status: "lead" },
-      { id: "c2", lifecycle_status: "active" },
-      { id: "c3", lifecycle_status: "lost" },
-      { id: "c4", lifecycle_status: "archived" },
+      { id: "c1", archived_at: null, lost_at: null },
+      { id: "c2", archived_at: null, lost_at: null },
+      { id: "c3", archived_at: "2026-01-01", lost_at: null },
+      { id: "c4", archived_at: null, lost_at: "2026-01-02" },
     ];
-    const { eligible, skipped } = partitionForBulkStatus(rows);
+    const { eligible, skipped } = partitionForBulkArchive(rows);
     expect(eligible.map((r) => r.id)).toEqual(["c1", "c2"]);
     expect(skipped.map((r) => r.id)).toEqual(["c3", "c4"]);
   });
 
   it("C (empty selection): returns two empty arrays without throwing", () => {
-    const { eligible, skipped } = partitionForBulkStatus([]);
+    const { eligible, skipped } = partitionForBulkArchive([]);
     expect(eligible).toEqual([]);
     expect(skipped).toEqual([]);
   });
 
   it("does not silently mutate data -- every input row appears in exactly one of the two output arrays", () => {
     const rows = [
-      { id: "c1", lifecycle_status: "lead" },
-      { id: "c2", lifecycle_status: "lost" },
+      { id: "c1", archived_at: null, lost_at: null },
+      { id: "c2", archived_at: null, lost_at: "2026-01-01" },
     ];
-    const { eligible, skipped } = partitionForBulkStatus(rows);
+    const { eligible, skipped } = partitionForBulkArchive(rows);
     expect(eligible.length + skipped.length).toBe(rows.length);
+  });
+});
+
+describe("isEligibleForBulkRestore", () => {
+  it("allows only an archived (and not lost) contact", () => {
+    expect(isEligibleForBulkRestore({ archived_at: "2026-01-01", lost_at: null })).toBe(true);
+  });
+
+  it("rejects a contact with no disposition set, and one that's also lost", () => {
+    expect(isEligibleForBulkRestore({ archived_at: null, lost_at: null })).toBe(false);
+    expect(isEligibleForBulkRestore({ archived_at: "2026-01-01", lost_at: "2026-01-02" })).toBe(false);
+  });
+});
+
+describe("partitionForBulkRestore", () => {
+  it("splits archived-only rows into eligible, everything else into skipped", () => {
+    const rows = [
+      { id: "c1", archived_at: "2026-01-01", lost_at: null },
+      { id: "c2", archived_at: null, lost_at: null },
+      { id: "c3", archived_at: "2026-01-01", lost_at: "2026-01-02" },
+    ];
+    const { eligible, skipped } = partitionForBulkRestore(rows);
+    expect(eligible.map((r) => r.id)).toEqual(["c1"]);
+    expect(skipped.map((r) => r.id)).toEqual(["c2", "c3"]);
   });
 });
 

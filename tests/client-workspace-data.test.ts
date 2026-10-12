@@ -43,7 +43,7 @@ describe("getClientWorkspaceData", () => {
     expect(result?.contacts).toEqual([]);
     expect(result?.engagements).toEqual([]);
     expect(result?.outstandingBalance).toBe(0);
-    expect(result?.leadPipelines).toEqual([]);
+    expect(result?.pipelines).toEqual([]);
     expect(result?.automationStatus).toBeNull();
   });
 

@@ -55,12 +55,12 @@ describe("/clients (Contacts) list page", () => {
     await expect(ClientsPage({ searchParams: {} })).resolves.toBeTruthy();
   });
 
-  it("loads filtered to a status with no matching clients", async () => {
+  it("loads filtered to a tag with no matching clients", async () => {
     setSupabase({
       clients: { data: [], count: 0 },
     });
     const { default: ClientsPage } = await import("@/app/(app)/clients/page");
-    await expect(ClientsPage({ searchParams: { status: "archived" } })).resolves.toBeTruthy();
+    await expect(ClientsPage({ searchParams: { tag: "Hot Lead" } })).resolves.toBeTruthy();
   });
 
   it("renders a table row for each fixture client without throwing", async () => {

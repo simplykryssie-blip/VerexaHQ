@@ -16,11 +16,11 @@ const GHL_VERSION = "2021-07-28";
 const PAGE_LIMIT_CONTACTS_ONLY = 25;
 const PAGE_LIMIT_WITH_EXTRAS = 8;
 const IMPORT_TAG = "source:ghl-import";
-// Automations that could fire once per imported contact -- new-lead
-// notifications/portal invites, and any tag-triggered automation whose tag
-// happens to collide with a GHL tag name -- are paused for the run rather
-// than blasting staff or clients for a batch of historical contacts.
-const PAUSE_TRIGGER_TYPES = ["lead.created", "client.tag_added"];
+// Tag-triggered automations (including the Lead-tag new-lead automations, and
+// any whose tag happens to collide with a GHL tag name) could fire once per
+// imported contact, so they are paused for the run rather than blasting staff
+// or clients for a batch of historical contacts.
+const PAUSE_TRIGGER_TYPES = ["client.tag_added"];
 
 type GhlCustomFieldValue = { id?: string; value?: unknown };
 

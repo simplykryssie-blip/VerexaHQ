@@ -4,9 +4,7 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { QuickActions } from "./QuickActions";
-import { ConvertLeadButton } from "./ConvertLeadButton";
-import { RevertToLeadButton } from "./RevertToLeadButton";
-import { MarkLeadLostButton } from "./MarkLeadLostButton";
+import { MarkContactLostButton } from "./MarkContactLostButton";
 import { ArchiveClientButton } from "./ArchiveClientButton";
 import Link from "next/link";
 import type { ActionPermissions } from "@/lib/actionPermissions";
@@ -18,7 +16,6 @@ import { automationActionLabel } from "@/lib/automationLabels";
 import { FileUp, MessageSquare, Receipt as ReceiptIcon, NotebookPen } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { SectionCard } from "@/components/ui/SectionCard";
-import { clientStatusTone } from "@/lib/clientStatus";
 import { ClientTabsBody, displayName, TABS, type ClientTab } from "./ClientTabsBody";
 import {
   type ContactRow,
@@ -53,7 +50,8 @@ type ClientRow = {
   first_name: string | null;
   last_name: string | null;
   business_name: string | null;
-  lifecycle_status: string;
+  archived_at: string | null;
+  lost_at: string | null;
   primary_email: string | null;
   primary_phone: string | null;
   address_line1: string | null;
@@ -122,7 +120,7 @@ export type ClientWorkspaceProps = {
   complianceDefault: { id: string; display_name: string | null } | null;
   requestedService: string | null;
   interestedServiceIds: string[];
-  leadPipelines: { processId: string; processName: string | null; stageName: string | null }[];
+  pipelines: { processId: string; processName: string | null; stageName: string | null }[];
   automationStatus: { automationName: string; status: string; stepActionType: string | null; error: string | null } | null;
   additionalSigners: AdditionalSignerOption[];
 };
@@ -171,7 +169,7 @@ export function ClientWorkspace(props: ClientWorkspaceProps) {
   complianceDefault,
   requestedService,
   interestedServiceIds,
-  leadPipelines,
+  pipelines,
   automationStatus,
   additionalSigners,
   } = props;
@@ -222,17 +220,13 @@ export function ClientWorkspace(props: ClientWorkspaceProps) {
             <span className="capitalize">{client.client_type}</span>
             {primaryService && <span>{primaryService}</span>}
             {!primaryService && requestedService && <span>Requested: {requestedService}</span>}
-            <Badge tone={clientStatusTone(client.lifecycle_status)} className="capitalize">
-              {client.lifecycle_status}
-            </Badge>
-            {client.lifecycle_status === "lead" &&
-              leadPipelines.map((pipeline) =>
-                pipeline.stageName ? (
-                  <Link key={pipeline.processId} href={`/pipelines/${pipeline.processId}`} className="text-accent hover:underline">
-                    {pipeline.processName ?? "Pipeline"}: {pipeline.stageName}
-                  </Link>
-                ) : null
-              )}
+            {pipelines.map((pipeline) =>
+              pipeline.stageName ? (
+                <Link key={pipeline.processId} href={`/pipelines/${pipeline.processId}`} className="text-accent hover:underline">
+                  {pipeline.processName ?? "Pipeline"}: {pipeline.stageName}
+                </Link>
+              ) : null
+            )}
             {automationStatusText && (
               <span className={automationStatus?.status === "failed" ? "text-danger" : undefined} title={automationStatus?.error ?? undefined}>
                 Automation: {automationStatusText}
@@ -253,10 +247,8 @@ export function ClientWorkspace(props: ClientWorkspaceProps) {
       />
 
       <div className="flex items-center gap-2 border-b border-border bg-surface px-8 py-3">
-        <ConvertLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
-        <RevertToLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
-        <MarkLeadLostButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
-        <ArchiveClientButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
+        <MarkContactLostButton clientId={client.id} isLost={Boolean(client.lost_at)} isArchived={Boolean(client.archived_at)} />
+        <ArchiveClientButton clientId={client.id} archivedAt={client.archived_at} lostAt={client.lost_at} />
         <QuickActions
           clientId={client.id}
           workspaceId={workspace.id}

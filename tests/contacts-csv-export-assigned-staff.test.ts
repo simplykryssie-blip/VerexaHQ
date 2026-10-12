@@ -50,21 +50,21 @@ const contactsBulkTablePath = join(
 const source = readFileSync(contactsBulkTablePath, "utf8");
 
 describe("Contacts CSV export -- source-level invariants", () => {
-  it("6: the existing columns (Name/Type/Email/Phone/Status/Tags) all remain in the header, unchanged", () => {
+  it("6: the existing columns (Name/Type/Email/Phone/Tags) all remain in the header, unchanged", () => {
     const headerLine = source.match(/const header = \[(.*)\];/)?.[1] ?? "";
-    for (const existing of ["Name", "Type", "Email", "Phone", "Status", "Tags"]) {
+    for (const existing of ["Name", "Type", "Email", "Phone", "Tags"]) {
       expect(headerLine).toContain(`"${existing}"`);
     }
   });
 
-  it("adds exactly one new column, 'Assigned Staff', positioned to match the on-screen table (after Status, before Tags)", () => {
+  it("adds exactly one new column, 'Assigned Staff', positioned to match the on-screen table (after Phone, before Tags)", () => {
     const headerLine = source.match(/const header = \[(.*)\];/)?.[1] ?? "";
     expect(headerLine).toContain('"Assigned Staff"');
-    const statusIndex = headerLine.indexOf('"Status"');
+    const phoneIndex = headerLine.indexOf('"Phone"');
     const assignedIndex = headerLine.indexOf('"Assigned Staff"');
     const tagsIndex = headerLine.indexOf('"Tags"');
-    expect(statusIndex).toBeGreaterThanOrEqual(0);
-    expect(assignedIndex).toBeGreaterThan(statusIndex);
+    expect(phoneIndex).toBeGreaterThanOrEqual(0);
+    expect(assignedIndex).toBeGreaterThan(phoneIndex);
     expect(tagsIndex).toBeGreaterThan(assignedIndex);
   });
 

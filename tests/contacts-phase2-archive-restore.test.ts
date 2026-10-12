@@ -20,17 +20,16 @@ import { dirname, join } from "node:path";
 const clientsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "app/(app)/clients");
 
 describe("partitionForBulkArchive", () => {
-  it("treats lead/active/inactive as eligible, lost/archived as skipped -- same set as bulk status", () => {
+  it("treats a contact with no disposition as eligible, archived/lost as skipped", () => {
     const rows = [
-      { id: "c1", lifecycle_status: "lead" },
-      { id: "c2", lifecycle_status: "active" },
-      { id: "c3", lifecycle_status: "inactive" },
-      { id: "c4", lifecycle_status: "lost" },
-      { id: "c5", lifecycle_status: "archived" },
+      { id: "c1", archived_at: null, lost_at: null },
+      { id: "c2", archived_at: null, lost_at: null },
+      { id: "c3", archived_at: "2026-01-01", lost_at: null },
+      { id: "c4", archived_at: null, lost_at: "2026-01-02" },
     ];
     const { eligible, skipped } = partitionForBulkArchive(rows);
-    expect(eligible.map((r) => r.id)).toEqual(["c1", "c2", "c3"]);
-    expect(skipped.map((r) => r.id)).toEqual(["c4", "c5"]);
+    expect(eligible.map((r) => r.id)).toEqual(["c1", "c2"]);
+    expect(skipped.map((r) => r.id)).toEqual(["c3", "c4"]);
   });
 
   it("returns two empty arrays for an empty selection", () => {
@@ -41,19 +40,17 @@ describe("partitionForBulkArchive", () => {
 });
 
 describe("isEligibleForBulkRestore / partitionForBulkRestore", () => {
-  it("only 'archived' is eligible for restore", () => {
-    expect(isEligibleForBulkRestore("archived")).toBe(true);
-    expect(isEligibleForBulkRestore("lead")).toBe(false);
-    expect(isEligibleForBulkRestore("active")).toBe(false);
-    expect(isEligibleForBulkRestore("inactive")).toBe(false);
-    expect(isEligibleForBulkRestore("lost")).toBe(false);
+  it("only an archived-and-not-lost contact is eligible for restore", () => {
+    expect(isEligibleForBulkRestore({ archived_at: "2026-01-01", lost_at: null })).toBe(true);
+    expect(isEligibleForBulkRestore({ archived_at: null, lost_at: null })).toBe(false);
+    expect(isEligibleForBulkRestore({ archived_at: "2026-01-01", lost_at: "2026-01-02" })).toBe(false);
   });
 
   it("partitions a mixed selection so only archived contacts are restored", () => {
     const rows = [
-      { id: "c1", lifecycle_status: "archived" },
-      { id: "c2", lifecycle_status: "active" },
-      { id: "c3", lifecycle_status: "archived" },
+      { id: "c1", archived_at: "2026-01-01", lost_at: null },
+      { id: "c2", archived_at: null, lost_at: null },
+      { id: "c3", archived_at: "2026-01-01", lost_at: null },
     ];
     const { eligible, skipped } = partitionForBulkRestore(rows);
     expect(eligible.map((r) => r.id)).toEqual(["c1", "c3"]);
@@ -62,8 +59,8 @@ describe("isEligibleForBulkRestore / partitionForBulkRestore", () => {
 
   it("every input row appears in exactly one output array", () => {
     const rows = [
-      { id: "c1", lifecycle_status: "archived" },
-      { id: "c2", lifecycle_status: "lost" },
+      { id: "c1", archived_at: "2026-01-01", lost_at: null },
+      { id: "c2", archived_at: null, lost_at: "2026-01-02" },
     ];
     const { eligible, skipped } = partitionForBulkRestore(rows);
     expect(eligible.length + skipped.length).toBe(rows.length);
@@ -79,11 +76,11 @@ describe("ArchiveClientButton -- source-level invariants", () => {
   });
 
   it("never offers archive/restore for a 'lost' client -- that's mark_client_lost's own terminal state", () => {
-    expect(source).toMatch(/lifecycleStatus === "lost"\) return null/);
+    expect(source).toMatch(/if \(lostAt\) return null;/);
   });
 
   it("renders Restore (not Archive) once a client is already archived", () => {
-    const archivedBranch = source.match(/if \(lifecycleStatus === "archived"\) \{([\s\S]*?)\n  \}/)?.[1] ?? "";
+    const archivedBranch = source.match(/if \(archivedAt\) \{([\s\S]*?)\n  \}/)?.[1] ?? "";
     expect(archivedBranch).toMatch(/restore_client/);
     expect(archivedBranch).not.toMatch(/archive_client/);
   });
@@ -105,7 +102,7 @@ describe("ContactsBulkTable -- bulk archive/restore source-level invariants", ()
   });
 
   it("the Restore bulk action is only shown when at least one selected row is already archived", () => {
-    expect(source).toMatch(/hasArchivedSelected = selectedRows\.some\(\(r\) => r\.lifecycle_status === "archived"\)/);
+    expect(source).toMatch(/hasArchivedSelected = selectedRows\.some\(\(r\) => Boolean\(r\.archived_at\) && !r\.lost_at\)/);
     expect(source).toMatch(/canEdit && hasArchivedSelected/);
   });
 

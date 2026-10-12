@@ -25,7 +25,7 @@ describe("app/api/ghl/import-contacts/route.ts -- automation guard wiring", () =
   });
 
   it("still pauses automations-table rows for the run (PAUSE_TRIGGER_TYPES) -- the two mechanisms are complementary, not a replacement for each other", () => {
-    expect(source).toMatch(/PAUSE_TRIGGER_TYPES = \["lead\.created", "client\.tag_added"\]/);
+    expect(source).toMatch(/PAUSE_TRIGGER_TYPES = \["client\.tag_added"\]/);
     expect(source).toMatch(/body\.phase === "start"/);
     expect(source).toMatch(/body\.phase === "finish"/);
   });

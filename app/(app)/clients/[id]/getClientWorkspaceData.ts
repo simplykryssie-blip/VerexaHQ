@@ -124,29 +124,28 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
 
   const engagementIds = (engagements ?? []).map((e) => e.id);
 
-  // No single pipeline is designated "the" lead pipeline anymore -- a lead
-  // can have more than one simultaneous active run (e.g. Tax + Bookkeeping
+  // Contacts can have more than one simultaneous active pipeline run (e.g. Tax + Bookkeeping
   // at once), each in its own pipeline, so every active run is surfaced
   // rather than assuming there's only ever one. A .maybeSingle() query here
   // would throw once any client had two concurrent active runs, which is an
   // expected, supported state, not an edge case.
-  const { data: activeLeadRuns } = await supabase
+  const { data: activePipelineRuns } = await supabase
     .from("pipeline_runs")
     .select("id, process_id, processes(name), pipeline_stages!pipeline_runs_current_stage_fkey(stage_name)")
     .eq("entity_type", "client")
     .eq("entity_id", client.id)
     .eq("status", "Active");
-  const leadPipelines = (activeLeadRuns ?? []).map((run) => ({
+  const pipelines = (activePipelineRuns ?? []).map((run) => ({
     processId: run.process_id,
     processName: (run.processes as unknown as { name?: string } | null)?.name ?? null,
     stageName: (run.pipeline_stages as unknown as { stage_name?: string } | null)?.stage_name ?? null,
   }));
 
   // IA CONSOLIDATION -- the client card's Engagements section is now the
-  // primary place to see an engagement's pipeline/stage, not just a lead's
+  // primary place to see an engagement's pipeline/stage
   // (see app/(app)/engagements/[id]/page.tsx's own pipeline_runs query for
   // the single-engagement precedent this mirrors). entity_type/entity_id is
-  // the same polymorphic, FK-less pair leadPipelines already resolves in
+  // the same polymorphic, FK-less pair pipelines already resolves in
   // app code above -- one query across every engagement id rather than one
   // per engagement, then joined in JS, to avoid an N+1. If an engagement
   // somehow has more than one active run at once, the first one found wins
@@ -170,9 +169,8 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
     });
   }
 
-  // Staff need to see not just that an automation touched this lead/client
-  // but where it currently stands -- which automation, which step, and
-  // whether it's stuck. Only the single most recent run is surfaced here
+  // Staff need to see not just that an automation touched this contact
+  // but where it currently stands -- which automation, which step, and whether it is stuck. Only the single most recent run is surfaced here
   // (older runs are visible in the automation's own run history).
   const { data: latestAutomationRun } = await supabase
     .from("automation_runs")
@@ -683,7 +681,7 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
     complianceDefault,
     requestedService,
     interestedServiceIds,
-    leadPipelines,
+    pipelines,
     automationStatus,
   };
 }

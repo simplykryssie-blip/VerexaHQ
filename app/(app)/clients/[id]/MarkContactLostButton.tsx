@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 
-export function MarkLeadLostButton({ clientId, lifecycleStatus }: { clientId: string; lifecycleStatus: string }) {
+export function MarkContactLostButton({ clientId, isLost, isArchived }: { clientId: string; isLost: boolean; isArchived: boolean }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
@@ -16,15 +16,8 @@ export function MarkLeadLostButton({ clientId, lifecycleStatus }: { clientId: st
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Already-terminal statuses have nothing left to mark lost. Everything
-  // else -- lead or an already-engaged client (active/inactive) -- can be:
-  // marking a client (not just a pre-conversion lead) lost also archives
-  // her open engagement(s), voids her unpaid invoice(s), and cancels her
-  // open document request(s) in one atomic step (mark_client_lost RPC), so
-  // she immediately drops off every actionable dashboard count while still
-  // showing up correctly wherever lifecycle_status itself is reported.
-  const isLead = lifecycleStatus === "lead";
-  if (lifecycleStatus === "lost" || lifecycleStatus === "archived") return null;
+  // Lost is an operational disposition. Archive is handled separately.
+  if (isLost || isArchived) return null;
 
   async function markLost() {
     setSaving(true);
@@ -39,7 +32,7 @@ export function MarkLeadLostButton({ clientId, lifecycleStatus }: { clientId: st
       return;
     }
     setOpen(false);
-    toast.show(isLead ? "Lead marked lost" : "Client marked lost", "success");
+    toast.show("Contact marked lost", "success");
     router.refresh();
   }
 
@@ -54,9 +47,9 @@ export function MarkLeadLostButton({ clientId, lifecycleStatus }: { clientId: st
       </button>
 
       {open && (
-        <Modal title={isLead ? "Mark lead lost" : "Mark client lost"} onClose={() => setOpen(false)}>
+        <Modal title={"Mark contact lost"} onClose={() => setOpen(false)}>
           <div className="space-y-3">
-            {!isLead && (
+            { (
               <p className="text-xs text-muted">
                 This also archives their open engagement(s), voids any unpaid invoice(s), and cancels any open document request(s) -- so they drop
                 out of the dashboard&apos;s actionable counts immediately.
@@ -69,7 +62,7 @@ export function MarkLeadLostButton({ clientId, lifecycleStatus }: { clientId: st
                 onChange={(e) => setReason(e.target.value)}
                 rows={3}
                 placeholder={
-                  isLead ? "e.g. went with another firm, priced out, unresponsive" : "e.g. stopped responding, never sent in paperwork"
+                  "e.g. went with another firm, priced out, unresponsive"
                 }
                 className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
