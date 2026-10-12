@@ -133,6 +133,9 @@ export type WorkflowRunRow = {
   current_step_id: string | null;
   engagement_number: string | null;
   client_name: string | null;
+  // Who a partner-purchase / partner-onboarding run was for -- those runs have
+  // no contact or engagement, so client_name is null for them.
+  partner_name?: string | null;
   is_test?: boolean;
 };
 
@@ -2483,7 +2486,7 @@ export function WorkflowBuilder({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
-                        <th className="px-4 py-2 font-medium">Engagement / client</th>
+                        <th className="px-4 py-2 font-medium">Engagement / client / partner</th>
                         <th className="px-4 py-2 font-medium">Status</th>
                         <th className="px-4 py-2 font-medium">Started</th>
                         <th className="px-4 py-2 font-medium">Completed</th>
@@ -2497,7 +2500,7 @@ export function WorkflowBuilder({
                           className="cursor-pointer transition-colors hover:bg-surfaceMuted"
                         >
                           <td className="px-4 py-2 font-medium text-ink">
-                            {r.client_name ?? r.engagement_number ?? "--"}
+                            {r.client_name ?? r.partner_name ?? r.engagement_number ?? "--"}
                             {r.is_test && (
                               <Badge tone="accent" className="ml-2 inline-flex items-center gap-1">
                                 <FlaskConical size={11} /> Test
