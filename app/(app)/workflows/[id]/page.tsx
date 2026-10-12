@@ -70,7 +70,9 @@ export default async function WorkflowDetailPage({ params, searchParams }: { par
         .order("sort_order"),
       supabase
         .from("automation_runs")
-        .select("id, status, started_at, completed_at, current_step_id, is_test, engagements(engagement_number), clients(first_name, last_name, business_name)")
+        .select(
+          "id, status, started_at, completed_at, current_step_id, is_test, engagements(engagement_number), clients(first_name, last_name, business_name), partner_onboardings(firm_connections(manual_name, manual_owner_name, workspaces!firm_connections_child_workspace_id_fkey(name)))"
+        )
         .eq("automation_id", automation.id)
         .order("started_at", { ascending: false })
         .limit(50),
@@ -234,6 +236,21 @@ export default async function WorkflowDetailPage({ params, searchParams }: { par
     return c.business_name || [c.first_name, c.last_name].filter(Boolean).join(" ") || null;
   }
 
+  // Partner-purchase / partner-onboarding runs have no contact or engagement --
+  // they're tied to a partner onboarding, so who they were for lives on the
+  // onboarding's firm connection (a workspace-backed partner's name, or the
+  // manually-entered name/owner of one who hasn't got a workspace yet).
+  function partnerLabelFor(
+    po: { firm_connections: { manual_name: string | null; manual_owner_name: string | null; workspaces: { name: string | null } | null } | null } | null
+  ) {
+    const conn = po?.firm_connections;
+    if (!conn) return null;
+    const owner = conn.manual_owner_name?.trim() || null;
+    const name = conn.workspaces?.name?.trim() || conn.manual_name?.trim() || null;
+    if (owner && name && owner !== name) return `${owner} (${name})`;
+    return owner ?? name;
+  }
+
   const runRows: WorkflowRunRow[] = (runs ?? []).map((r) => ({
     id: r.id,
     status: r.status,
@@ -243,6 +260,9 @@ export default async function WorkflowDetailPage({ params, searchParams }: { par
     is_test: Boolean(r.is_test),
     engagement_number: (r.engagements as unknown as { engagement_number: string | null } | null)?.engagement_number ?? null,
     client_name: clientLabelFor(r.clients as unknown as { first_name: string | null; last_name: string | null; business_name: string | null } | null),
+    partner_name: partnerLabelFor(
+      (r as unknown as { partner_onboardings: Parameters<typeof partnerLabelFor>[0] }).partner_onboardings
+    ),
   }));
 
   const pipelines: PipelineOption[] = (processes ?? []).map((p) => ({
