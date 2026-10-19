@@ -19,6 +19,7 @@ import { InviteContactToPortalButton } from "./InviteContactToPortalButton";
 import { PortalInviteStatus } from "./PortalInviteStatus";
 import { PaymentLinkButton } from "@/components/PaymentLinkButton";
 import { RefundButton } from "@/components/billing/RefundButton";
+import { ProductCheckoutCard } from "@/components/billing/ProductCheckoutCard";
 import { CreatePaymentPlanForm } from "@/components/billing/CreatePaymentPlanForm";
 import { PaymentPlanList, type PaymentPlanRow } from "@/components/billing/PaymentPlanList";
 import { RecordPaymentForm } from "@/components/billing/RecordPaymentForm";
@@ -943,6 +944,8 @@ export function BillingTab({
   canManageBilling,
   workspaceServices = [],
   bankProductTransactions = [],
+  sellableProducts = [],
+  clientProductPurchases = [],
 }: {
   clientId: string;
   clientName: string;
@@ -956,6 +959,8 @@ export function BillingTab({
   canManageBilling: boolean;
   workspaceServices?: { id: string; name: string }[];
   bankProductTransactions?: ClientBankProductTransactionRow[];
+  sellableProducts?: { id: string; name: string; description: string | null; product_type: string; flat_price: number | null; billing_cadence: string | null }[];
+  clientProductPurchases?: { id: string; package_id: string; status: string; billing_cadence: string | null; amount: number | null; current_period_end: string | null }[];
 }) {
   const [modal, setModal] = useState<"invoice" | "quote" | null>(null);
   const [editingQuote, setEditingQuote] = useState<QuoteRow | null>(null);
@@ -1193,6 +1198,25 @@ export function BillingTab({
           </ul>
         )}
       </Section>
+
+      {sellableProducts.length > 0 && (
+        <Section title="Products">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {sellableProducts.map((product) => {
+              const forThisProduct = clientProductPurchases.filter((p) => p.package_id === product.id);
+              // created_at-desc order (from the fetch) is preserved for ties, but
+              // a still-live purchase (pending/active/past_due) always wins over
+              // an older canceled one for the same product -- the canceled row
+              // shouldn't hide a purchase the client is actually on.
+              const purchase =
+                forThisProduct.find((p) => p.status === "pending" || p.status === "active" || p.status === "past_due") ??
+                forThisProduct[0] ??
+                null;
+              return <ProductCheckoutCard key={product.id} clientId={clientId} product={product} purchase={purchase} canSell={canManageBilling} />;
+            })}
+          </div>
+        </Section>
+      )}
 
       {bankProductTransactions.length > 0 && (
         <Section title="Bank Products">
