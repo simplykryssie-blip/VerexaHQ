@@ -49,5 +49,18 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     return NextResponse.json({ error: remove.reason }, { status: 502 });
   }
 
+  // Persists the release server-side (nulls custom_domain/domain_verified*,
+  // which is also what frees the domain for reclaim) through a SECURITY
+  // DEFINER RPC rather than a plain table update, so this still works for a
+  // suspended/archived workspace -- site_websites' own RLS write policies
+  // require is_workspace_operational, which a departing customer's
+  // workspace is, by definition, often not. This makes the route fully
+  // self-contained: the caller no longer has to do its own DB write after
+  // this succeeds.
+  const { error: releaseError } = await createClient().rpc("release_website_custom_domain", { p_website_id: params.id });
+  if (releaseError) {
+    return NextResponse.json({ error: releaseError.message }, { status: 500 });
+  }
+
   return NextResponse.json({ automated: true, removed: true });
 }

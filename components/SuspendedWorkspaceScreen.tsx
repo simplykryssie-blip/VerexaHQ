@@ -52,6 +52,9 @@ export function SuspendedWorkspaceScreen({ status, suspensionReason }: { status:
         <Link href={ctaHref} className="mt-6 inline-flex items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90">
           {copy.ctaLabel}
         </Link>
+        <Link href="/settings/domains" className="mt-3 block text-sm font-medium text-accent hover:underline">
+          Manage your connected domains
+        </Link>
       </div>
     </div>
   );

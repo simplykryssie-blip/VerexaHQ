@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace, workspaceOperationalError, isWorkspaceStatusOperational } from "@/lib/workspace";
-import { createResendDomain } from "@/lib/email/domains";
+import { createResendDomain, deleteResendDomain } from "@/lib/email/domains";
 import { canUseMultipleSendingDomains } from "@/lib/workspaceCapabilities";
 import { hasAal2, AAL2_REQUIRED_RESPONSE_BODY, AAL2_REQUIRED_STATUS } from "@/lib/auth/requireAal2";
 
@@ -45,7 +45,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Enter a valid domain, e.g. yourfirm.com -- no spaces, @ symbols, or extra text." }, { status: 400 });
   }
 
-  const { data: existingDomains } = await supabase.from("workspace_email_domains").select("id").eq("workspace_id", workspace.id);
+  // Scoped to released_at is null -- a workspace that released a domain and
+  // wants to reconnect it (same domain or a different one) must not be
+  // blocked by counting its own released history row as "existing."
+  const { data: existingDomains } = await supabase
+    .from("workspace_email_domains")
+    .select("id")
+    .eq("workspace_id", workspace.id)
+    .is("released_at", null);
   const hasExisting = (existingDomains?.length ?? 0) > 0;
   if (hasExisting && !canUseMultipleSendingDomains(workspace)) {
     return NextResponse.json({ error: "This workspace already has a sending domain. Remove it before adding a new one." }, { status: 409 });
@@ -76,6 +83,15 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
+    // workspace_email_domains_domain_active_unique: another workspace (RLS
+    // keeps its row invisible to this one, so this can only ever surface
+    // as an insert-time conflict, not a pre-check) already holds this exact
+    // domain as an active claim. Roll back the Resend-side domain we just
+    // created so a rejected claim doesn't leave an orphaned Resend record.
+    if (error.message.includes("workspace_email_domains_domain_active_unique")) {
+      await deleteResendDomain(result.data.id);
+      return NextResponse.json({ error: "That domain is already connected to another account." }, { status: 409 });
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

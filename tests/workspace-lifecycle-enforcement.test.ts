@@ -51,6 +51,13 @@ describe("isSuspensionRecoveryPath -- unchanged, reused for the full non-operati
     expect(isSuspensionRecoveryPath("/support/manage")).toBe(true);
   });
 
+  // Domain portability: a suspended/archived workspace must still be able
+  // to self-service release a customer-owned domain, or leaving Verexa
+  // requires contacting support to get it released.
+  it("allows the domain self-service release surface", () => {
+    expect(isSuspensionRecoveryPath("/settings/domains")).toBe(true);
+  });
+
   it("blocks normal operational pages", () => {
     expect(isSuspensionRecoveryPath("/clients")).toBe(false);
     expect(isSuspensionRecoveryPath("/dashboard")).toBe(false);

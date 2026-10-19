@@ -77,6 +77,7 @@ export async function sendEmailViaResend({
       .select("domain, from_local_part, status")
       .eq("workspace_id", workspaceId)
       .eq("status", "verified")
+      .is("released_at", null)
       .order("is_primary", { ascending: false })
       .limit(1)
       .maybeSingle();
