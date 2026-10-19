@@ -26,6 +26,7 @@ const state = vi.hoisted(() => ({
   shouldAdvanceResult: { data: true as unknown, error: null as unknown },
   advanceResult: { data: null as unknown, error: null as unknown },
   deletedIds: [] as string[],
+  releasedIds: [] as string[],
   rpcCalls: [] as Array<{ fn: string; args: unknown }>,
 }));
 
@@ -35,6 +36,7 @@ function resetState() {
   state.shouldAdvanceResult = { data: true, error: null };
   state.advanceResult = { data: null, error: null };
   state.deletedIds = [];
+  state.releasedIds = [];
   state.rpcCalls = [];
 }
 
@@ -48,6 +50,18 @@ vi.mock("@/lib/supabase/service", () => ({
   createServiceClient: () => ({
     rpc: (fn: string, args: unknown) => {
       state.rpcCalls.push({ fn, args });
+      if (fn === "claim_due_pending_automation_steps") {
+        return Promise.resolve({
+          data: state.pendingRows.map((r) => ({
+            id: r.id,
+            run_id: r.run_id,
+            workspace_id: r.workspace_id,
+            automation_step_id: r.automation_step_id,
+          })),
+          error: null,
+        });
+      }
+      if (fn === "claim_blocked_automation_runs") return Promise.resolve({ data: [], error: null });
       if (fn === "should_advance_wait_until_step") return Promise.resolve(state.shouldAdvanceResult);
       if (fn === "start_next_automation_step" || fn === "execute_automation_step") return Promise.resolve(state.advanceResult);
       return Promise.resolve({ data: null, error: null });
@@ -56,17 +70,17 @@ vi.mock("@/lib/supabase/service", () => ({
       if (table === "automation_pending_steps") {
         return {
           select: () => ({
-            eq: () => ({
-              lte: () => ({
-                order: () => ({
-                  limit: () => thenable({ data: state.pendingRows, error: null }),
-                }),
-              }),
-            }),
+            in: () => thenable({ data: state.pendingRows, error: null }),
           }),
           delete: () => ({
             eq: (_col: string, id: string) => {
               state.deletedIds.push(id);
+              return thenable({ data: null, error: null });
+            },
+          }),
+          update: () => ({
+            eq: (_col: string, id: string) => {
+              state.releasedIds.push(id);
               return thenable({ data: null, error: null });
             },
           }),
@@ -82,11 +96,10 @@ vi.mock("@/lib/supabase/service", () => ({
       if (table === "automation_runs") {
         return {
           select: () => ({
-            eq: () => ({
-              not: () => ({
-                limit: () => thenable({ data: [], error: null }),
-              }),
-            }),
+            in: () => thenable({ data: [], error: null }),
+          }),
+          update: () => ({
+            eq: () => thenable({ data: null, error: null }),
           }),
         };
       }
@@ -196,18 +209,25 @@ describe("run-pending-automation-steps RPC error handling (P08-02)", () => {
     const { body } = await callRoute();
 
     expect(state.deletedIds).toEqual(["pending-1"]);
-    expect(state.rpcCalls).toEqual([]);
+    const advanceCalls = state.rpcCalls.filter(
+      (c) => c.fn === "should_advance_wait_until_step" || c.fn === "execute_automation_step" || c.fn === "start_next_automation_step"
+    );
+    expect(advanceCalls).toEqual([]);
     expect(body.processed).toBe(0);
   });
 
-  it("still leaves the row parked (not deleted, no RPC call) when the workspace is not operational", async () => {
+  it("still leaves the row parked (released, not deleted, no advance RPC call) when the workspace is not operational", async () => {
     state.pendingRows = [makeRow()];
     state.workspaceRows = [{ id: "ws-1", status: "suspended" }];
 
     const { body } = await callRoute();
 
     expect(state.deletedIds).toEqual([]);
-    expect(state.rpcCalls).toEqual([]);
+    expect(state.releasedIds).toEqual(["pending-1"]);
+    const advanceCalls = state.rpcCalls.filter(
+      (c) => c.fn === "should_advance_wait_until_step" || c.fn === "execute_automation_step" || c.fn === "start_next_automation_step"
+    );
+    expect(advanceCalls).toEqual([]);
     expect(body.blocked).toBe(1);
     expect(body.failed).toBe(0);
   });

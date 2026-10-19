@@ -9,6 +9,7 @@ import { Avatar } from "@/components/Avatar";
 import { AutomationDecisionQueueItem, ReviewQueueItem } from "./ReviewQueueItem";
 import { ReviewQueueClientChangeItem } from "./ReviewQueueClientChangeItem";
 import { ReviewQueueDocumentItem } from "./ReviewQueueDocumentItem";
+import { ReviewQueueSignedLetterItem } from "./ReviewQueueSignedLetterItem";
 import { Badge } from "@/components/ui/Badge";
 import { ENGAGEMENT_SHARE_STATUS_TONE } from "@/lib/engagementStatus";
 import { buildEntityLabelMap } from "@/lib/documentEntityLabels";
@@ -49,7 +50,24 @@ export default async function ReviewQueuePage() {
         .order("updated_at", { ascending: false })
     : { data: [] as { id: string; title: string; entity_type: string; entity_id: string; updated_at: string }[] };
 
-  const documentEntityLabels = await buildEntityLabelMap(supabase, completedDocumentRequests ?? []);
+  // Signed via a public engagement-letter link (/e/[token]) -- these file
+  // themselves into the client's Documents automatically (see
+  // app/api/documents/file-signed-engagement-letter/route.ts) but, unlike a
+  // completed document request, previously had no "needs review" surface
+  // anywhere in the app. Same documents.view gate as document requests.
+  const { data: signedLetters } = canReviewDocuments
+    ? await supabase
+        .from("engagement_letter_public_signatures")
+        .select("id, client_id, signed_at, engagement_letter_templates(name)")
+        .eq("workspace_id", workspace.id)
+        .is("reviewed_at", null)
+        .order("signed_at", { ascending: false })
+    : { data: [] as { id: string; client_id: string; signed_at: string; engagement_letter_templates: { name: string } | null }[] };
+
+  const documentEntityLabels = await buildEntityLabelMap(supabase, [
+    ...(completedDocumentRequests ?? []),
+    ...(signedLetters ?? []).map((s) => ({ entity_type: "client", entity_id: s.client_id })),
+  ]);
 
   // Leads submit their intake organizer before an engagement exists (the
   // New Tax Service Lead Enters CRM flow sends it, then waits for it back),
@@ -221,6 +239,7 @@ export default async function ReviewQueuePage() {
     clientChangeBatches.size +
     (submittedOrganizers ?? []).length +
     (completedDocumentRequests ?? []).length +
+    (signedLetters ?? []).length +
     openShares.length +
     reviewDecisionItems.length;
 
@@ -244,7 +263,12 @@ export default async function ReviewQueuePage() {
         <div className="grid grid-cols-4 gap-4">
           <StatTile icon={FileText} tone="accent" label="Client info changes" value={clientChangeBatches.size} />
           <StatTile icon={ListChecks} tone="emerald" label="Forms submitted" value={(submittedOrganizers ?? []).length} />
-          <StatTile icon={FileCheck2} tone="amber" label="Documents submitted" value={(completedDocumentRequests ?? []).length} />
+          <StatTile
+            icon={FileCheck2}
+            tone="amber"
+            label="Documents submitted"
+            value={(completedDocumentRequests ?? []).length + (signedLetters ?? []).length}
+          />
           <StatTile icon={Share2} tone="violet" label="Shares awaiting review" value={openShares.length} />
         </div>
         {reviewDecisionItems.length > 0 && (
@@ -367,8 +391,8 @@ export default async function ReviewQueuePage() {
         {canReviewDocuments && (
           <section>
             <h2 className="mb-2 text-sm font-semibold text-ink">Documents submitted</h2>
-            {(completedDocumentRequests ?? []).length === 0 ? (
-              <EmptyState message="No completed document requests waiting on your review." />
+            {(completedDocumentRequests ?? []).length === 0 && (signedLetters ?? []).length === 0 ? (
+              <EmptyState message="No completed document requests or signed letters waiting on your review." />
             ) : (
               <ul className="space-y-3">
                 {(completedDocumentRequests ?? []).map((r) => {
@@ -381,6 +405,19 @@ export default async function ReviewQueuePage() {
                       entityLabel={entity?.label ?? "Client"}
                       entityHref={entity?.href ?? "#"}
                       completedAt={r.updated_at}
+                    />
+                  );
+                })}
+                {(signedLetters ?? []).map((s) => {
+                  const entity = documentEntityLabels.get(`client:${s.client_id}`);
+                  return (
+                    <ReviewQueueSignedLetterItem
+                      key={s.id}
+                      signatureId={s.id}
+                      title={(s.engagement_letter_templates as unknown as { name: string } | null)?.name ?? "Letter"}
+                      entityLabel={entity?.label ?? "Client"}
+                      entityHref={entity?.href ?? "#"}
+                      signedAt={s.signed_at}
                     />
                   );
                 })}

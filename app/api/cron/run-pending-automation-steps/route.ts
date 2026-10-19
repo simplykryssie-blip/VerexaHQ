@@ -25,11 +25,24 @@ function isAuthorized(request: Request) {
 // uses for zero-delay steps, then clears the pending row -- it was only ever
 // a scheduling marker, not something staff need to see once it's resolved.
 //
+// This route runs every minute (vercel.json), and a slow invocation still
+// finishing when the next tick fires -- or a manual trigger during a
+// scheduled one -- must not process the same due row twice (a second email,
+// a second task...). claim_due_pending_automation_steps/
+// claim_blocked_automation_runs atomically claim rows via `for update skip
+// locked`, so a concurrent invocation simply skips whatever this one already
+// holds instead of also picking it up. A row this invocation decides NOT to
+// process this tick (still waiting, workspace not operational, or a genuine
+// RPC failure) has its claim released immediately so the very next tick can
+// pick it straight back up rather than waiting out the claim's staleness
+// window, which exists only to recover a row whose claiming request crashed
+// or hit this route's own deadline before finishing it.
+//
 // A "wait until a condition is met" step schedules scheduled_for = now(), so
 // it's due on every tick from the moment it starts waiting -- but it isn't
 // necessarily ready to advance. should_advance_wait_until_step re-evaluates
 // the condition (or the wait's timeout) each time; when it says no, the
-// pending row is left exactly as-is so the next cron tick checks it again.
+// pending row is released (unclaimed) so the next cron tick checks it again.
 //
 // A condition-type step opted into retry_until_matched (see
 // start_next_automation_step) also parks here while none of its branches
@@ -37,29 +50,44 @@ function isAuthorized(request: Request) {
 // does, so advancing it calls start_next_automation_step(run_id) (which
 // re-evaluates its branches from the run's current position) instead of
 // execute_automation_step.
+//
+// P08-02: every RPC result below is checked for `error`. The pending row --
+// "the only durable 'still waiting' marker" this step has -- is deleted
+// only when we have positive evidence the call actually ran (no error),
+// never on a guess. An error here (a genuine RPC failure, as opposed to a
+// normal business-logic outcome like the step's own action legitimately
+// failing, which these RPCs already catch internally and report as a
+// successful call) releases the claim and leaves the row in place so a
+// future tick -- or, failing that, the stale-queue safety net in
+// check-stale-automation-queues -- can still find it.
 async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const supabase = createServiceClient();
-  const nowIso = new Date().toISOString();
 
-  const { data: pending } = await supabase
-    .from("automation_pending_steps")
-    .select("id, run_id, workspace_id, automation_step_id, automation_steps(action_type), automation_runs(status)")
-    .eq("status", "pending_delay")
-    .lte("scheduled_for", nowIso)
-    .order("scheduled_for", { ascending: true })
-    .limit(BATCH_SIZE);
+  const { data: claimed } = await supabase.rpc("claim_due_pending_automation_steps", { p_limit: BATCH_SIZE });
+  const claimedIds = (claimed ?? []).map((row) => row.id);
 
-  // A due step's workspace can have gone non-operational since it was
-  // queued. It must not execute, but the pending_delay row must also not
-  // be deleted -- that's the only durable "still waiting" marker this step
-  // has. Left in place, the next tick (after should_advance_wait_until_step
-  // re-checks it, same as any other still-waiting row) picks it up again,
-  // including once the workspace recovers to active.
-  const pendingWorkspaceIds = Array.from(new Set((pending ?? []).map((row) => row.workspace_id)));
+  // Now safe to read without a lock: this invocation is the only one that
+  // holds these specific rows' claims.
+  const { data: pendingDetails } = claimedIds.length
+    ? await supabase
+        .from("automation_pending_steps")
+        .select("id, run_id, workspace_id, automation_step_id, automation_steps(action_type), automation_runs(status)")
+        .in("id", claimedIds)
+    : { data: [] as never[] };
+  const detailsById = new Map((pendingDetails ?? []).map((row) => [row.id, row]));
+  const pending = (claimed ?? [])
+    .map((row) => detailsById.get(row.id))
+    .filter((row): row is NonNullable<typeof row> => Boolean(row));
+
+  async function releaseClaim(pendingStepId: string) {
+    await supabase.from("automation_pending_steps").update({ claimed_at: null }).eq("id", pendingStepId);
+  }
+
+  const pendingWorkspaceIds = Array.from(new Set(pending.map((row) => row.workspace_id)));
   const { data: pendingWorkspaceStatusRows } = pendingWorkspaceIds.length
     ? await supabase.from("workspaces").select("id, status").in("id", pendingWorkspaceIds)
     : { data: [] as { id: string; status: string }[] };
@@ -71,10 +99,14 @@ async function handleGET(request: Request) {
   let deferred = 0;
   let blocked = 0;
   let failed = 0;
-  for (const row of pending ?? []) {
+  for (const row of pending) {
     if (Date.now() - startedAt > DEADLINE_MS) {
-      deferred = (pending?.length ?? 0) - processed - stillWaiting;
+      deferred = pending.length - processed - stillWaiting - blocked - failed;
       console.log(`run-pending-automation-steps: stopping early with ${deferred} row(s) left for the next tick`);
+      // Release the rest so the next tick claims them immediately rather
+      // than waiting out the staleness window.
+      const remaining = pending.slice(pending.indexOf(row));
+      await Promise.all(remaining.map((r) => releaseClaim(r.id)));
       break;
     }
     // The run may have been cancelled (e.g. a pending-approval step on it
@@ -88,27 +120,21 @@ async function handleGET(request: Request) {
     }
     if (!isWorkspaceStatusOperational(statusByWorkspaceId.get(row.workspace_id) ?? "active")) {
       blocked++;
+      await releaseClaim(row.id);
       continue;
     }
-    // P08-02: every RPC result below is now checked for `error`. The
-    // pending row -- "the only durable 'still waiting' marker" this step
-    // has -- is deleted only when we have positive evidence the call
-    // actually ran (no error), never on a guess. An error here (a genuine
-    // RPC failure, as opposed to a normal business-logic outcome like the
-    // step's own action legitimately failing, which these RPCs already
-    // catch internally and report as a successful call) must leave the row
-    // in place so a future tick -- or, failing that, the stale-queue safety
-    // net in check-stale-automation-queues -- can still find it.
     const { data: shouldAdvance, error: shouldAdvanceError } = await supabase.rpc("should_advance_wait_until_step", {
       p_pending_id: row.id,
     });
     if (shouldAdvanceError) {
       console.error(`run-pending-automation-steps: should_advance_wait_until_step failed for pending step ${row.id}`, shouldAdvanceError);
       failed++;
+      await releaseClaim(row.id);
       continue;
     }
     if (shouldAdvance === false) {
       stillWaiting++;
+      await releaseClaim(row.id);
       continue;
     }
     const actionType = (row.automation_steps as unknown as { action_type?: string } | null)?.action_type;
@@ -119,6 +145,7 @@ async function handleGET(request: Request) {
     if (advanceError) {
       console.error(`run-pending-automation-steps: advancing run ${row.run_id} (pending step ${row.id}) failed`, advanceError);
       failed++;
+      await releaseClaim(row.id);
       continue;
     }
     await supabase.from("automation_pending_steps").delete().eq("id", row.id);
@@ -137,16 +164,22 @@ async function handleGET(request: Request) {
   //     as done and walk straight past it -- so this case re-invokes
   //     execute_automation_step for the exact step instead, which is what
   //     actually runs its action before advancing the run normally.
-  const { data: blockedRuns } = await supabase
-    .from("automation_runs")
-    .select("id, blocked_step_id, workspaces(status)")
-    .eq("status", "running")
-    .not("blocked_at", "is", null)
-    .limit(BATCH_SIZE);
+  const { data: claimedRuns } = await supabase.rpc("claim_blocked_automation_runs", { p_limit: BATCH_SIZE });
+  const claimedRunIds = (claimedRuns ?? []).map((run) => run.id);
+  const { data: blockedRunWorkspaces } = claimedRunIds.length
+    ? await supabase.from("automation_runs").select("id, workspaces(status)").in("id", claimedRunIds)
+    : { data: [] as { id: string; workspaces: { status?: string } | null }[] };
+  const workspaceStatusByRunId = new Map(
+    (blockedRunWorkspaces ?? []).map((r) => [r.id, (r.workspaces as unknown as { status?: string } | null)?.status])
+  );
+
   let resumed = 0;
-  for (const run of blockedRuns ?? []) {
-    const workspaceStatus = (run.workspaces as unknown as { status?: string } | null)?.status;
-    if (!isWorkspaceStatusOperational(workspaceStatus ?? "")) continue;
+  for (const run of claimedRuns ?? []) {
+    const workspaceStatus = workspaceStatusByRunId.get(run.id);
+    if (!isWorkspaceStatusOperational(workspaceStatus ?? "")) {
+      await supabase.from("automation_runs").update({ resume_claimed_at: null }).eq("id", run.id);
+      continue;
+    }
     if (run.blocked_step_id) {
       await supabase.rpc("execute_automation_step", { p_run_id: run.id, p_step_id: run.blocked_step_id });
     } else {
